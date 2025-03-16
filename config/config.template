@@ -1,0 +1,20 @@
+# Copy this file into config.ini in the same directory and update values for your environment
+
+[ARLIAI]
+# You can get values from https://www.arliai.com/quick-start
+ARLIAI_KEY = ""
+ARLIAI_MODEL = "Mistral-Nemo-12B-Instruct-2407"
+ARLIAI_URL = "https://api.arliai.com/v1/chat/completions"
+
+[STEEM]
+POSTING_KEY = "5JrvPrQeBBvCRdjv29iDvkwn3EQYZ9jqfAHzrCyUvfbEbRkrYFC"
+STEEM_API = "https://api.steemit.com"
+
+[CONTENT]
+ACCOUNT_REGISTRY = penny4thoughts # Not ready.  This account will track blacklists and whitelists (mute and follow)
+EXCLUDE_TAGS = "test"
+INCLUDE_TAGS = ""
+MIN_WORDS = 200
+
+[BLOG]
+NUMBER_OF_REVIEWED_POSTS=5
