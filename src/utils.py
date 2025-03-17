@@ -1,6 +1,8 @@
 import langdetect
 import configparser
 import re
+import authorValidation
+import contentValidation
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -13,32 +15,28 @@ def detect_language(text):
         return langdetect.detect(text)
     except langdetect.lang_detect_exception.LangDetectException:
         return "Unable to detect language"
-    
-def word_count(text):
-    return len(text.split())
 
 def screenPost(comment):
-    if (comment['body'][:1] == '@@'):
+    if (comment['body'][:1] == '@@'):  ## Edited post (better check needed)
         return False
-    print(comment)
-    minWords=config.getint('CONTENT', 'MIN_WORDS')
+    
     tmpBody=remove_formatting(comment['body'])
+    if ( contentValidation.isTooShort (tmpBody)):
+        return False
+
     bodyLanguage = detect_language(tmpBody)
     titleLanguage = detect_language(comment['title'])
     if ( bodyLanguage == 'en' and titleLanguage == 'en'):
         language = 'en'
     else:
         language = 'other'
-
-    wc=word_count(tmpBody)
-    if ( language == 'en' and wc > minWords ):
-        return True
-    else:
+    if ( language != 'en' ):
         return False
     
-    import re
-
-import re
+    if ( authorValidation.isBlacklisted ( comment['author'] )):  # This is checked against muted accounts from REGISTER_ACCOUNT in config.
+        return False
+    
+    return True
 
 def remove_formatting(text):
     # Remove markdown and HTML formatting

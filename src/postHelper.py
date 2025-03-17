@@ -30,9 +30,8 @@ def create_beneficiary_list(beneficiary_list):
                          for account, weight in account_weights.items()]
     beneficiary_dicts.sort(key=lambda x: x["account"])
     
-    # Return the final data structure
-    return {"beneficiaries": beneficiary_dicts}
-
+    # Return the beneficiaries list to be inserted into extensions
+    return beneficiary_dicts
 
 def postCuration (commentList, aiResponseList):
     postingKey=config.get('STEEM', 'POSTING_KEY')
@@ -41,10 +40,12 @@ def postCuration (commentList, aiResponseList):
     # Connect to the STEEM blockchain
     randValue = ''.join(random.choices(string.ascii_lowercase, k=10))
     s = Steem(keys=[postingKey], nodes=[steemApi])
-    title = f"Curated by THOTH - {randValue}"
+    title = f"Curated by Thoth - {randValue}"
     author = 'social'
 
-    body='AI Curation by [Thoth](https://github.com/remlaps)'
+    body='AI Curation by [Thoth](https://github.com/remlaps)<br><br>'
+    body=body + '<div class=pull-right>\n\n[![](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)<h6><sup>Image by AI</sup></h6>\n\n</div>'
+
     for lcv, aiResponse in enumerate(aiResponseList):
         body += f'\nPost number: {lcv + 1} - '
         body += f'[{commentList[lcv]["title"]}](/thoth/@{commentList[lcv]["author"]}/{commentList[lcv]["permlink"]})\n'
@@ -63,8 +64,8 @@ def postCuration (commentList, aiResponseList):
         'allow_votes': True,
         'allow_curation_rewards': True,
         'extensions': [[0, {
-            'beneficiaries': beneficiaryList }
-        ]]
+            'beneficiaries': beneficiaryList
+        }]]
     }
 
     permlink = f"thoth{randValue}"
