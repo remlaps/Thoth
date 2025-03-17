@@ -10,30 +10,28 @@ config = configparser.ConfigParser()
 config.read('config/config.ini')
 
 def create_beneficiary_list(beneficiary_list):
-    # Define the weights for each account
-    account_weights = {
-        'null': 4000,
-        'social': 1000
-    }
+    # Initialize empty dictionary to track accounts and their weights
+    account_weights = {}
     
-    # Initialize a dictionary to store the combined weights
-    combined_weights = {}
-    
-    # Combine the weights
+    # Process each account in the list
     for account in beneficiary_list:
         if account == "null":
-            combined_weights[account] = 4000
+            # Special case for "null"
+            account_weights[account] = 7000
         elif account == "social":
-            combined_weights[account] = 1000
-        elif account in combined_weights:
-            combined_weights[account] += 1000
+            # Special case for "social"
+            account_weights[account] = 500
         else:
-            combined_weights[account] = 1000
+            # Regular accounts get 500, add if the account appears multiple times
+            account_weights[account] = account_weights.get(account, 0) + 500
     
-    # Convert the combined weights dictionary to a list of dictionaries
-    result = [{'account': account, 'weight': weight} for account, weight in combined_weights.items()]
+    # Convert to list of dictionaries and sort alphabetically by account
+    beneficiary_dicts = [{"account": account, "weight": weight} 
+                         for account, weight in account_weights.items()]
+    beneficiary_dicts.sort(key=lambda x: x["account"])
     
-    return {'beneficiaries': result}
+    # Return the final data structure
+    return {"beneficiaries": beneficiary_dicts}
 
 
 def postCuration (commentList, aiResponseList):
@@ -57,7 +55,6 @@ def postCuration (commentList, aiResponseList):
     for comment in commentList:
         beneficiaryList.append(comment['author'])
         
-    beneficiaryList = sorted(beneficiaryList)
     beneficiaryList = create_beneficiary_list ( beneficiaryList )
 
     comment_options = {

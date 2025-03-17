@@ -17,8 +17,8 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, author, permlink, title, postBod
     payload = json.dumps({
     "model": arliaiModel,
     "messages": [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "Hello!  We are here to find valuable posts on the Steem blockchain."},
+        {"role": "system", "content": "You are a curator on the Steem blockchain.  You want to find valuable posts and help them get visibility."},
+        {"role": "user", "content": "Hello!"},
         {"role": "curator", "content": "Hi!, how can I help you today?"},
         {"role": "user", "content": f"{curationPrompt} - {postBody}"}
     ],
