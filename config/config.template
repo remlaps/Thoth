@@ -1,18 +1,47 @@
 # Copy this file into config.ini in the same directory and update values for your environment
 
-
 ###
 ### DO NOT COPY KEYS into config.template
 ###
 
 [ARLIAI]
 # You can get values from https://www.arliai.com/quick-start
+ARLIAI_URL = https://api.arliai.com/v1/chat/completions
 ARLIAI_KEY = 
 ARLIAI_MODEL = Mistral-Nemo-12B-Instruct-2407
-ARLIAI_URL = https://api.arliai.com/v1/chat/completions
 
 [STEEM]
-### Default to @social
-POSTING_KEY = ENTER_KEY_HERE ###
-STEEM_API = https://api.steemit.com
+# Default to @social for testing
+POSTING_ACCOUNT = social
+# It is recommended to set these in your wallet, using "steempy"
+POSTING_KEY = 
+STEEM_API = 
 
+####
+#### From here down copy content from config.ini to config.template
+####
+
+
+####
+#### From here down copy content from config.ini to config.template
+####
+
+[CONTENT]
+EXCLUDE_TAGS = "test"
+INCLUDE_TAGS = ""
+MIN_WORDS = 500
+MIN_FEED_REACH = 200
+REGISTRY_ACCOUNT = penny4thoughts
+### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS
+
+[AUTHOR]
+MIN_ACCOUNT_AGE = 30
+MIN_REPUTATION = 55
+MIN_FOLLOWERS = 50
+MIN_FOLLOWERS_PER_MONTH = 2
+MIN_FOLLOWER_MEDIAN_REP = 30
+### Implemented: MIN_REPUTATION, MIN_FOLLOWERS
+
+[BLOG]
+NUMBER_OF_REVIEWED_POSTS = 5
+### Implemented: NUMBER_OF_REVIEWED_POSTS - must be less than 20 at current percentages (hard-coded at 5%)

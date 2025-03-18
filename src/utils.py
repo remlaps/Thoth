@@ -33,7 +33,7 @@ def screenPost(comment):
     if ( language != 'en' ):
         return False
     
-    if ( authorValidation.isBlacklisted ( comment['author'] )):  # This is checked against muted accounts from REGISTER_ACCOUNT in config.
+    if ( authorValidation.isAuthorScreened(comment)):
         return False
     
     return True

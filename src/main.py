@@ -22,7 +22,11 @@ steemApi=config.get('STEEM', 'STEEM_API')
 maxSize=config.getint('BLOG', 'NUMBER_OF_REVIEWED_POSTS')
 
 blockchain = Blockchain()
-stream = blockchain.stream(node=steemApi)
+
+if steemApi:
+    blockchain = Blockchain(steemApi)
+else:
+    stream=blockchain.stream()
 
 commentList = []
 aiResponseList = []
@@ -37,8 +41,7 @@ for operation in stream:
         if 'parent_author' in comment and comment['parent_author'] == '':
             if utils.screenPost(comment):
                 print(f"Comment by {comment['author']}: {comment['title']}\n{tmpBody[:100]}...")
-                aiResponse = aiCurator.aicurate(arliaiKey, arliaiModel, arliaiUrl, comment['author'],
-                                                comment['permlink'], comment['title'], tmpBody)
+                aiResponse = aiCurator.aicurate(arliaiKey, arliaiModel, arliaiUrl, tmpBody)
                 if ( not re.search("DO NOT CURATE", aiResponse)):
                     commentList.append(comment)
                     aiResponseList.append(aiResponse)

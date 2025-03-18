@@ -2,7 +2,7 @@ import requests
 import json
 import utils
 
-def aicurate(arliaiKey, arliaiModel, arliaiUrl, author, permlink, title, postBody):
+def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody):
     curationPrompt = """
     If the following article is boring, difficult to understand, seems plagiarized or seems like an AI wrote it then print: DO NOT CURATE. (and nothing else)
     If the following article is about gambling or contests then print: DO NOT CURATE. (and nothing else)
