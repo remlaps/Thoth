@@ -2,6 +2,8 @@ from steem import Steem
 import random
 import string
 import configparser
+import datetime
+import time
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -54,8 +56,6 @@ def postCuration (commentList, aiResponseList):
     else:
         s = Steem()
 
-    title = f"Curated by Thoth - {randValue}"
-
     body='AI Curation by [Thoth](https://github.com/remlaps/Thoth)<br><br>'
     body=body + '<div class=pull-right>\n\n[![](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)<h6><sup>Image by AI</sup></h6>\n\n</div>\n\n'
 
@@ -87,4 +87,16 @@ def postCuration (commentList, aiResponseList):
     print (f"Body: {body}")
     print (f"Tags: {taglist}")
     print (f"Beneficiaries: {beneficiaryList}")
-    s.commit.post(title, body, postingAccount, permlink=permlink, comment_options=comment_options, tags=taglist, beneficiaries=None)
+    postDone=False
+    while not postDone:
+        try:
+            now = datetime.datetime.now()
+            timeStamp = now.strftime("%Y-%m-%d:%H:%M")
+            title = f"Curated by Thoth - {timeStamp}"
+            print(f"Posting: {title}")
+            s.commit.post(title, body, postingAccount, permlink=permlink, comment_options=comment_options, tags=taglist, beneficiaries=None)
+            print(body)
+            postDone=True
+        except Exception as E:
+            print (E)
+        time.sleep(60)

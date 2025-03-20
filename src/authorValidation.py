@@ -1,6 +1,7 @@
 from steem import Steem
 import math
 import configparser
+import datetime
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -8,18 +9,6 @@ config = configparser.ConfigParser()
 # Read the config.ini file
 config.read('config/config.ini')
 
-def isBlacklisted ( account ):
-    steemApi = config.get('STEEM', 'STEEM_API')
-    if ( steemApi ):
-        s=Steem(node=steemApi)
-    else:
-        s=Steem()
-    registryAccount = config.get('CONTENT', 'REGISTRY_ACCOUNT')
-    hideAccount=s.get_following(registryAccount, account, 'ignore', 1)
-    if ( len(hideAccount) > 0 ):
-        return True
-    return False
-    
 ### rep_log10 is straight from here - https://developers.steem.io/tutorials-python/account_reputation
 def rep_log10(rep):
     """Convert raw steemd rep into a UI-ready value centered at 25."""
@@ -42,6 +31,24 @@ def rep_log10(rep):
     out = (out * 9) + 25          # 9 points per magnitude. center at 25
     return round(out, 2)
 
+def isBlacklisted(account):
+    steemApi = config.get('STEEM', 'STEEM_API')
+    if (steemApi):
+        s = Steem(node=steemApi)
+    else:
+        s = Steem()
+    registryAccount = config.get('CONTENT', 'REGISTRY_ACCOUNT')
+    
+    try:
+        hideAccount = s.get_following(registryAccount, account, 'ignore', 1)
+        if (len(hideAccount) > 0):
+            return True
+    except Exception as e:
+        print(f"Error checking blacklist status for {account}: {e}")
+        return False
+    
+    return False
+
 def isAuthorScreened(comment):
     if ( isBlacklisted(comment['author']) ):
         return True
@@ -58,7 +65,10 @@ def isAuthorScreened(comment):
 
     if isRepTooLow(accountInfo['reputation']) :
         return True
-
+    
+    if isMonthlyFollowersTooLow(accountInfo, comment):
+        return True
+    
     return False
 
 def isRepTooLow(reputation):
@@ -68,4 +78,18 @@ def isFollowerCountTooLow(commentAuthor):
     s=Steem()
     followerCount = s.get_follow_count(commentAuthor)['follower_count']
     return followerCount < config.getint('AUTHOR','MIN_FOLLOWERS')
+
+# If you used "import datetime"
+def followersPerMonth(accountInfo, comment):
+    s = Steem()
+    followerCount = s.get_follow_count(comment['author'])['follower_count']
+    accountCreated = datetime.datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
+    now = datetime.datetime.now()
+    if accountCreated > now:
+        raise ValueError("Account creation date is in the future")
+    age = now - accountCreated
+    return followerCount / (age.days / 30.0)
+
+def isMonthlyFollowersTooLow (accountInfo, comment):
+    return followersPerMonth(accountInfo, comment) < config.getint('AUTHOR','MIN_FOLLOWERS_PER_MONTH')
 
