@@ -80,15 +80,6 @@ def postCuration (commentList, aiResponseList):
         
     beneficiaryList = create_beneficiary_list ( beneficiaryList )
 
-    # comment_options = {
-    #     'max_accepted_payout': '1000000.000 SBD',
-    #     'percent_steem_dollars': 10000,
-    #     'allow_votes': True,
-    #     'allow_curation_rewards': True,
-    #     'extensions': [[0, {
-    #         'beneficiaries': beneficiaryList
-    #     }]]
-    # }
     comment_options = {
         'max_accepted_payout': '1000000.000 SBD',
         'percent_steem_dollars': 10000,

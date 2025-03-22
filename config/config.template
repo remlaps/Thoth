@@ -11,11 +11,12 @@ ARLIAI_KEY =
 ARLIAI_MODEL = Mistral-Nemo-12B-Instruct-2407
 
 [STEEM]
-# Default to @social for testing
-POSTING_ACCOUNT = social
+DEFAULT_START_BLOCK = 3250000
 # It is recommended to set these in your wallet, using "steempy"
 POSTING_KEY = 
 STEEM_API = 
+# ACTIVE, HISTORY, or RANDOM
+STREAM_TYPE = RANDOM
 
 ####
 #### From here down copy content from config.ini to config.template
@@ -32,12 +33,14 @@ REGISTRY_ACCOUNT = penny4thoughts
 [AUTHOR]
 LAST_BLURT_ACTIVITY_AGE = 60     ; required days since the account was active on Blurt
 LAST_HIVE_ACTIVITY_AGE = 1461    ; required days since the account was active on Hive
+MAX_INACTIVITY_DAYS = 365
 MIN_ACCOUNT_AGE = 30 
-MIN_FOLLOWERS = 50
-MIN_FOLLOWERS_PER_MONTH = 3
-MIN_FOLLOWER_MEDIAN_REP = 0
+MIN_ACTIVE_FOLLOWERS = 10
+MIN_FOLLOWERS = 100
+MIN_FOLLOWERS_PER_MONTH = 5
+MIN_FOLLOWER_MEDIAN_REP = 35
 MIN_REPUTATION = 55
-### Implemented: MIN_REPUTATION, MIN_FOLLOWERS, MIN_FOLLOWERS_PER_MONTH
+### Implemented: MIN_REPUTATION, MIN_FOLLOWERS, MIN_FOLLOWERS_PER_MONTH, MAX_INACTIVITY_DAYS, MIN_FOLLOWER_MEDIAN_REP
 
 [BLOG]
 CURATED_AUTHOR_WEIGHT = 500

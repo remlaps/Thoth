@@ -17,7 +17,7 @@ def detect_language(text):
         return "Unable to detect language"
 
 def screenPost(comment):
-    if (comment['body'][:1] == '@@'):  ## Edited post (better check needed)
+    if ( contentValidation.isEdit (comment)):
         return False
     
     tmpBody=remove_formatting(comment['body'])

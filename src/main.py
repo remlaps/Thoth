@@ -9,6 +9,7 @@ import aiCurator # From the thoth package
 import postHelper # From the thoth package
 
 from steem.blockchain import Blockchain
+from steem import Steem
 
 # Check if the UNLOCK environment variable exists
 if "UNLOCK" in os.environ:
@@ -29,6 +30,7 @@ arliaiModel=config.get('ARLIAI', 'ARLIAI_MODEL')
 arliaiUrl=config.get('ARLIAI', 'ARLIAI_URL')
 
 steemApi=config.get('STEEM', 'STEEM_API')
+streamType = config.get('STEEM', 'STREAM_TYPE')
 
 maxSize=config.getint('BLOG', 'NUMBER_OF_REVIEWED_POSTS')
 
@@ -45,13 +47,19 @@ retry_delay = 0.25  # Base delay in seconds
 # File to store the last processed block
 BLOCK_FILE = 'config/last_block.txt'
 
-# Read the last processed block number from file, if exists
-if os.path.exists(BLOCK_FILE):
-    with open(BLOCK_FILE, 'r') as f:
-        streamFromBlock = int(f.read().strip())
+s = Steem()
+if ( streamType == 'RANDOM' ):
+    streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), s.get_dynamic_global_properties()['last_irreversible_block_num'] )
+elif ( streamType == 'ACTIVE' ):
+    streamFromBlock = s.get_dynamic_global_properties()['last_irreversible_block_num']
 else:
-    streamFromBlock = 3250000
-
+    # Read the last processed block number from file, if exists
+    if os.path.exists(BLOCK_FILE):
+        with open(BLOCK_FILE, 'r') as f:
+            streamFromBlock = int(f.read().strip())
+    else:
+        streamFromBlock = config.getint('STEEM', 'DEFAULT_START_BLOCK')
+    
 print(f"Starting from block {streamFromBlock}")
 
 while retry_count <= max_retries:
@@ -62,13 +70,13 @@ while retry_count <= max_retries:
             stream = blockchain.stream(start_block=streamFromBlock, filter_by=['comment'])
 
         for operation in stream:
+            # print(operation)
             streamFromBlock = operation['block_num'] + 1
             
             # Save the current block number to file
             with open(BLOCK_FILE, 'w') as f:
                 f.write(str(streamFromBlock))
                 
-            print(streamFromBlock)
             retry_count = 0
             if (postCount >= maxSize):
                 break    
