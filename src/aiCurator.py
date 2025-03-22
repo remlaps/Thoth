@@ -9,24 +9,26 @@ Evaluate the following article based on quality, originality, and value to reade
 - Writing quality (grammar, organization, readability)
 - Originality (unique perspectives, not AI-generated or plagiarized)
 - Engagement potential (interesting, informative, thought-provoking)
-- Appropriate content (no gambling, contests, cryptocurrency, or prohibited topics)
+- Appropriate content (no gambling, prize contests, cryptocurrency, or prohibited topics)
 
 If ANY of these conditions are met, respond ONLY with: "DO NOT CURATE."
 - Content appears AI-generated or plagiarized
 - Poor writing quality (confusing, repetitive, disorganized)
-- Focuses on gambling, contests, giveaways, or any competition with prizes
+- Focuses on gambling, prize contests, giveaways, or any competitions involving rewards
 - Contains cryptocurrency discussion, trading advice, or token promotion
 - Lacks substance or original thinking
 
-IMPORTANT: Carefully screen for ANY mention of contests or giveaways - even if they appear minor in the post. If detected, respond only with "DO NOT CURATE."
+IMPORTANT: Sports competitions and athletic events are acceptable topics. Only reject posts about contests where participants can win prizes, money, or other rewards.
 
-If none of those conditions are met, then create a curation report with the following sections:
+Otherwise, create a curation report with ONLY the following three sections and NOTHING else:
 
 1. KEY TAKEAWAYS (3-5 bullet points summarizing the main insights using SEO-friendly keywords)
 
 2. TARGET AUDIENCE (Who would find this content most valuable and why)
 
 3. CONVERSATION STARTERS (3 thought-provoking questions that could spark discussion around this topic)
+
+DO NOT add any additional comments, conclusions, or sections beyond these three. Your response must end after the third section.
 
 Here is the article: 
     """

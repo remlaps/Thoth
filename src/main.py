@@ -42,15 +42,34 @@ retry_count=0
 max_retries = 5
 retry_delay = 0.25  # Base delay in seconds
 
+# File to store the last processed block
+BLOCK_FILE = 'config/last_block.txt'
+
+# Read the last processed block number from file, if exists
+if os.path.exists(BLOCK_FILE):
+    with open(BLOCK_FILE, 'r') as f:
+        streamFromBlock = int(f.read().strip())
+else:
+    streamFromBlock = 3250000
+
+print(f"Starting from block {streamFromBlock}")
+
 while retry_count <= max_retries:
     try:
         if steemApi:
             blockchain = Blockchain(steemApi)
         else:
-            stream=blockchain.stream(filter_by=['comment'])
+            stream = blockchain.stream(start_block=streamFromBlock, filter_by=['comment'])
 
         for operation in stream:
-            retry_count =0
+            streamFromBlock = operation['block_num'] + 1
+            
+            # Save the current block number to file
+            with open(BLOCK_FILE, 'w') as f:
+                f.write(str(streamFromBlock))
+                
+            print(streamFromBlock)
+            retry_count = 0
             if (postCount >= maxSize):
                 break    
             if 'type' in operation and operation['type'] == 'comment':
@@ -62,7 +81,7 @@ while retry_count <= max_retries:
                         aiResponse = aiCurator.aicurate(arliaiKey, arliaiModel, arliaiUrl, tmpBody)
 
                         print (f"\n\nAI Response: {aiResponse}\n")
-                        
+
                         if (not re.search("DO NOT CURATE", aiResponse)):
                             commentList.append(comment)
                             aiResponseList.append(aiResponse)
@@ -98,3 +117,4 @@ while retry_count <= max_retries:
             time.sleep(retry_delay)
                       
 postHelper.postCuration(commentList, aiResponseList)
+print("Posting finished.")

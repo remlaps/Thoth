@@ -21,27 +21,29 @@ STEEM_API =
 #### From here down copy content from config.ini to config.template
 ####
 
-
-####
-#### From here down copy content from config.ini to config.template
-####
-
 [CONTENT]
-EXCLUDE_TAGS = "test"
-INCLUDE_TAGS = ""
-MIN_WORDS = 500
+EXCLUDE_TAGS = booming, nsfw, test
+INCLUDE_TAGS = 
 MIN_FEED_REACH = 200
+MIN_WORDS = 500
 REGISTRY_ACCOUNT = penny4thoughts
 ### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS
 
 [AUTHOR]
-MIN_ACCOUNT_AGE = 30
-MIN_REPUTATION = 55
+LAST_BLURT_ACTIVITY_AGE = 60     ; required days since the account was active on Blurt
+LAST_HIVE_ACTIVITY_AGE = 1461    ; required days since the account was active on Hive
+MIN_ACCOUNT_AGE = 30 
 MIN_FOLLOWERS = 50
-MIN_FOLLOWERS_PER_MONTH = 6
-MIN_FOLLOWER_MEDIAN_REP = 30
-### Implemented: MIN_REPUTATION, MIN_FOLLOWERS
+MIN_FOLLOWERS_PER_MONTH = 3
+MIN_FOLLOWER_MEDIAN_REP = 0
+MIN_REPUTATION = 55
+### Implemented: MIN_REPUTATION, MIN_FOLLOWERS, MIN_FOLLOWERS_PER_MONTH
 
 [BLOG]
+CURATED_AUTHOR_WEIGHT = 500
 NUMBER_OF_REVIEWED_POSTS = 5
-### Implemented: NUMBER_OF_REVIEWED_POSTS - must be less than 20 at current percentages (hard-coded at 5%)
+# Default to @social for testing
+POSTING_ACCOUNT = social
+POSTING_ACCOUNT_WEIGHT = 500
+### Implemented: CURATED_AUTHOR_WEIGHT, NUMBER_OF_REVIEWED_POSTS, POSTING_ACCOUNT, POSTING_ACCOUNT_WEIGHT
+### [ POSTING_ACCOUNT_WEIGHT + ( NUMBER_OF_REVIEWED_POSTS * CURATED_AUTHOR_WEIGHT ) ] must be less than 10000 (i.e. 500 == 5%)

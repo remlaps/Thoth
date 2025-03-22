@@ -10,8 +10,10 @@ config = configparser.ConfigParser()
 
 # Read the config.ini file
 config.read('config/config.ini')
-postingAccount=config.get('STEEM', 'POSTING_ACCOUNT')
+postingAccount=config.get('BLOG', 'POSTING_ACCOUNT')
+postingAccountWeight=config.getint('BLOG','POSTING_ACCOUNT_WEIGHT')
 curatedPostCount=config.getint('BLOG','NUMBER_OF_REVIEWED_POSTS')
+curatedAuthorWeight=config.getint('BLOG','CURATED_AUTHOR_WEIGHT')
 
 def create_beneficiary_list(beneficiary_list):
     # Initialize empty dictionary to track accounts and their weights
@@ -20,16 +22,23 @@ def create_beneficiary_list(beneficiary_list):
     # Process each account in the list
     totalWeight=0
     for account in beneficiary_list:
-        if account == "null":                ### Reward burning
-            account_weights[account] = 10000 - ( (1 + curatedPostCount) * 500 )
+        if account == 'null':                ### Reward burning
+            account_weights[account] = 10000 - ( postingAccountWeight + (curatedPostCount * curatedAuthorWeight))
+            totalWeight += account_weights[account]
         elif account == postingAccount:      ### Account submitting the post
             account_weights[account] = 500
+            totalWeight += 500
         else:
             # Regular accounts get 500, add if the account appears multiple times
             account_weights[account] = account_weights.get(account, 0) + 500
-        totalWeight += account_weights[account]
+            totalWeight += 500
 
     if ( totalWeight != 10000 ):
+        print (f"Total Weight: {totalWeight}")
+        print (f"Account Weights: {account_weights}")
+        print (f"Posting Account Weight: {postingAccountWeight}")
+        print (f"Curated Post Count: {curatedPostCount}")
+        print (f"Curated Author Weight: {curatedAuthorWeight}")
         print ("Something went wrong with the benficiaries.  Exiting.")
         exit()
     
@@ -65,38 +74,46 @@ def postCuration (commentList, aiResponseList):
         body += f'Author: @{commentList[lcv]["author"]}\n\n'
         body += f'\n\n{aiResponse}\n'
 
-    beneficiaryList = ['null', 'social']
+    beneficiaryList = ['null', postingAccount ]
     for comment in commentList:
         beneficiaryList.append(comment['author'])
         
     beneficiaryList = create_beneficiary_list ( beneficiaryList )
 
+    # comment_options = {
+    #     'max_accepted_payout': '1000000.000 SBD',
+    #     'percent_steem_dollars': 10000,
+    #     'allow_votes': True,
+    #     'allow_curation_rewards': True,
+    #     'extensions': [[0, {
+    #         'beneficiaries': beneficiaryList
+    #     }]]
+    # }
     comment_options = {
         'max_accepted_payout': '1000000.000 SBD',
         'percent_steem_dollars': 10000,
         'allow_votes': True,
         'allow_curation_rewards': True,
-        'extensions': [[0, {
-            'beneficiaries': beneficiaryList
-        }]]
-    }
+        'extensions': [[0, { }]]
+}
 
     permlink = f"thoth{randValue}"
     taglist="['test', 'test1', 'test2', test3', 'test4']"
 
     print (f"Body: {body}")
+    print (f"Body length:  {len(body)}")
     print (f"Tags: {taglist}")
     print (f"Beneficiaries: {beneficiaryList}")
     postDone=False
     while not postDone:
         try:
             now = datetime.datetime.now()
-            timeStamp = now.strftime("%Y-%m-%d:%H:%M")
+            timeStamp = now.strftime("%Y-%m-%d %H:%M")
             title = f"Curated by Thoth - {timeStamp}"
             print(f"Posting: {title}")
-            s.commit.post(title, body, postingAccount, permlink=permlink, comment_options=comment_options, tags=taglist, beneficiaries=None)
+            s.commit.post(title, body, postingAccount, permlink=permlink, comment_options=comment_options, tags=taglist, beneficiaries=beneficiaryList)
             print(body)
             postDone=True
         except Exception as E:
             print (E)
-        time.sleep(60)
+            time.sleep(60)
