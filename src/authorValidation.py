@@ -2,6 +2,8 @@ from steem import Steem
 import math
 import configparser
 from datetime import datetime
+import requests
+import json
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -70,6 +72,9 @@ def isAuthorScreened(comment):
         return True
     
     if isInactive(accountInfo) :
+        return True
+    
+    if isHiveActivityTooRecent(comment['author']):
         return True
 
     if ( getMedianFollowerRep ( comment['author'] ) < config.getint( 'AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP' )):
@@ -185,3 +190,98 @@ def getMedianFollowerRep(author):
        middle1 = reputations[(n // 2) - 1]
        middle2 = reputations[n // 2]
        return (middle1 + middle2) / 2
+
+def isHiveActivityTooRecent(account):
+    hiveInactivity = hiveInactiveDays(account)
+    print (f"Account {account} - hive inactive days: {hiveInactivity}")
+    if ( hiveInactivity != None ):
+        if ( hiveInactivity < config.getint('AUTHOR','LAST_HIVE_ACTIVITY_AGE') ):
+            return True
+    return False
+
+def hiveInactiveDays(account):
+    """
+    Calculate the number of days since the last activity for a Hive account.
+    
+    Args:
+        account (str): The Hive account name to query
+        
+    Returns:
+        int: Number of days since last activity, or None if the activity date couldn't be retrieved
+    """
+    lastHiveActivity = getLastHiveActivityDate(account)
+    
+    if not lastHiveActivity:
+        return None
+    
+    # Convert string date to datetime object
+    lastHiveActivityDt = datetime.strptime(lastHiveActivity, "%Y-%m-%d %H:%M:%S")
+    
+    # Get current datetime
+    now = datetime.now()
+    
+    # Calculate the difference in days
+    daysPassed = (now - lastHiveActivityDt).days
+    
+    return daysPassed
+
+import requests
+import json
+from datetime import datetime
+
+def getLastHiveActivityDate(account):
+    """
+    Query the Hive API for an account and return the last activity date.
+    
+    Args:
+        account (str): The Hive account name to query
+        
+    Returns:
+        str: The last activity date as a formatted date string, or None if the API call fails
+    """
+    url = "https://api.hive.blog"
+    payload = {
+        "jsonrpc": "2.0", 
+        "method": "condenser_api.get_accounts", 
+        "params": [[account]], 
+        "id": 1
+    }
+    
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        
+        data = response.json()
+        
+        # Check if we got a valid response with results
+        if "result" in data and data["result"] and len(data["result"]) > 0:
+            account_data = data["result"][0]
+            
+            # Extract the last_post and last_vote_time fields
+            lastHivePostTime = account_data.get("last_post")
+            lastHiveVoteTime = account_data.get("last_vote_time")
+            
+            # Convert string dates to datetime objects
+            lastHivePostTime = datetime.fromisoformat(lastHivePostTime.replace("Z", "+00:00")) if lastHivePostTime else None
+            lastHiveVoteTime = datetime.fromisoformat(lastHiveVoteTime.replace("Z", "+00:00")) if lastHiveVoteTime else None
+            
+            # Find the most recent date
+            if lastHivePostTime and lastHiveVoteTime:
+                lastHiveActivityTime = max(lastHivePostTime, lastHiveVoteTime)
+            elif lastHivePostTime:
+                lastHiveActivityTime = lastHivePostTime
+            elif lastHiveVoteTime:
+                lastHiveActivityTime = lastHiveVoteTime
+            else:
+                return None
+                
+            return lastHiveActivityTime.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            return None
+            
+    except requests.exceptions.RequestException as e:
+        print(f"Error querying API: {e}")
+        return None
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        print(f"Error processing response: {e}")
+        return None

@@ -51,7 +51,7 @@ s = Steem()
 if ( streamType == 'RANDOM' ):
     streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), s.get_dynamic_global_properties()['last_irreversible_block_num'] )
 elif ( streamType == 'ACTIVE' ):
-    streamFromBlock = s.get_dynamic_global_properties()['last_irreversible_block_num']
+    streamFromBlock = s.get_dynamic_global_properties()['last_irreversible_block_num'] - 14400
 else:
     # Read the last processed block number from file, if exists
     if os.path.exists(BLOCK_FILE):
@@ -70,7 +70,6 @@ while retry_count <= max_retries:
             stream = blockchain.stream(start_block=streamFromBlock, filter_by=['comment'])
 
         for operation in stream:
-            # print(operation)
             streamFromBlock = operation['block_num'] + 1
             
             # Save the current block number to file
