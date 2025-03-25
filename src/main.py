@@ -46,19 +46,26 @@ retry_delay = 0.25  # Base delay in seconds
 
 # File to store the last processed block
 BLOCK_FILE = 'config/last_block.txt'
+if os.path.exists(BLOCK_FILE):
+    with open(BLOCK_FILE, 'r') as f:
+        lastBlock = int(f.read().strip())
+else:
+    lastBlock = 0
 
 s = Steem()
 if ( streamType == 'RANDOM' ):
     streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), s.get_dynamic_global_properties()['last_irreversible_block_num'] )
 elif ( streamType == 'ACTIVE' ):
-    streamFromBlock = s.get_dynamic_global_properties()['last_irreversible_block_num'] - 14400
-else:
+    streamFromBlock = max (s.get_dynamic_global_properties()['last_irreversible_block_num'] - 28800, lastBlock )
+elif ( streamType == 'HISTORY'):
     # Read the last processed block number from file, if exists
-    if os.path.exists(BLOCK_FILE):
-        with open(BLOCK_FILE, 'r') as f:
-            streamFromBlock = int(f.read().strip())
+    if (lastBlock != 0 ):
+        streamFromBlock = lastBlock
     else:
         streamFromBlock = config.getint('STEEM', 'DEFAULT_START_BLOCK')
+else:
+    print (f"Invalid CONFIG -> STREAM_TYPE setting: {streamType}")
+    exit()
     
 print(f"Starting from block {streamFromBlock}")
 
@@ -81,10 +88,13 @@ while retry_count <= max_retries:
                 break    
             if 'type' in operation and operation['type'] == 'comment':
                 comment = operation
-                tmpBody = utils.remove_formatting(comment['body'])
                 if 'parent_author' in comment and comment['parent_author'] == '':
                     if utils.screenPost(comment):
-                        print(f"Comment by {comment['author']}: {comment['title']}\n{tmpBody[:100]}...")
+                        ### After screening is done, retrieve the latest version of the post
+                        comment=s.get_content(comment['author'],comment['permlink'])
+                        tmpBody = utils.remove_formatting(comment['body'])
+                        print(f"Comment by {comment['author']}/comment['permlink']: {comment['title']}\n{tmpBody[:100]}...")
+
                         aiResponse = aiCurator.aicurate(arliaiKey, arliaiModel, arliaiUrl, tmpBody)
 
                         print (f"\n\nAI Response: {aiResponse}\n")

@@ -82,7 +82,7 @@ def postCuration (commentList, aiResponseList):
 
     comment_options = {
         'max_accepted_payout': '1000000.000 SBD',
-        'percent_steem_dollars': 10000,
+        'percent_steem_dollars': 0,
         'allow_votes': True,
         'allow_curation_rewards': True,
         'extensions': [[0, { }]]
