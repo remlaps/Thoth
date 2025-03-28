@@ -65,7 +65,7 @@ def postCuration (commentList, aiResponseList):
     else:
         s = Steem()
 
-    body='AI Curation by [Thoth](https://github.com/remlaps/Thoth)<br><br>'
+    body=f"AI Curation by [Thoth](https://github.com/remlaps/Thoth)<br><br>This was generated with AI model: {config.get('ARLIAI','ARLIAI_MODEL')}"
     body=body + '<div class=pull-right>\n\n[![](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)<h6><sup>Image by AI</sup></h6>\n\n</div>\n\n'
 
     for lcv, aiResponse in enumerate(aiResponseList):
@@ -97,13 +97,15 @@ def postCuration (commentList, aiResponseList):
     print (f"Beneficiaries: {beneficiaryList}")
     postDone=False
     while not postDone:
+        now = datetime.datetime.now()
+        timeStamp = now.strftime("%Y-%m-%d %H:%M")
+        title = f"Curated by Thoth - {timeStamp}"
+        print(f"Posting: {title}")
+        print(body)
+        with open('data/output.html', 'w', encoding='utf-8') as f:
+            print(body, file=f)
         try:
-            now = datetime.datetime.now()
-            timeStamp = now.strftime("%Y-%m-%d %H:%M")
-            title = f"Curated by Thoth - {timeStamp}"
-            print(f"Posting: {title}")
             s.commit.post(title, body, postingAccount, permlink=permlink, comment_options=comment_options, tags=taglist, beneficiaries=beneficiaryList)
-            print(body)
             postDone=True
         except Exception as E:
             print (E)

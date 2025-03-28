@@ -16,30 +16,34 @@ DEFAULT_START_BLOCK = 3250000
 POSTING_KEY = 
 STEEM_API = 
 # ACTIVE, HISTORY, or RANDOM
-STREAM_TYPE = RANDOM
+STREAM_TYPE = HISTORY
 
 ####
 #### From here down copy content from config.ini to config.template
 ####
 
 [CONTENT]
-EXCLUDE_TAGS = booming, nsfw, test
+EXCLUDE_TAGS = actifit, appics, bible, booming, christianity, contest, islam, nsfw, porn, pornography, \
+   promo-steem, realrobinhood, religion, steemzzang, test, upgoat, yehey, zzan
 INCLUDE_TAGS = 
+LANGUAGE = de, en, ukr
 MIN_FEED_REACH = 200
 MIN_WORDS = 500
 REGISTRY_ACCOUNT = penny4thoughts
-### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS
+### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS, EXCLUDE_TAGS, LANGUAGE
 
 [AUTHOR]
-LAST_BLURT_ACTIVITY_AGE = 60     ; required days since the account was active on Blurt
-LAST_HIVE_ACTIVITY_AGE = 1461    ; required days since the account was active on Hive
-MAX_INACTIVITY_DAYS = 365
+# required days since the account was active on Blurt
+LAST_BLURT_ACTIVITY_AGE = 60
+# required days since the account was active on Hive
+LAST_HIVE_ACTIVITY_AGE = 1461
+MAX_INACTIVITY_DAYS = 3650
 MIN_ACCOUNT_AGE = 30 
 MIN_ACTIVE_FOLLOWERS = 10
-MIN_FOLLOWERS = 100
-MIN_FOLLOWERS_PER_MONTH = 4
-MIN_FOLLOWER_MEDIAN_REP = 33
-MIN_REPUTATION = 55
+MIN_FOLLOWERS = 20
+MIN_FOLLOWERS_PER_MONTH = 5
+MIN_FOLLOWER_MEDIAN_REP = 35
+MIN_REPUTATION = 50
 ### Implemented: MIN_REPUTATION, MIN_FOLLOWERS, MIN_FOLLOWERS_PER_MONTH, MAX_INACTIVITY_DAYS, MIN_FOLLOWER_MEDIAN_REP
 
 [BLOG]
