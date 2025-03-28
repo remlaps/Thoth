@@ -1,4 +1,5 @@
 import configparser
+import json
 from steem import Steem
 from datetime import datetime
 
@@ -25,3 +26,23 @@ def isEdit(comment):
         return True
     
     return False
+
+def hasBlacklistedTag(comment):
+    excludedTags=getTagBlacklist()
+    if comment.get('json_metadata', None):
+        metadataString=comment['json_metadata']
+        metadataJson=json.loads(metadataString)
+        if ( metadataJson.get('tags', None) != None):
+            tags=metadataJson['tags']
+            for tag in tags:
+                if tag in excludedTags:
+                    return True
+
+    if comment.get('category', None) in excludedTags:
+        return True
+
+    return False
+    
+def getTagBlacklist():
+    tags = config.get('CONTENT', 'EXCLUDE_TAGS')
+    return [tag.strip() for tag in tags.split(',')]

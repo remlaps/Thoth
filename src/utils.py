@@ -18,25 +18,25 @@ def detect_language(text):
 
 def screenPost(comment):
     if ( contentValidation.isEdit (comment)):
-        return False
+        return True
+    
+    if ( contentValidation.hasBlacklistedTag(comment)):
+        return True
     
     tmpBody=remove_formatting(comment['body'])
     if ( contentValidation.isTooShort (tmpBody)):
-        return False
+        return True
 
+    targetLanguage = [lang.strip() for lang in config.get('CONTENT', 'LANGUAGE').split(',') if lang]
     bodyLanguage = detect_language(tmpBody)
     titleLanguage = detect_language(comment['title'])
-    if ( bodyLanguage == 'en' and titleLanguage == 'en'):
-        language = 'en'
-    else:
-        language = 'other'
-    if ( language != 'en' ):
-        return False
+    if not ( bodyLanguage in targetLanguage and titleLanguage in targetLanguage ):
+        return True
     
     if ( authorValidation.isAuthorScreened(comment)):
-        return False
+        return True
     
-    return True
+    return False
 
 def remove_formatting(text):
     # Remove markdown and HTML formatting

@@ -54,7 +54,8 @@ else:
 
 s = Steem()
 if ( streamType == 'RANDOM' ):
-    streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), s.get_dynamic_global_properties()['last_irreversible_block_num'] )
+    # streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), s.get_dynamic_global_properties()['last_irreversible_block_num'] )
+    streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), 40969437 )
 elif ( streamType == 'ACTIVE' ):
     streamFromBlock = max (s.get_dynamic_global_properties()['last_irreversible_block_num'] - 28800, lastBlock )
 elif ( streamType == 'HISTORY'):
@@ -89,11 +90,11 @@ while retry_count <= max_retries:
             if 'type' in operation and operation['type'] == 'comment':
                 comment = operation
                 if 'parent_author' in comment and comment['parent_author'] == '':
-                    if utils.screenPost(comment):
+                    if not utils.screenPost(comment):
                         ### After screening is done, retrieve the latest version of the post
                         comment=s.get_content(comment['author'],comment['permlink'])
                         tmpBody = utils.remove_formatting(comment['body'])
-                        print(f"Comment by {comment['author']}/comment['permlink']: {comment['title']}\n{tmpBody[:100]}...")
+                        print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}\n{tmpBody[:100]}...")
 
                         aiResponse = aiCurator.aicurate(arliaiKey, arliaiModel, arliaiUrl, tmpBody)
 

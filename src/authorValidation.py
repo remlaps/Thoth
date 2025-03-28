@@ -193,7 +193,6 @@ def getMedianFollowerRep(author):
 
 def isHiveActivityTooRecent(account):
     hiveInactivity = hiveInactiveDays(account)
-    print (f"Account {account} - hive inactive days: {hiveInactivity}")
     if ( hiveInactivity != None ):
         if ( hiveInactivity < config.getint('AUTHOR','LAST_HIVE_ACTIVITY_AGE') ):
             return True
