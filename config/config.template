@@ -27,6 +27,7 @@ EXCLUDE_TAGS = actifit, appics, bible, booming, christianity, contest, islam, ns
    promo-steem, realrobinhood, religion, steemzzang, test, upgoat, yehey, zzan
 INCLUDE_TAGS = 
 LANGUAGE = de, en, ukr
+MAX_VOTING_SERVICE_PCT = 25
 MIN_FEED_REACH = 200
 MIN_WORDS = 500
 REGISTRY_ACCOUNT = penny4thoughts
@@ -52,5 +53,7 @@ NUMBER_OF_REVIEWED_POSTS = 5
 # Default to @social for testing
 POSTING_ACCOUNT = social
 POSTING_ACCOUNT_WEIGHT = 500
+# [Name, alias, or Acccount info here (will be published in the post)]
+THOTH_OPERATOR = 
 ### Implemented: CURATED_AUTHOR_WEIGHT, NUMBER_OF_REVIEWED_POSTS, POSTING_ACCOUNT, POSTING_ACCOUNT_WEIGHT
 ### [ POSTING_ACCOUNT_WEIGHT + ( NUMBER_OF_REVIEWED_POSTS * CURATED_AUTHOR_WEIGHT ) ] must be less than 10000 (i.e. 500 == 5%)

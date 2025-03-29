@@ -70,6 +70,9 @@ else:
     
 print(f"Starting from block {streamFromBlock}")
 
+with open('data/output.html', 'w', encoding='utf-8') as f:
+    print(f"Starting from block {streamFromBlock}\n\n", file=f)
+
 while retry_count <= max_retries:
     try:
         if steemApi:
@@ -97,7 +100,8 @@ while retry_count <= max_retries:
                         print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}\n{tmpBody[:100]}...")
 
                         aiResponse = aiCurator.aicurate(arliaiKey, arliaiModel, arliaiUrl, tmpBody)
-
+                        with open('data/output.html', 'a', encoding='utf-8') as f:
+                            print(f"Body: {tmpBody}\n\nAI Response: {aiResponse}\n", file=f)
                         print (f"\n\nAI Response: {aiResponse}\n")
 
                         if (not re.search("DO NOT CURATE", aiResponse)):

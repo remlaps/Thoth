@@ -65,14 +65,52 @@ def postCuration (commentList, aiResponseList):
     else:
         s = Steem()
 
-    body=f"AI Curation by [Thoth](https://github.com/remlaps/Thoth)<br><br>This was generated with AI model: {config.get('ARLIAI','ARLIAI_MODEL')}"
-    body=body + '<div class=pull-right>\n\n[![](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)<h6><sup>Image by AI</sup></h6>\n\n</div>\n\n'
+    body=f"""
+AI Curation by [Thoth](https://github.com/remlaps/Thoth)
+
+This post was generated with the assistance of the following AI model: <i>{config.get('ARLIAI','ARLIAI_MODEL')}</i>
+    """
+
+    body+='<div class=pull-right>\n\n[![](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)<h6><sup>Image by AI</sup></h6>\n\n</div>\n\n'
+
+    body+=f"""
+Named after the ancient Egyptian god of writing, science, art, wisdom, judgment, and magic, <i>Thoth</i> is an Open Source curation bot that is intended to align incentives for authors and investors towards the production and support of creativity that attracts human eyeballs to the Steem blockchain.<br><br>
+
+This will be done by:
+1. Identifying attractive posts on the blockchain - past and present;
+2. Highlighting those posts for curators; and
+3. Using beneficiary rewards to deliver additional rewards to authors and delegators.<br><br>
+
+If the highlighted post has passed payout, you can upvote this post in order to reward to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br><br>
+
+Here are the posts that are featured in this curation post:<br><br>
+"""
+
+    body+="<table>"
+    for lcv, comment in enumerate(commentList):
+        body += "<tr>\n"
+        body += f'<td><b>{lcv + 1}</b>: </td>\n'
+        body += f'<A HREF="/thoth/@{comment["author"]}/{comment["permlink"]}" target="_blank">{repr(comment["title"])}</A></td>\n'
+        body += f'<td>@{commentList[lcv]["author"]}</td>\n'
+        body += '</tr>\n'
+
+    body += "</table><br><br>And here is the AI response for each post:<br><br>"
 
     for lcv, aiResponse in enumerate(aiResponseList):
-        body += f'\n___Post number___: {lcv + 1} - '
-        body += f'[{repr(commentList[lcv]["title"])}](/thoth/@{commentList[lcv]["author"]}/{commentList[lcv]["permlink"]})\n'
-        body += f'Author: @{commentList[lcv]["author"]}\n\n'
-        body += f'\n\n{aiResponse}\n'
+        body += '<table border="1">\n'
+        body += '   <tr>\n'
+        body += f'     <td><b>Post #</b></td>\n'
+        body += f'     <td><b>Title</b></td>\n'
+        body += f'     <td><b>Author</b></td>\n'
+        body += f'  </tr><tr>\n'
+        body += f'     <td>{lcv + 1}</td>\n'
+        body += f'     <td><a href="/thoth/@{commentList[lcv]["author"]}/{commentList[lcv]["permlink"]}">{repr(commentList[lcv]["title"])}</a></td>\n'
+        body += f'     <td>@{commentList[lcv]["author"]}</td>\n'
+        body += f'   </tr>\n'
+        body += f'</table>'
+        body += f'<blockquote>{aiResponse}</blockquote><br><br>\n'
+
+    body += "You can contribute to the project or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
 
     beneficiaryList = ['null', postingAccount ]
     for comment in commentList:
@@ -86,10 +124,10 @@ def postCuration (commentList, aiResponseList):
         'allow_votes': True,
         'allow_curation_rewards': True,
         'extensions': [[0, { }]]
-}
+    }
 
     permlink = f"thoth{randValue}"
-    taglist="['test', 'test1', 'test2', test3', 'test4']"
+    taglist="['test', 'test1', 'test2', 'test3', 'test4']"
 
     print (f"Body: {body}")
     print (f"Body length:  {len(body)}")
@@ -102,8 +140,8 @@ def postCuration (commentList, aiResponseList):
         title = f"Curated by Thoth - {timeStamp}"
         print(f"Posting: {title}")
         print(body)
-        with open('data/output.html', 'w', encoding='utf-8') as f:
-            print(body, file=f)
+        with open('data/fakepost.html', 'w', encoding='utf-8') as f:
+            print(f"{body}", file=f)
         try:
             s.commit.post(title, body, postingAccount, permlink=permlink, comment_options=comment_options, tags=taglist, beneficiaries=beneficiaryList)
             postDone=True
