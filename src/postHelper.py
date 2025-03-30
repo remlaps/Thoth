@@ -4,13 +4,14 @@ import string
 import configparser
 import datetime
 import time
+import contentValidation
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
 
 # Read the config.ini file
 config.read('config/config.ini')
-postingAccount=config.get('BLOG', 'POSTING_ACCOUNT')
+postingAccount=config.get('STEEM', 'POSTING_ACCOUNT')
 postingAccountWeight=config.getint('BLOG','POSTING_ACCOUNT_WEIGHT')
 curatedPostCount=config.getint('BLOG','NUMBER_OF_REVIEWED_POSTS')
 curatedAuthorWeight=config.getint('BLOG','CURATED_AUTHOR_WEIGHT')
@@ -79,19 +80,31 @@ Named after the ancient Egyptian god of writing, science, art, wisdom, judgment,
 This will be done by:
 1. Identifying attractive posts on the blockchain - past and present;
 2. Highlighting those posts for curators; and
-3. Using beneficiary rewards to deliver additional rewards to authors and delegators.<br><br>
+3. Using beneficiary rewards to deliver additional rewards to authors.
+4. A future enhancement will start delivering beneficiary rewards to delegators.<br><br>
 
-If the highlighted post has passed payout, you can upvote this post in order to reward to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br><br>
+If the highlighted post has already paid out, you can upvote this post in order to send rewards to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br><br>
 
 Here are the posts that are featured in this curation post:<br><br>
 """
 
     body+="<table>"
     for lcv, comment in enumerate(commentList):
+        steemPost=s.get_content(comment['author'],comment['permlink'])
+        tags = contentValidation.getTags(steemPost)
+        tagString=""
+        for index, tag in enumerate(tags):
+            tagString+=f"<A HREF='/hot/{tag}'>{tag}</A>"
+            if ( index < len(tags)-1):
+                tagString +=", "
         body += "<tr>\n"
-        body += f'<td><b>{lcv + 1}</b>: </td>\n'
-        body += f'<A HREF="/thoth/@{comment["author"]}/{comment["permlink"]}" target="_blank">{repr(comment["title"])}</A></td>\n'
-        body += f'<td>@{commentList[lcv]["author"]}</td>\n'
+        body += f'   <td><b>{lcv + 1}</b>: </td>\n'
+        body += f'   <td><A HREF="/thoth/@{comment["author"]}/{comment["permlink"]}" target="_blank">{repr(comment["title"])}</A>'
+        body += f'      <hr>\n'
+        body += f'      <b>Tags</b>: {tagString}</td>\n'
+        body += f'   <td>@{commentList[lcv]["author"]}'
+        body += f'      <hr>\n'
+        body += f'      <b>Created</b>: {steemPost["created"]}</td>\n'
         body += '</tr>\n'
 
     body += "</table><br><br>And here is the AI response for each post:<br><br>"
@@ -108,9 +121,12 @@ Here are the posts that are featured in this curation post:<br><br>
         body += f'     <td>@{commentList[lcv]["author"]}</td>\n'
         body += f'   </tr>\n'
         body += f'</table>'
-        body += f'<blockquote>{aiResponse}</blockquote><br><br>\n'
+        body += f'<table><tr><td>{aiResponse}\n\n'
+        body += '</td></tr></table><br><br>\n'  ## Whitespace needed by Steemit/Upvu web sites.  No idea wy.
 
-    body += "You can contribute to the project or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
+    body += "<br><br>Obviously, inclusion in this list does not imply endorsement of the author's ideas.  The list was built by AI and other automated tools, so the results may contain halucinations, errors, or controversial opinions.  If you see content that should be filtered in the future, please let the operator know.\n"
+    body += f"<br><br>This Thoth instance is operated by {config.get('BLOG', 'THOTH_OPERATOR')}\n"
+    body += "<br><br>You can contribute to Thoth or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
 
     beneficiaryList = ['null', postingAccount ]
     for comment in commentList:

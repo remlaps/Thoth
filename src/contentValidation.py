@@ -46,3 +46,30 @@ def hasBlacklistedTag(comment):
 def getTagBlacklist():
     tags = config.get('CONTENT', 'EXCLUDE_TAGS')
     return [tag.strip() for tag in tags.split(',')]
+
+def getTags(comment):
+    """
+    Extracts tags from a Steem comment, ensuring no duplicates.
+
+    Args:
+        comment (dict): The Steem comment data.
+
+    Returns:
+        list: A list of unique tags.
+    """
+    tags = set()  # Use a set to automatically handle duplicates
+
+    if comment.get('json_metadata', None):
+        metadata_string = comment['json_metadata']
+        try:
+            metadata_json = json.loads(metadata_string)
+            if metadata_json.get('tags', None) is not None:
+                tags.update(metadata_json['tags'])  # Add tags to the set
+        except json.JSONDecodeError:
+            print(f"Error decoding JSON metadata: {metadata_string}")
+
+    if comment.get('category', None):
+        tags.add(comment['category'])  # Add category to the set
+
+    return sorted(list(tags))  # Convert the set to a sorted list for the return value
+

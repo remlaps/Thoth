@@ -54,13 +54,15 @@ else:
 
 s = Steem()
 if ( streamType == 'RANDOM' ):
-    # streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), s.get_dynamic_global_properties()['last_irreversible_block_num'] )
-    streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), 40969437 )
+    streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), s.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 30) )
+    # streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), 40969437 )
 elif ( streamType == 'ACTIVE' ):
-    streamFromBlock = max (s.get_dynamic_global_properties()['last_irreversible_block_num'] - 28800, lastBlock )
+    streamFromBlock = max (s.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 6), lastBlock ) # 6 days or last processed
 elif ( streamType == 'HISTORY'):
     # Read the last processed block number from file, if exists
-    if (lastBlock != 0 ):
+    payoutBlock = s.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 30)
+    
+    if (lastBlock != 0 and lastBlock < payoutBlock ):
         streamFromBlock = lastBlock
     else:
         streamFromBlock = config.getint('STEEM', 'DEFAULT_START_BLOCK')
@@ -70,6 +72,10 @@ else:
     
 print(f"Starting from block {streamFromBlock}")
 
+# Ensure the 'data' directory exists
+os.makedirs('data', exist_ok=True)
+
+# Empty and initialize the output file
 with open('data/output.html', 'w', encoding='utf-8') as f:
     print(f"Starting from block {streamFromBlock}\n\n", file=f)
 

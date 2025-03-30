@@ -13,20 +13,21 @@ ARLIAI_MODEL = Mistral-Nemo-12B-Instruct-2407
 [STEEM]
 DEFAULT_START_BLOCK = 3250000
 # It is recommended to set these in your wallet, using "steempy"
+POSTING_ACCOUNT = social
 POSTING_KEY = 
 STEEM_API = 
 # ACTIVE, HISTORY, or RANDOM
-STREAM_TYPE = HISTORY
+STREAM_TYPE = RANDOM
 
 ####
 #### From here down copy content from config.ini to config.template
 ####
 
 [CONTENT]
-EXCLUDE_TAGS = actifit, appics, bible, booming, christianity, contest, islam, nsfw, porn, pornography, \
-   promo-steem, realrobinhood, religion, steemzzang, test, upgoat, yehey, zzan
+EXCLUDE_TAGS = actifit, appics, booming, contest, nsfw, porn, pornography, \
+   promo-steem, realrobinhood, steemzzang, test, upgoat, yehey, zzan
 INCLUDE_TAGS = 
-LANGUAGE = de, en, ukr
+LANGUAGE = de, en, es, ukr
 MAX_VOTING_SERVICE_PCT = 25
 MIN_FEED_REACH = 200
 MIN_WORDS = 500
@@ -41,7 +42,7 @@ LAST_HIVE_ACTIVITY_AGE = 1461
 MAX_INACTIVITY_DAYS = 3650
 MIN_ACCOUNT_AGE = 30 
 MIN_ACTIVE_FOLLOWERS = 10
-MIN_FOLLOWERS = 20
+MIN_FOLLOWERS = 200
 MIN_FOLLOWERS_PER_MONTH = 5
 MIN_FOLLOWER_MEDIAN_REP = 35
 MIN_REPUTATION = 50
@@ -51,7 +52,6 @@ MIN_REPUTATION = 50
 CURATED_AUTHOR_WEIGHT = 500
 NUMBER_OF_REVIEWED_POSTS = 5
 # Default to @social for testing
-POSTING_ACCOUNT = social
 POSTING_ACCOUNT_WEIGHT = 500
 # [Name, alias, or Acccount info here (will be published in the post)]
 THOTH_OPERATOR = 
