@@ -47,6 +47,27 @@ def getTagBlacklist():
     tags = config.get('CONTENT', 'EXCLUDE_TAGS')
     return [tag.strip() for tag in tags.split(',')]
 
+def hasRequiredTag(comment):
+    requiredTags=getIncludeTagList()
+    if comment.get('json_metadata', None):
+        metadataString=comment['json_metadata']
+        metadataJson=json.loads(metadataString)
+        if ( metadataJson.get('tags', None) != None):
+            tags=metadataJson['tags']
+            print(f"Tags: {tags}\nRequired Tags:{requiredTags}")
+            for tag in tags:
+                if tag in requiredTags:
+                    return True
+
+    if comment.get('category', None) in requiredTags:
+        return True
+
+    return False
+
+def getIncludeTagList():
+    tags = config.get('CONTENT', 'INCLUDE_TAGS')
+    return [tag.strip() for tag in tags.split(',')]
+
 def getTags(comment):
     """
     Extracts tags from a Steem comment, ensuring no duplicates.

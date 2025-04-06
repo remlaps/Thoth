@@ -23,6 +23,9 @@ def screenPost(comment):
     if ( contentValidation.hasBlacklistedTag(comment)):
         return True
     
+    if ( not contentValidation.hasRequiredTag(comment)):
+        return True
+    
     tmpBody=remove_formatting(comment['body'])
     if ( contentValidation.isTooShort (tmpBody)):
         return True
