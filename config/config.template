@@ -12,8 +12,9 @@ ARLIAI_MODEL = Mistral-Nemo-12B-Instruct-2407
 
 [STEEM]
 DEFAULT_START_BLOCK = 3250000
-# It is recommended to set these in your wallet, using "steempy"
+# Default to @social for testing
 POSTING_ACCOUNT = social
+# It is recommended to set these in your wallet, using "steempy"
 POSTING_KEY = 
 STEEM_API = 
 # ACTIVE, HISTORY, or RANDOM
@@ -24,15 +25,15 @@ STREAM_TYPE = RANDOM
 ####
 
 [CONTENT]
-EXCLUDE_TAGS = actifit, appics, booming, contest, nsfw, porn, pornography, \
-   promo-steem, realrobinhood, steemzzang, test, upgoat, yehey, zzan
+EXCLUDE_TAGS = actifit, appics, booming, contest, erotic, nsfw, porn, pornography, \
+   nobots, promo-steem, realrobinhood, steemzzang, test, upgoat, yehey, zzan
 INCLUDE_TAGS = 
 LANGUAGE = de, en, es, ukr
 MAX_VOTING_SERVICE_PCT = 25
 MIN_FEED_REACH = 200
 MIN_WORDS = 500
 REGISTRY_ACCOUNT = penny4thoughts
-### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS, EXCLUDE_TAGS, LANGUAGE
+### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS, EXCLUDE_TAGS, LANGUAGE, INCLUDE_TAGS
 
 [AUTHOR]
 # required days since the account was active on Blurt
@@ -51,7 +52,6 @@ MIN_REPUTATION = 50
 [BLOG]
 CURATED_AUTHOR_WEIGHT = 500
 NUMBER_OF_REVIEWED_POSTS = 5
-# Default to @social for testing
 POSTING_ACCOUNT_WEIGHT = 500
 # [Name, alias, or Acccount info here (will be published in the post)]
 THOTH_OPERATOR = 

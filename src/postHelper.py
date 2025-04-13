@@ -107,7 +107,7 @@ Here are the posts that are featured in this curation post:<br><br>
         body += f'      <b>Created</b>: {steemPost["created"]}</td>\n'
         body += '</tr>\n'
 
-    body += "</table><br><br>And here is the AI response for each post:<br><br>"
+    body += "</table><br><br>And here is the AI response for each post:<br><br><hr>"
 
     for lcv, aiResponse in enumerate(aiResponseList):
         body += '<table border="1">\n'
@@ -126,13 +126,29 @@ Here are the posts that are featured in this curation post:<br><br>
 
     body += "<br><br>Obviously, inclusion in this list does not imply endorsement of the author's ideas.  The list was built by AI and other automated tools, so the results may contain halucinations, errors, or controversial opinions.  If you see content that should be filtered in the future, please let the operator know.\n"
     body += f"<br><br>This Thoth instance is operated by {config.get('BLOG', 'THOTH_OPERATOR')}\n"
-    body += "<br><br>You can contribute to Thoth or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
+    body += "<br><br>\n\nYou can contribute to Thoth or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
 
     beneficiaryList = ['null', postingAccount ]
     for comment in commentList:
         beneficiaryList.append(comment['author'])
         
     beneficiaryList = create_beneficiary_list ( beneficiaryList )
+    body += f"\n\n<br><br>Beneficiaries:<br><br>"
+    body += "<table>"
+    for beneficiary in beneficiaryList:
+        body += "<tr>\n"
+        body += f'   <td>@{beneficiary["account"]}</td>\n'
+        body += f'   <td>{beneficiary["weight"] / 100}</td>\n'
+        body += '</tr>\n'
+    body += "</table><br><br>\n"
+
+    permlink = f"thoth{randValue}"
+
+    thothCategory='test'
+    taglist=[thothCategory, 'test1', 'test2', 'test3', 'test4']
+    metadata = {
+        "app": "Thoth/0.0.1"
+    }
 
     comment_options = {
         'max_accepted_payout': '1000000.000 SBD',
@@ -142,25 +158,34 @@ Here are the posts that are featured in this curation post:<br><br>
         'extensions': [[0, { }]]
     }
 
-    permlink = f"thoth{randValue}"
-    taglist="['test', 'test1', 'test2', 'test3', 'test4']"
-
     print (f"Body: {body}")
     print (f"Body length:  {len(body)}")
     print (f"Tags: {taglist}")
     print (f"Beneficiaries: {beneficiaryList}")
     postDone=False
-    while not postDone:
-        now = datetime.datetime.now()
+    retryCount = 0
+    while not postDone and retryCount < 3:
+        now = datetime.datetime.now(datetime.timezone.utc)
         timeStamp = now.strftime("%Y-%m-%d %H:%M")
-        title = f"Curated by Thoth - {timeStamp}"
+        title = f"Curated by Thoth - {timeStamp}Z"
         print(f"Posting: {title}")
         print(body)
         with open('data/fakepost.html', 'w', encoding='utf-8') as f:
             print(f"{body}", file=f)
         try:
-            s.commit.post(title, body, postingAccount, permlink=permlink, comment_options=comment_options, tags=taglist, beneficiaries=beneficiaryList)
+            s.commit.post(title, body, postingAccount, permlink=permlink, tags=taglist,
+                comment_options=comment_options, json_metadata=metadata, 
+                beneficiaries=beneficiaryList)
             postDone=True
         except Exception as E:
             print (E)
+            print ("Sleeping 1 minute before retry...")
             time.sleep(60)
+            retryCount += 1
+    if ( not postDone ):
+        print (f"Post {title} failed.  Exiting.")
+        return False
+    
+    time.sleep(300)
+    Steem().commit.vote(f"@{postingAccount}/{permlink}", 100, postingAccount )
+    print (f"Post and vote for {title} completed.")
