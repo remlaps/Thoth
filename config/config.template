@@ -25,8 +25,8 @@ STREAM_TYPE = RANDOM
 ####
 
 [CONTENT]
-EXCLUDE_TAGS = actifit, appics, booming, contest, nsfw, porn, pornography, \
-   promo-steem, realrobinhood, steemzzang, test, upgoat, yehey, zzan
+EXCLUDE_TAGS = actifit, appics, booming, contest, erotic, nsfw, porn, pornography, \
+   nobots, promo-steem, realrobinhood, steemzzang, test, upgoat, yehey, zzan
 INCLUDE_TAGS = 
 LANGUAGE = de, en, es, ukr
 MAX_VOTING_SERVICE_PCT = 25

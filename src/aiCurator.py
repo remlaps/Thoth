@@ -62,11 +62,10 @@ Otherwise, if none of the above conditions are met, create a curation report wit
 
 END OF CURATION REPORT
 
-IMPORTANT: Write your report in English.  Use HTML formatting for section headings, and don't add anything after those four sections.
+IMPORTANT: Write your report in English.  Use HTML formatting for section headings, and don't add anything after those four sections.  Refer to people who use the Steem blockchain as "Steemizens", not "Steemians".
 
 Here is the article: 
     """
-
     postBody = utils.remove_formatting(postBody)
 
     payload = json.dumps({
