@@ -133,6 +133,14 @@ Here are the posts that are featured in this curation post:<br><br>
         beneficiaryList.append(comment['author'])
         
     beneficiaryList = create_beneficiary_list ( beneficiaryList )
+    body += f"\n\n<br><br>Beneficiaries:<br><br>"
+    body += "<table>"
+    for beneficiary in beneficiaryList:
+        body += "<tr>\n"
+        body += f'   <td>@{beneficiary["account"]}</td>\n'
+        body += f'   <td>{beneficiary["weight"] / 100}</td>\n'
+        body += '</tr>\n'
+    body += "</table><br><br>\n"
 
     permlink = f"thoth{randValue}"
 
@@ -155,10 +163,11 @@ Here are the posts that are featured in this curation post:<br><br>
     print (f"Tags: {taglist}")
     print (f"Beneficiaries: {beneficiaryList}")
     postDone=False
-    while not postDone:
-        now = datetime.datetime.now()
+    retryCount = 0
+    while not postDone and retryCount < 3:
+        now = datetime.datetime.now(datetime.timezone.utc)
         timeStamp = now.strftime("%Y-%m-%d %H:%M")
-        title = f"Curated by Thoth - {timeStamp}"
+        title = f"Curated by Thoth - {timeStamp}Z"
         print(f"Posting: {title}")
         print(body)
         with open('data/fakepost.html', 'w', encoding='utf-8') as f:
@@ -170,4 +179,13 @@ Here are the posts that are featured in this curation post:<br><br>
             postDone=True
         except Exception as E:
             print (E)
+            print ("Sleeping 1 minute before retry...")
             time.sleep(60)
+            retryCount += 1
+    if ( not postDone ):
+        print (f"Post {title} failed.  Exiting.")
+        return False
+    
+    time.sleep(300)
+    Steem().commit.vote(f"@{postingAccount}/{permlink}", 100, postingAccount )
+    print (f"Post and vote for {title} completed.")

@@ -54,7 +54,6 @@ def hasRequiredTag(comment):
         metadataJson=json.loads(metadataString)
         if ( metadataJson.get('tags', None) != None):
             tags=metadataJson['tags']
-            print(f"Tags: {tags}\nRequired Tags:{requiredTags}")
             for tag in tags:
                 if tag in requiredTags:
                     return True

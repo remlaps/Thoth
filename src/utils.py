@@ -4,6 +4,9 @@ import re
 import authorValidation
 import contentValidation
 
+from steem import Steem
+
+
 # Create a ConfigParser object
 config = configparser.ConfigParser()
 
@@ -16,27 +19,32 @@ def detect_language(text):
     except langdetect.lang_detect_exception.LangDetectException:
         return "Unable to detect language"
 
-def screenPost(comment):
+def screenPost(comment):    
     if ( contentValidation.isEdit (comment)):
+        return True
+    
+    latestComment=Steem().get_content(comment['author'],comment['permlink'])
+
+    if ( contentValidation.hasBlacklistedTag(latestComment)):
         return True
     
     if ( contentValidation.hasBlacklistedTag(comment)):
         return True
     
-    if ( not contentValidation.hasRequiredTag(comment)):
+    if ( not contentValidation.hasRequiredTag(latestComment)):
         return True
     
-    tmpBody=remove_formatting(comment['body'])
+    tmpBody=remove_formatting(latestComment['body'])
     if ( contentValidation.isTooShort (tmpBody)):
         return True
 
-    targetLanguage = [lang.strip() for lang in config.get('CONTENT', 'LANGUAGE').split(',') if lang]
-    bodyLanguage = detect_language(tmpBody)
-    titleLanguage = detect_language(comment['title'])
-    if not ( bodyLanguage in targetLanguage and titleLanguage in targetLanguage ):
+    if ( authorValidation.isAuthorScreened(comment)):
         return True
     
-    if ( authorValidation.isAuthorScreened(comment)):
+    targetLanguage = [lang.strip() for lang in config.get('CONTENT', 'LANGUAGE').split(',') if lang]
+    bodyLanguage = detect_language(tmpBody)
+    titleLanguage = detect_language(latestComment['title'])
+    if not ( bodyLanguage in targetLanguage and titleLanguage in targetLanguage ):
         return True
     
     return False

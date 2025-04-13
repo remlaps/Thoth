@@ -98,11 +98,12 @@ while retry_count <= max_retries:
                 break    
             if 'type' in operation and operation['type'] == 'comment':
                 comment = operation
+
                 if 'parent_author' in comment and comment['parent_author'] == '':
                     if not utils.screenPost(comment):
-                        ### After screening is done, retrieve the latest version of the post
-                        comment=s.get_content(comment['author'],comment['permlink'])
-                        tmpBody = utils.remove_formatting(comment['body'])
+                        ### Retrieve the latest version of the post
+                        latestComment=s.get_content(comment['author'],comment['permlink'])
+                        tmpBody = utils.remove_formatting(latestComment['body'])
                         print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}\n{tmpBody[:100]}...")
 
                         aiResponse = aiCurator.aicurate(arliaiKey, arliaiModel, arliaiUrl, tmpBody)
@@ -110,12 +111,15 @@ while retry_count <= max_retries:
                             print(f"Body: {tmpBody}\n\nAI Response: {aiResponse}\n", file=f)
                         print (f"\n\nAI Response: {aiResponse}\n")
 
-                        if (not re.search("DO NOT CURATE", aiResponse)):
+                        if (re.search("DO NOT CURATE", aiResponse)):
+                            print(f"{postCount}: {operation['author']}/{operation['permlink']}: disqualified by AI.")
+                        elif  (aiResponse == "API Error"):
+                            print("AI not available.  Exiting.  Try again later.")
+                            exit()
+                        else:
                             commentList.append(comment)
                             aiResponseList.append(aiResponse)
                             postCount = postCount + 1
-                        else:
-                            print(f"{postCount}: {operation['author']}/{operation['permlink']}: disqualified by AI.")
                     else:
                         print(f"{postCount}: {operation['author']}/{operation['permlink']}: excluded by screening.")
                 else:
