@@ -5,6 +5,7 @@ import configparser
 import datetime
 import time
 import contentValidation
+import aiPoem
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -104,13 +105,22 @@ Here are the posts that are featured in this curation post:<br><br>
         body += f'      <b>Tags</b>: {tagString}</td>\n'
         body += f'   <td>@{commentList[lcv]["author"]}'
         body += f'      <hr>\n'
-        body += f'      <b>Created</b>: {steemPost["created"]}</td>\n'
-        body += '</tr>\n'
+        body += f'      <b>Created</b>: {steemPost["created"]}\n</td>\n'
+        body += f'</tr>\n<tr></tr>\n'        ## Empty row to separate entries
+    body += '</table><br>\n'
 
-    body += "</table><br><br>And here is the AI response for each post:<br><br><hr>"
+    poem = aiPoem.aiPoem(config.get('ARLIAI','ARLIAI_KEY'), config.get('ARLIAI','ARLIAI_MODEL'), config.get('ARLIAI','ARLIAI_URL'), commentList)
+    body += "Here is an AI generated short story that's inspired by the posts:<br><br>"
+    body += f"<table>\n"
+    body += f"<tr>\n"
+    body += f"<td>{poem}\n</td>\n"
+    body += f"</tr>\n"
+    body += f"</table>\n"
+
+    body += "<hr>And here is the AI response for each post:<br>"
 
     for lcv, aiResponse in enumerate(aiResponseList):
-        body += '<table border="1">\n'
+        body += '<table>\n'
         body += '   <tr>\n'
         body += f'     <td><b>Post #</b></td>\n'
         body += f'     <td><b>Title</b></td>\n'
@@ -119,10 +129,9 @@ Here are the posts that are featured in this curation post:<br><br>
         body += f'     <td>{lcv + 1}</td>\n'
         body += f'     <td><a href="/thoth/@{commentList[lcv]["author"]}/{commentList[lcv]["permlink"]}">{repr(commentList[lcv]["title"])}</a></td>\n'
         body += f'     <td>@{commentList[lcv]["author"]}</td>\n'
-        body += f'   </tr>\n'
         body += f'</table>'
         body += f'<table><tr><td>{aiResponse}\n\n'
-        body += '</td></tr></table><br><br>\n'  ## Whitespace needed by Steemit/Upvu web sites.  No idea wy.
+        body += '</td></tr></table><br><br>\n'  ## Whitespace needed by Steemit/Upvu web sites.  No idea why.
 
     body += "<br><br>Obviously, inclusion in this list does not imply endorsement of the author's ideas.  The list was built by AI and other automated tools, so the results may contain halucinations, errors, or controversial opinions.  If you see content that should be filtered in the future, please let the operator know.\n"
     body += f"<br><br>This Thoth instance is operated by {config.get('BLOG', 'THOTH_OPERATOR')}\n"
@@ -135,15 +144,26 @@ Here are the posts that are featured in this curation post:<br><br>
     beneficiaryList = create_beneficiary_list ( beneficiaryList )
     body += f"\n\n<br><br>Beneficiaries:<br><br>"
     body += "<table>"
-    for beneficiary in beneficiaryList:
-        body += "<tr>\n"
-        body += f'   <td>@{beneficiary["account"]}</td>\n'
-        body += f'   <td>{beneficiary["weight"] / 100}</td>\n'
-        body += '</tr>\n'
+    
+    # Define the number of columns
+    columns = 2
+    for i, beneficiary in enumerate(beneficiaryList):
+        if i % columns == 0:  # Start a new row for every 'columns' items
+            body += "<tr>\n"
+        body += f'   <td>@{beneficiary["account"]} / {beneficiary["weight"] / 100}%</td>\n'
+        if (i + 1) % columns == 0:  # Close the row after 'columns' items
+            body += "</tr>\n"
+    
+    # Fill remaining cells in the last row, if necessary
+    remaining_cells = columns - (len(beneficiaryList) % columns)
+    if remaining_cells != columns:  # Only add if the last row isn't full
+        for _ in range(remaining_cells):
+            body += "   <td></td>\n"  # Add empty cells
+        body += "</tr>\n"
+    
     body += "</table><br><br>\n"
-
+    
     permlink = f"thoth{randValue}"
-
     thothCategory='test'
     taglist=[thothCategory, 'test1', 'test2', 'test3', 'test4']
     metadata = {

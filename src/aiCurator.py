@@ -2,6 +2,7 @@ import requests
 import json
 import utils
 from datetime import datetime
+import time
 import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -40,7 +41,7 @@ Evaluate the following article based on quality, originality, relevance, and val
 - Engagement potential (interesting, informative, thought-provoking)
 - Appropriate subject matter for the main topic (no gambling, prize contests, cryptocurrency, or prohibited topics)
 - Avoid digest posts, lengthy lists, or tables.
-- The inclusion of the authors own experience or thought process.
+- The inclusion of the author's own experience or thought process.
 
 If ANY of these conditions are met, respond ONLY with: "DO NOT CURATE."
 - Content appears AI-generated or plagiarized
@@ -96,20 +97,24 @@ Here is the article:
         'Authorization': f"Bearer {arliaiKey}"
     }
 
-    try:
-        response = requests.post(arliaiUrl, headers=headers, data=payload)
-        response.raise_for_status()
-        aiResponse = response.json()['choices'][0]['message']['content']
-        return aiResponse
-    except requests.exceptions.RequestException as e:
-        logging.error(f"API request failed: {e}")
-        return "API Error"
-    except json.JSONDecodeError as e:
-        logging.error(f"JSON decode error: {e}, response text: {response.text}")
-        return "JSON Error"
-    except KeyError as e:
-        logging.error(f"KeyError: {e}, response json: {response.json()}")
-        return "Response Error"
-    except Exception as e:
-        logging.error(f"An unexpected error occurred: {e}")
-        return "Unexpected Error"
+    aiResponseReceived = False
+    while not aiResponseReceived:
+        try:
+            response = requests.post(arliaiUrl, headers=headers, data=payload)
+            response.raise_for_status()
+            aiResponse = response.json()['choices'][0]['message']['content']
+            return aiResponse
+        except requests.exceptions.RequestException as e:
+            logging.error(f"API request failed: {e}")
+            print ("Sleeping for 15 minutes before retrying...")
+            time.sleep(900)
+        except json.JSONDecodeError as e:
+            logging.error(f"JSON decode error: {e}, response text: {response.text}")
+            return "JSON Error"
+        except KeyError as e:
+            logging.error(f"KeyError: {e}, response json: {response.json()}")
+            return "Response Error"
+        except Exception as e:
+            logging.error(f"An unexpected error occurred: {e}")
+            return "Unexpected Error"
+        
