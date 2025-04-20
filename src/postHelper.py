@@ -135,11 +135,23 @@ Here are the posts that are featured in this curation post:<br><br>
     beneficiaryList = create_beneficiary_list ( beneficiaryList )
     body += f"\n\n<br><br>Beneficiaries:<br><br>"
     body += "<table>"
-    for beneficiary in beneficiaryList:
-        body += "<tr>\n"
-        body += f'   <td>@{beneficiary["account"]}</td>\n'
-        body += f'   <td>{beneficiary["weight"] / 100}</td>\n'
-        body += '</tr>\n'
+    
+    # Define the number of columns
+    columns = 2
+    for i, beneficiary in enumerate(beneficiaryList):
+        if i % columns == 0:  # Start a new row for every 'columns' items
+            body += "<tr>\n"
+        body += f'   <td>@{beneficiary["account"]} / {beneficiary["weight"] / 100}%</td>\n'
+        if (i + 1) % columns == 0:  # Close the row after 'columns' items
+            body += "</tr>\n"
+    
+    # Fill remaining cells in the last row, if necessary
+    remaining_cells = columns - (len(beneficiaryList) % columns)
+    if remaining_cells != columns:  # Only add if the last row isn't full
+        for _ in range(remaining_cells):
+            body += "   <td></td>\n"  # Add empty cells
+        body += "</tr>\n"
+    
     body += "</table><br><br>\n"
 
     permlink = f"thoth{randValue}"
