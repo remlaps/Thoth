@@ -105,7 +105,7 @@ Here are the posts that are featured in this curation post:<br><br>
         body += f'   <td>@{commentList[lcv]["author"]}'
         body += f'      <hr>\n'
         body += f'      <b>Created</b>: {steemPost["created"]}</td>\n'
-        body += '</tr>\n'
+        body += f'</tr>\n<tr></tr>\n'        ## Empty row to separate entries
 
     body += "</table><br><br>And here is the AI response for each post:<br><br><hr>"
 
