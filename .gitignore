@@ -7,3 +7,5 @@ images/aiThoth.jfif
 images/ThothAI2.png
 .vscode
 .env
+config/configHistorical.ini
+config/configActive.ini

@@ -99,15 +99,18 @@ while retry_count <= max_retries:
             if 'type' in operation and operation['type'] == 'comment':
                 comment = operation
 
-                if 'parent_author' in comment and comment['parent_author'] == '':
-                    if not utils.screenPost(comment):
+                if 'parent_author' in comment and comment['parent_author'] == '': # top-level posts only
+                    screenResult = utils.screenPost(comment)
+                    if screenResult == "Accept": 
                         ### Retrieve the latest version of the post
-                        latestComment=s.get_content(comment['author'],comment['permlink'])
-                        tmpBody = utils.remove_formatting(latestComment['body'])
+                        latestPostVersion=s.get_content(comment['author'],comment['permlink'])
+                        tmpBody = utils.remove_formatting(latestPostVersion['body'])
                         print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}\n{tmpBody[:100]}...")
 
+                        ### Get the AI Evaluation
                         aiResponse = aiCurator.aicurate(arliaiKey, arliaiModel, arliaiUrl, tmpBody)
                         with open('data/output.html', 'a', encoding='utf-8') as f:
+                            print(f"URL: https://steemit.com/@{comment['author']}/{comment['permlink']}")
                             print(f"Body: {tmpBody}\n\nAI Response: {aiResponse}\n", file=f)
                         print (f"\n\nAI Response: {aiResponse}\n")
 
@@ -121,11 +124,9 @@ while retry_count <= max_retries:
                             aiResponseList.append(aiResponse)
                             postCount = postCount + 1
                     else:
-                        print(f"{postCount}: {operation['author']}/{operation['permlink']}: excluded by screening.")
-                else:
-                    print(f"{postCount}: {operation['author']}/{operation['permlink']}: is a reply.")
-            else:
-                print(f"{postCount}: {operation['type']}")
+                        print(f"{postCount}: https://steemitdev.com/@{operation['author']}/{operation['permlink']}: excluded by screening: {screenResult}.")
+                # else:
+                    # print(f"{postCount}: {operation['type']}")
         
         # If we get here without exceptions, break out of the retry loop
         break

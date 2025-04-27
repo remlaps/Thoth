@@ -49,6 +49,9 @@ def getTagBlacklist():
 
 def hasRequiredTag(comment):
     requiredTags=getIncludeTagList()
+    if ( not requiredTags ):
+        return True
+    
     if comment.get('json_metadata', None):
         metadataString=comment['json_metadata']
         metadataJson=json.loads(metadataString)
@@ -64,8 +67,9 @@ def hasRequiredTag(comment):
     return False
 
 def getIncludeTagList():
-    tags = config.get('CONTENT', 'INCLUDE_TAGS')
-    return [tag.strip() for tag in tags.split(',')]
+    tagsString = config.get('CONTENT', 'INCLUDE_TAGS', fallback='')
+    tagsList = [tag.strip() for tag in tagsString.split(',') if tag.strip()] # Filters out empty strings
+    return tagsList
 
 def getTags(comment):
     """

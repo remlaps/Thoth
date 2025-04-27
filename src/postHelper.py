@@ -5,6 +5,7 @@ import configparser
 import datetime
 import time
 import contentValidation
+import delegationInfo
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -15,6 +16,8 @@ postingAccount=config.get('STEEM', 'POSTING_ACCOUNT')
 postingAccountWeight=config.getint('BLOG','POSTING_ACCOUNT_WEIGHT')
 curatedPostCount=config.getint('BLOG','NUMBER_OF_REVIEWED_POSTS')
 curatedAuthorWeight=config.getint('BLOG','CURATED_AUTHOR_WEIGHT')
+delegatorCount=config.getint('BLOG','NUMBER_OF_DELEGATORS_PER_POST')
+delegatorWeight=config.getint('BLOG','DELEGATOR_WEIGHT')
 
 def create_beneficiary_list(beneficiary_list):
     # Initialize empty dictionary to track accounts and their weights
@@ -24,15 +27,22 @@ def create_beneficiary_list(beneficiary_list):
     totalWeight=0
     for account in beneficiary_list:
         if account == 'null':                ### Reward burning
-            account_weights[account] = 10000 - ( postingAccountWeight + (curatedPostCount * curatedAuthorWeight))
+            account_weights[account] = \
+                10000 - ( postingAccountWeight + (curatedPostCount * curatedAuthorWeight) + (delegatorCount * delegatorWeight))
             totalWeight += account_weights[account]
         elif account == postingAccount:      ### Account submitting the post
-            account_weights[account] = 500
-            totalWeight += 500
+            account_weights[account] = postingAccountWeight
+            totalWeight += postingAccountWeight
         else:
-            # Regular accounts get 500, add if the account appears multiple times
-            account_weights[account] = account_weights.get(account, 0) + 500
-            totalWeight += 500
+            print(f"Account: {account}")
+            accountType=account.split('-')[0]
+            tmpAccount='-'.join(account.split('-')[1:])
+            if accountType == 'a':
+                account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + curatedAuthorWeight
+                totalWeight += curatedAuthorWeight
+            elif accountType == 'd':
+                account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + delegatorWeight
+                totalWeight += delegatorWeight
 
     if ( totalWeight != 10000 ):
         print (f"Total Weight: {totalWeight}")
@@ -95,7 +105,7 @@ Here are the posts that are featured in this curation post:<br><br>
         tagString=""
         for index, tag in enumerate(tags):
             tagString+=f"<A HREF='/hot/{tag}'>{tag}</A>"
-            if ( index < len(tags)-1):
+            if ( index > 0 and index < len(tags)-1):
                 tagString +=", "
         body += "<tr>\n"
         body += f'   <td><b>{lcv + 1}</b>: </td>\n'
@@ -129,8 +139,12 @@ Here are the posts that are featured in this curation post:<br><br>
     body += "<br><br>\n\nYou can contribute to Thoth or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
 
     beneficiaryList = ['null', postingAccount ]
+    # The "a/d account types is a kludge"
     for comment in commentList:
-        beneficiaryList.append(comment['author'])
+        beneficiaryList.append(f"a-{comment['author']}")
+    delegatorList = delegationInfo.shuffled_delegators_by_weight(delegationInfo.get_delegations(postingAccount))
+    for delegator in delegatorList[:delegatorCount]:
+        beneficiaryList.append(f"d-{delegator}")
         
     beneficiaryList = create_beneficiary_list ( beneficiaryList )
     body += f"\n\n<br><br>Beneficiaries:<br><br>"
@@ -141,7 +155,7 @@ Here are the posts that are featured in this curation post:<br><br>
     for i, beneficiary in enumerate(beneficiaryList):
         if i % columns == 0:  # Start a new row for every 'columns' items
             body += "<tr>\n"
-        body += f'   <td>@{beneficiary["account"]} / {beneficiary["weight"] / 100}%</td>\n'
+        body += f'   <td>{beneficiary["account"]} / {beneficiary["weight"] / 100}%</td>\n'
         if (i + 1) % columns == 0:  # Close the row after 'columns' items
             body += "</tr>\n"
     

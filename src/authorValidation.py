@@ -58,23 +58,26 @@ def isAuthorScreened(comment):
     if isFollowerCountTooLow(comment['author']):
         return True
     
+    if isHiveActivityTooRecent(comment['author']):
+        return True
+    
     steemApi = config.get('STEEM', 'STEEM_API')
     if ( steemApi ):
         s=Steem(node=steemApi)
     else:
         s=Steem()
     accountInfo = s.get_account(comment['author'])
-
+     
+    if isInactive(accountInfo) :
+        return True
+        
     if isRepTooLow(accountInfo['reputation']) :
         return True
     
     if isMonthlyFollowersTooLow(accountInfo, comment):
         return True
     
-    if isInactive(accountInfo) :
-        return True
-    
-    if isHiveActivityTooRecent(comment['author']):
+    if isAdjustedMonthlyFollowersTooLow ( accountInfo, comment):
         return True
 
     if ( getMedianFollowerRep ( comment['author'] ) < config.getint( 'AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP' )):
@@ -99,10 +102,39 @@ def followersPerMonth(accountInfo, comment):
     if accountCreated > now:
         raise ValueError("Account creation date is in the future")
     age = now - accountCreated
-    return followerCount / (age.days / 30.0)
+    return 30.44 * followerCount / age.days
+
+import math
+
+def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1):
+    s = Steem()
+    followerCount = s.get_follow_count(comment['author'])['follower_count']
+    accountCreated = datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
+    now = datetime.now()
+    if accountCreated > now:
+        raise ValueError("Account creation date is in the future")
+    age = now - accountCreated
+
+    ## halflife formula - https://www.calculator.net/half-life-calculator.html
+    adjustedHalfLife = max ( age.days - halfLife, 1 )  ## Give them one halving cycle for free
+    adjustedFollowerCount = followerCount * (0.5 ** (age.days / adjustedHalfLife))  
+    adjustedFollowersPerMonth = 30.44 * adjustedFollowerCount / age.days
+    
+    return adjustedFollowersPerMonth
 
 def isMonthlyFollowersTooLow (accountInfo, comment):
     return followersPerMonth(accountInfo, comment) < config.getint('AUTHOR','MIN_FOLLOWERS_PER_MONTH')
+
+def isAdjustedMonthlyFollowersTooLow (accountInfo, comment):
+    halfLife = config.getint('AUTHOR','FOLLOWER_HALFLIFE_YEARS')
+    if ( halfLife ):
+        return \
+            adjustedFollowersPerMonth(accountInfo, comment, halfLife * 365.25) < \
+                config.getint('AUTHOR','MIN_ADJUSTED_FOLLOWERS_PER_MONTH')
+    else:
+        return \
+            adjustedFollowersPerMonth(accountInfo, comment) < \
+                config.getint('AUTHOR','MIN_ADJUSTED_FOLLOWERS_PER_MONTH')
 
 def isInactive ( accountInfo ):
     return inactiveDays(accountInfo['name']) > config.getint('AUTHOR','MAX_INACTIVITY_DAYS')
