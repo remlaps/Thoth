@@ -50,9 +50,9 @@ If ANY of these conditions are met, respond ONLY with: "DO NOT CURATE."
 - Lacks substance or original thinking
 - Repetitive phrases, lack of specific details or examples, or a noticeable disconnect between topic and conclusion.
 
-IMPORTANT: Check carefully for those conditions.  If any are met, respond with "DO NOT CURATE."  Then STOP.
+IMPORTANT: If any of those conditions are met, respond with "DO NOT CURATE."  Then STOP.  Don't write anything else.
 
-Otherwise, if none of the above conditions are met, create a curation report with ONLY the following four sections and NOTHING else:
+Otherwise, if none of the above conditions are met, create a curation report with ONLY the following three sections and NOTHING else:
 
 1. KEY TAKEAWAYS (3-4 bullet points summarizing the main insights using SEO-friendly keywords)
 
@@ -62,7 +62,10 @@ Otherwise, if none of the above conditions are met, create a curation report wit
 
 END OF CURATION REPORT
 
-IMPORTANT: Write your report in English.  Use HTML formatting for section headings, and don't add anything after those four sections.  Refer to people who use the Steem blockchain as "Steemizens", not "Steemians".
+IMPORTANT:
+ - Write the curation report in English.
+ - Use level 2 heading formats for section titles, and don't add anything after the required three sections.
+ - Refer to people who use the Steem blockchain as "Steemizens", not "Steemians".
 
 Here is the article: 
     """

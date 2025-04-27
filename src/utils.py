@@ -21,33 +21,33 @@ def detect_language(text):
 
 def screenPost(comment):    
     if ( contentValidation.isEdit (comment)):
-        return True
+        return "Post edit"
+    
+    if ( contentValidation.hasBlacklistedTag(comment)):
+        return "Blacklisted tag in original version"
     
     latestComment=Steem().get_content(comment['author'],comment['permlink'])
 
     if ( contentValidation.hasBlacklistedTag(latestComment)):
-        return True
-    
-    if ( contentValidation.hasBlacklistedTag(comment)):
-        return True
+        return "Blacklisted tag in latest revision."
     
     if ( not contentValidation.hasRequiredTag(latestComment)):
-        return True
+        return "Required tag missing"
     
     tmpBody=remove_formatting(latestComment['body'])
     if ( contentValidation.isTooShort (tmpBody)):
-        return True
+        return "Too short"
 
     if ( authorValidation.isAuthorScreened(comment)):
-        return True
+        return "Author screening"
     
     targetLanguage = [lang.strip() for lang in config.get('CONTENT', 'LANGUAGE').split(',') if lang]
     bodyLanguage = detect_language(tmpBody)
     titleLanguage = detect_language(latestComment['title'])
     if not ( bodyLanguage in targetLanguage and titleLanguage in targetLanguage ):
-        return True
+        return "Not a target language"
     
-    return False
+    return "Accept"
 
 def remove_formatting(text):
     # Remove markdown and HTML formatting
