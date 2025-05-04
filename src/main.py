@@ -34,8 +34,6 @@ streamType = config.get('STEEM', 'STREAM_TYPE')
 
 maxSize=config.getint('BLOG', 'NUMBER_OF_REVIEWED_POSTS')
 
-blockchain = Blockchain()
-
 commentList = []
 aiResponseList = []
 
@@ -52,15 +50,30 @@ if os.path.exists(BLOCK_FILE):
 else:
     lastBlock = 0
 
-s = Steem()
+if steemApi:
+    steemdInstance = Steem(node=steemApi)
+    print (f"Using Steem: {steemApi}")
+else:
+    steemdInstance = Steem()
+    print (f"Using Steem: default")
+
+if steemApi:
+    blockchain = Blockchain(steemd_instance=steemdInstance)
+    print(f"Using blockchain: {steemApi}")
+else:
+    blockchain = Blockchain()
+    print(f"Using blockchain: default")
+
+
 if ( streamType == 'RANDOM' ):
-    streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), s.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 30) )
-    # streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), 40969437 )
+    streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), 
+        steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 30) )
 elif ( streamType == 'ACTIVE' ):
-    streamFromBlock = max (s.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 6), lastBlock ) # 6 days or last processed
+    streamFromBlock = \
+        max (steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 6), lastBlock ) # 6 days or last processed
 elif ( streamType == 'HISTORY'):
     # Read the last processed block number from file, if exists
-    payoutBlock = s.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 30)
+    payoutBlock = steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 30)
     
     if (lastBlock != 0 and lastBlock < payoutBlock ):
         streamFromBlock = lastBlock
@@ -81,10 +94,7 @@ with open('data/output.html', 'w', encoding='utf-8') as f:
 
 while retry_count <= max_retries:
     try:
-        if steemApi:
-            blockchain = Blockchain(steemApi)
-        else:
-            stream = blockchain.stream(start_block=streamFromBlock, filter_by=['comment'])
+        stream = blockchain.stream(start_block=streamFromBlock, filter_by=['comment'])
 
         for operation in stream:
             streamFromBlock = operation['block_num'] + 1
@@ -103,7 +113,7 @@ while retry_count <= max_retries:
                     screenResult = utils.screenPost(comment)
                     if screenResult == "Accept": 
                         ### Retrieve the latest version of the post
-                        latestPostVersion=s.get_content(comment['author'],comment['permlink'])
+                        latestPostVersion=steemdInstance.get_content(comment['author'],comment['permlink'])
                         tmpBody = utils.remove_formatting(latestPostVersion['body'])
                         print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}\n{tmpBody[:100]}...")
 
@@ -115,7 +125,7 @@ while retry_count <= max_retries:
                         print (f"\n\nAI Response: {aiResponse}\n")
 
                         if (re.search("DO NOT CURATE", aiResponse)):
-                            print(f"{postCount}: {operation['author']}/{operation['permlink']}: disqualified by AI.")
+                            print(f"{streamFromBlock}/{postCount}: {operation['author']}/{operation['permlink']}: disqualified by AI.")
                         elif  (aiResponse == "API Error"):
                             print("AI not available.  Exiting.  Try again later.")
                             exit()
@@ -124,7 +134,7 @@ while retry_count <= max_retries:
                             aiResponseList.append(aiResponse)
                             postCount = postCount + 1
                     else:
-                        print(f"{postCount}: https://steemitdev.com/@{operation['author']}/{operation['permlink']}: excluded by screening: {screenResult}.")
+                        print(f"{streamFromBlock}/{postCount}: https://steemitdev.com/@{operation['author']}/{operation['permlink']}: excluded by screening: {screenResult}.")
                 # else:
                     # print(f"{postCount}: {operation['type']}")
         

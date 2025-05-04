@@ -6,6 +6,7 @@ import datetime
 import time
 import contentValidation
 import delegationInfo
+import threading
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -18,6 +19,8 @@ curatedPostCount=config.getint('BLOG','NUMBER_OF_REVIEWED_POSTS')
 curatedAuthorWeight=config.getint('BLOG','CURATED_AUTHOR_WEIGHT')
 delegatorCount=config.getint('BLOG','NUMBER_OF_DELEGATORS_PER_POST')
 delegatorWeight=config.getint('BLOG','DELEGATOR_WEIGHT')
+taglist = config.get("BLOG","POST_TAGS")
+thothCategory=taglist.split(',')[0]
 
 def create_beneficiary_list(beneficiary_list):
     # Initialize empty dictionary to track accounts and their weights
@@ -61,6 +64,10 @@ def create_beneficiary_list(beneficiary_list):
     # Return the beneficiaries list to be inserted into extensions
     return beneficiary_dicts
 
+def vote_in_background(postingAccount, permlink, voteWeight=100):
+    time.sleep(300)
+    Steem().commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
+
 def postCuration (commentList, aiResponseList):
     postingKey=config.get('STEEM', 'POSTING_KEY')
     steemApi=config.get('STEEM', 'STEEM_API')
@@ -78,6 +85,9 @@ def postCuration (commentList, aiResponseList):
 
     body=f"""
 AI Curation by [Thoth](https://github.com/remlaps/Thoth)
+| |
+| --- |
+| <h6>Unlocking permanent rewards for your Steem content</h6> |
 
 This post was generated with the assistance of the following AI model: <i>{config.get('ARLIAI','ARLIAI_MODEL')}</i>
     """
@@ -89,9 +99,9 @@ Named after the ancient Egyptian god of writing, science, art, wisdom, judgment,
 
 This will be done by:
 1. Identifying attractive posts on the blockchain - past and present;
-2. Highlighting those posts for curators; and
-3. Using beneficiary rewards to deliver additional rewards to authors.
-4. A future enhancement will start delivering beneficiary rewards to delegators.<br><br>
+2. Highlighting those posts for curators;
+3. Deliver beneficiary rewards to the creators who are producing blockchain content with lasting value; and
+4. Deliver beneficiary rewards to the delegators who support the curation initiative.<br><br>
 
 If the highlighted post has already paid out, you can upvote this post in order to send rewards to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br><br>
 
@@ -104,9 +114,10 @@ Here are the posts that are featured in this curation post:<br><br>
         tags = contentValidation.getTags(steemPost)
         tagString=""
         for index, tag in enumerate(tags):
-            tagString+=f"<A HREF='/hot/{tag}'>{tag}</A>"
-            if ( index > 0 and index < len(tags)-1):
-                tagString +=", "
+            if ( tag != "" ):
+                tagString+=f"<A HREF='/hot/{tag}'>{tag}</A>"
+                if ( index < len(tags)-1):
+                    tagString +=", "
         body += "<tr>\n"
         body += f'   <td><b>{lcv + 1}</b>: </td>\n'
         body += f'   <td><A HREF="/thoth/@{comment["author"]}/{comment["permlink"]}" target="_blank">{repr(comment["title"])}</A>'
@@ -170,8 +181,7 @@ Here are the posts that are featured in this curation post:<br><br>
 
     permlink = f"thoth{randValue}"
 
-    thothCategory='test'
-    taglist=[thothCategory, 'test1', 'test2', 'test3', 'test4']
+    # taglist=[thothCategory, 'test1', 'test2', 'test3', 'test4']
     metadata = {
         "app": "Thoth/0.0.1"
     }
@@ -212,6 +222,6 @@ Here are the posts that are featured in this curation post:<br><br>
         print (f"Post {title} failed.  Exiting.")
         return False
     
-    time.sleep(300)
-    Steem().commit.vote(f"@{postingAccount}/{permlink}", 100, postingAccount )
-    print (f"Post and vote for {title} completed.")
+    voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, 100))
+    voting_thread.start()
+    print (f"Post completed and vote for {title} scheduled.")
