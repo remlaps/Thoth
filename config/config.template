@@ -9,6 +9,10 @@
 ARLIAI_URL = https://api.arliai.com/v1/chat/completions
 ARLIAI_KEY = 
 ARLIAI_MODEL = Mistral-Nemo-12B-Instruct-2407
+SYSTEM_PROMPT_FILE = config\systemPrompt.txt
+SYSTEM_PROMPT_TEMPLATE = config\systemPromptTemplate.txt
+USER_PROMPT_FILE = config\userPrompt.txt
+USER_PROMPT_TEMPLATE = config\userPromptTemplate.txt
 
 [STEEM]
 DEFAULT_START_BLOCK = 3250000
@@ -28,7 +32,7 @@ STREAM_TYPE = RANDOM
 EXCLUDE_TAGS = actifit, appics, booming, contest, erotic, nsfw, porn, pornography, \
    nobots, promo-steem, realrobinhood, steemzzang, test, upgoat, yehey, zzan
 INCLUDE_TAGS = 
-LANGUAGE = de, en, es, ukr
+LANGUAGE = de, en, es, fr, it, ukr
 MAX_VOTING_SERVICE_PCT = 25
 MIN_FEED_REACH = 200
 MIN_WORDS = 500
