@@ -19,8 +19,9 @@ curatedPostCount=config.getint('BLOG','NUMBER_OF_REVIEWED_POSTS')
 curatedAuthorWeight=config.getint('BLOG','CURATED_AUTHOR_WEIGHT')
 delegatorCount=config.getint('BLOG','NUMBER_OF_DELEGATORS_PER_POST')
 delegatorWeight=config.getint('BLOG','DELEGATOR_WEIGHT')
-taglist = config.get("BLOG","POST_TAGS")
-thothCategory=taglist.split(',')[0]
+post_tags_config_string = config.get("BLOG", "POST_TAGS", fallback="") # Add fallback for safety
+parsed_tags = [tag.strip() for tag in post_tags_config_string.split(',') if tag.strip()]
+taglist = parsed_tags # taglist is the list of all parsed tags
 
 def create_beneficiary_list(beneficiary_list):
     # Initialize empty dictionary to track accounts and their weights
@@ -85,9 +86,9 @@ def postCuration (commentList, aiResponseList):
 
     body=f"""
 AI Curation by [Thoth](https://github.com/remlaps/Thoth)
-| |
+| <h6>Unlocking #lifetime-rewards for Steem's creators</h6> |
 | --- |
-| <h6>Unlocking permanent rewards for your Steem content</h6> |
+
 
 This post was generated with the assistance of the following AI model: <i>{config.get('ARLIAI','ARLIAI_MODEL')}</i>
     """
@@ -100,10 +101,8 @@ Named after the ancient Egyptian god of writing, science, art, wisdom, judgment,
 This will be done by:
 1. Identifying attractive posts on the blockchain - past and present;
 2. Highlighting those posts for curators;
-3. Deliver beneficiary rewards to the creators who are producing blockchain content with lasting value; and
-4. Deliver beneficiary rewards to the delegators who support the curation initiative.<br><br>
-
-If the highlighted post has already paid out, you can upvote this post in order to send rewards to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br><br>
+3. Delivering beneficiary rewards to the creators who are producing blockchain content with lasting value; and
+4. Delivering beneficiary rewards to the delegators who support the curation initiative.<br><br>
 
 Here are the posts that are featured in this curation post:<br><br>
 """
@@ -145,9 +144,10 @@ Here are the posts that are featured in this curation post:<br><br>
         body += f'<table><tr><td>{aiResponse}\n\n'
         body += '</td></tr></table><br><br>\n'  ## Whitespace needed by Steemit/Upvu web sites.  No idea wy.
 
-    body += "<br><br>Obviously, inclusion in this list does not imply endorsement of the author's ideas.  The list was built by AI and other automated tools, so the results may contain halucinations, errors, or controversial opinions.  If you see content that should be filtered in the future, please let the operator know.\n"
-    body += f"<br><br>This Thoth instance is operated by {config.get('BLOG', 'THOTH_OPERATOR')}\n"
-    body += "<br><br>\n\nYou can contribute to Thoth or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
+    body += "<br>Obviously, inclusion in this list does not imply endorsement of the author's ideas.  The list was built by AI and other automated tools, so the results may contain halucinations, errors, or controversial opinions.  If you see content that should be filtered in the future, please let the operator know.<br>\n"
+    body += "<br>If the highlighted post has already paid out, you can upvote this post in order to send rewards to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br>\n"
+    body += f"<br>This Thoth instance is operated by {config.get('BLOG', 'THOTH_OPERATOR')}<br>\n"
+    body += "<br>\n\nYou can contribute to Thoth or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
 
     beneficiaryList = ['null', postingAccount ]
     # The "a/d account types is a kludge"
@@ -181,7 +181,6 @@ Here are the posts that are featured in this curation post:<br><br>
 
     permlink = f"thoth{randValue}"
 
-    # taglist=[thothCategory, 'test1', 'test2', 'test3', 'test4']
     metadata = {
         "app": "Thoth/0.0.1"
     }
