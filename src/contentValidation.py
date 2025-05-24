@@ -47,6 +47,36 @@ def getTagBlacklist():
     tags = config.get('CONTENT', 'EXCLUDE_TAGS')
     return [tag.strip() for tag in tags.split(',')]
 
+
+def count_hashtag_words(comment):
+    """
+    Counts the number of words in a string that begin with a '#' (hash/pound) sign.
+
+    Args:
+        text (str): The input string to analyze.
+
+    Returns:
+        int: The number of words starting with '#'.
+    """
+
+    text = comment['body']
+    if not text or not isinstance(text, str):
+        return 0
+    
+    # Split the text into words. This handles various whitespace.
+    words = text.split()
+    
+    hashtag_count = 0
+    for word in words:
+        if word.startswith('#'):
+            hashtag_count += 1
+            
+    return hashtag_count
+
+def hasTooManyTags ( comment ):
+    maxTags = config.getint('CONTENT', 'MAX_TAG_COUNT')
+    return count_hashtag_words(comment) > maxTags
+
 def hasRequiredTag(comment):
     requiredTags=getIncludeTagList()
     if ( not requiredTags ):

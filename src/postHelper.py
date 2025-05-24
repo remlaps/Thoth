@@ -30,14 +30,10 @@ def create_beneficiary_list(beneficiary_list):
     # Process each account in the list
     totalWeight=0
     for account in beneficiary_list:
-        if account == 'null':                ### Reward burning
-            account_weights[account] = \
-                10000 - ( postingAccountWeight + (curatedPostCount * curatedAuthorWeight) + (delegatorCount * delegatorWeight))
-            totalWeight += account_weights[account]
-        elif account == postingAccount:      ### Account submitting the post
+        if account == postingAccount:      ### Account submitting the post
             account_weights[account] = postingAccountWeight
             totalWeight += postingAccountWeight
-        else:
+        elif account != 'null':
             print(f"Account: {account}")
             accountType=account.split('-')[0]
             tmpAccount='-'.join(account.split('-')[1:])
@@ -47,6 +43,9 @@ def create_beneficiary_list(beneficiary_list):
             elif accountType == 'd':
                 account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + delegatorWeight
                 totalWeight += delegatorWeight
+
+    account_weights['null'] = max(0, 10000 - totalWeight)
+    totalWeight += account_weights['null']
 
     if ( totalWeight != 10000 ):
         print (f"Total Weight: {totalWeight}")

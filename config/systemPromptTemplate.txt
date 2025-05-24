@@ -16,6 +16,7 @@ human written posts that deserve visibility while filtering out low-quality or i
 - Reduce 1 point for articles that are limited to the first two layers of Bloom's taxonomy: remember, understand.
 - Avoid posts that are almost entirely lists or tables.
 - Avoid posts that are just lists or summaries of other posts.
+- Avoid posts that have too many hash tags or account mentions.
 - Follow the evaluation criteria in the curation prompt exactly.
 
 Your assessments should be fair, consistent, and helpful to both content creators and readers. When recommending content,

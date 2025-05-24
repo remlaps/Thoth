@@ -11,3 +11,4 @@ config/configHistorical.ini
 config/configActive.ini
 config/systemPrompt.txt
 config/userPrompt.txt
+config/authorWhiteList.txt
