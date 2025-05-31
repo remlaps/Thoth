@@ -140,7 +140,7 @@ Here are the posts that are featured in this curation post:<br><br>
         body += f'     <td>@{commentList[lcv]["author"]}</td>\n'
         body += f'   </tr>\n'
         body += f'</table>'
-        body += f'<table><tr><td>{aiResponse}\n\n'
+        body += f'<table><tr><td>\n\n{aiResponse}\n\n'
         body += '</td></tr></table><br><br>\n'  ## Whitespace needed by Steemit/Upvu web sites.  No idea wy.
 
     body += "<br>Obviously, inclusion in this list does not imply endorsement of the author's ideas.  The list was built by AI and other automated tools, so the results may contain halucinations, errors, or controversial opinions.  If you see content that should be filtered in the future, please let the operator know.<br>\n"

@@ -129,6 +129,8 @@ while retry_count <= max_retries:
                         elif  (aiResponse == "API Error"):
                             print("AI not available.  Exiting.  Try again later.")
                             exit()
+                        elif (aiResponse == "Response Error"):
+                            print ("STOP Condition or bad key observed")
                         else:
                             commentList.append(comment)
                             aiResponseList.append(aiResponse)

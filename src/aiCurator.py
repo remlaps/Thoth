@@ -39,7 +39,12 @@ def ensurePromptFileExists(promptFilePath, templateFilePath, promptTypeName):
 ensurePromptFileExists(systemPromptFile, systemPromptTemplateFile, "System")
 ensurePromptFileExists(userPromptFile, userPromptTemplateFile, "User")
 
-def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=768):
+def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=1024):
+    if ( arliaiModel[:6] == "gemini" ):
+        stopParameter = "stop"
+    else:
+        stopParameter = "stop_sequences"
+
     today = datetime.now()
     try:
         with open(systemPromptFile, 'r', encoding='utf-8') as f:
@@ -71,15 +76,18 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=768):
                 "content": f"{curationPrompt} - {postBody}"
             }
         ],
-        "repetition_penalty": 1.1,
+        # "repetition_penalty": 1.1,
         "temperature": 0.6,
         "top_p": 0.9,
-        "top_k": 40,
+        # "top_k": 40,
         "max_tokens": maxTokens,
         "stream": False,
-        "frequency_penalty": 0.3,
-        "presence_penalty": 0.3,
-        "stop_sequences": ["\n\n\n", "END_OF_CURATION_REPORT", "DO NOT CURATE"]
+        # "frequency_penalty": 0.3,
+        # "presence_penalty": 0.3,
+        stopParameter: ["END_OF_CURATION_REPORT", "DO NOT CURATE"]
+        # "stop_sequences": ["\n\n\n", "END_OF_CURATION_REPORT", "DO NOT CURATE"]
+        # "stop": ["\n\n\n", "END_OF_CURATION_REPORT", "DO NOT CURATE"]
+
     })
 
     headers = {
