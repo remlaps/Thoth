@@ -25,7 +25,7 @@ config = configparser.ConfigParser()
 # Read the config.ini file
 config.read('config/config.ini')
 
-arliaiKey=config.get('ARLIAI', 'ARLIAI_KEY')
+arliaiKey=config.get('ARLIAI', 'ARLIAI_KEY').split()[0]  # Eliminate comments after the key
 arliaiModel=config.get('ARLIAI', 'ARLIAI_MODEL')
 arliaiUrl=config.get('ARLIAI', 'ARLIAI_URL')
 

@@ -40,12 +40,9 @@ ensurePromptFileExists(systemPromptFile, systemPromptTemplateFile, "System")
 ensurePromptFileExists(userPromptFile, userPromptTemplateFile, "User")
 
 def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=1024):
-    if ( arliaiModel[:6] == "gemini" ):
-        stopParameter = "stop"
-    else:
-        stopParameter = "stop_sequences"
-
     today = datetime.now()
+    arliaiKey = arliaiKey.split()[0]  # Eliminate comments after the key (should be redundant)
+    
     try:
         with open(systemPromptFile, 'r', encoding='utf-8') as f:
             systemPrompt = f.read()
@@ -64,7 +61,12 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=1024):
 
     postBody = utils.remove_formatting(postBody)
 
-    payload = json.dumps({
+    if ( arliaiModel.startswith("gemini" )):
+        stopParameter = "stop"
+    else:
+        stopParameter = "stop_sequences"
+
+    payloadDict = {
         "model": arliaiModel,
         "messages": [
             {
@@ -76,32 +78,49 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=1024):
                 "content": f"{curationPrompt} - {postBody}"
             }
         ],
-        # "repetition_penalty": 1.1,
         "temperature": 0.6,
         "top_p": 0.9,
-        # "top_k": 40,
         "max_tokens": maxTokens,
         "stream": False,
-        # "frequency_penalty": 0.3,
-        # "presence_penalty": 0.3,
         stopParameter: ["END_OF_CURATION_REPORT", "DO NOT CURATE"]
-        # "stop_sequences": ["\n\n\n", "END_OF_CURATION_REPORT", "DO NOT CURATE"]
-        # "stop": ["\n\n\n", "END_OF_CURATION_REPORT", "DO NOT CURATE"]
+        # "stop_sequences": ["END_OF_CURATION_REPORT", "DO NOT CURATE"]
+        # "stop": ["END_OF_CURATION_REPORT", "DO NOT CURATE"]
 
-    })
+    }
+
+    if arliaiModel.startswith("Mistral-Nemo"):
+        payloadDict["repetition_penalty"] = 1.1
+        payloadDict["top_k"] = 40
+        payloadDict["frequency_penalty"] = 0.3
+        payloadDict["presence_penalty"] = 0.3
 
     headers = {
         'Content-Type': 'application/json',
         'Authorization': f"Bearer {arliaiKey}"
     }
 
+    # print (payloadDict)
+    payload = json.dumps(payloadDict)
+
     try:
         response = requests.post(arliaiUrl, headers=headers, data=payload)
         response.raise_for_status()
         aiResponse = response.json()['choices'][0]['message']['content']
         return aiResponse
+    except requests.exceptions.HTTPError as e:
+        # Attempt to get more details from the response body for HTTP errors
+        error_message = f"API request failed with status {e.response.status_code} ({e.response.reason}) for URL {e.request.url}: {e}"
+        try:
+            error_details = e.response.json()
+            error_message += f"\nResponse JSON: {json.dumps(error_details, indent=2)}"
+        except json.JSONDecodeError:
+            # If response is not JSON, use text
+            error_message += f"\nResponse Text: {e.response.text}"
+        logging.error(error_message)
+        return "API Error"
     except requests.exceptions.RequestException as e:
-        logging.error(f"API request failed: {e}")
+        # For other network errors (not HTTP 4xx/5xx)
+        logging.error(f"API request failed (non-HTTP error, e.g., network issue): {e}")
         return "API Error"
     except json.JSONDecodeError as e:
         logging.error(f"JSON decode error: {e}, response text: {response.text}")
