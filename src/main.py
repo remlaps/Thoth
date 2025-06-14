@@ -4,9 +4,11 @@ import os
 import time
 import random
 
+import aiIntro
 import utils  # From the thoth package
 import aiCurator # From the thoth package
 import postHelper # From the thoth package
+import replyHelper # From the thoth package
 
 from steem.blockchain import Blockchain
 from steem import Steem
@@ -121,22 +123,28 @@ while retry_count <= max_retries:
                         aiResponse = aiCurator.aicurate(arliaiKey, arliaiModel, arliaiUrl, tmpBody)
                         with open('data/output.html', 'a', encoding='utf-8') as f:
                             print(f"URL: https://steemit.com/@{comment['author']}/{comment['permlink']}")
-                            print(f"Body: {tmpBody}\n\nAI Response: {aiResponse}\n", file=f)
+                            print(f"Title: {latestPostVersion['title']}")
+                            print(f"Body (first 200 chars): {tmpBody[:200]}...\n\nAI Response: {aiResponse}\n", file=f)
                         print (f"\n\nAI Response: {aiResponse}\n")
 
-                        if (re.search("DO NOT CURATE", aiResponse)):
-                            print(f"{streamFromBlock}/{postCount}: {operation['author']}/{operation['permlink']}: disqualified by AI.")
-                        elif  (aiResponse == "API Error"):
-                            print("AI not available.  Exiting.  Try again later.")
-                            exit()
-                        elif (aiResponse == "Response Error"):
-                            print ("STOP Condition or bad key observed")
+                        MIN_AI_RESPONSE_LENGTH = 100 # Define a reasonable minimum length
+                        if (re.search("DO NOT CURATE", aiResponse) or (aiResponse == "Content Error - Empty Body" )):
+                            print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: disqualified by AI.")
+                        elif aiResponse.startswith("API Error") or \
+                             aiResponse == "JSON Error" or \
+                             aiResponse == "Response Error" or \
+                             aiResponse == "Unexpected Error":
+                            # aiCurator has already attempted retries for relevant API errors.
+                            # Log the failure and continue with the next post.
+                            print(f"{streamFromBlock}/{postCount}: AI Curation for @{operation['author']}/{operation['permlink']} failed. AI System Response: '{aiResponse}'. Skipping this post.")
+                        elif len(aiResponse) < MIN_AI_RESPONSE_LENGTH:
+                            print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: disqualified by AI (response too short: '{aiResponse}').")
                         else:
                             commentList.append(comment)
                             aiResponseList.append(aiResponse)
                             postCount = postCount + 1
                     else:
-                        print(f"{streamFromBlock}/{postCount}: https://steemitdev.com/@{operation['author']}/{operation['permlink']}: excluded by screening: {screenResult}.")
+                        print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: excluded by screening: {screenResult}.")
                 # else:
                     # print(f"{postCount}: {operation['type']}")
         
@@ -160,6 +168,7 @@ while retry_count <= max_retries:
             if retry_count >= max_retries:
                 raise
             time.sleep(retry_delay)
-                      
-postHelper.postCuration(commentList, aiResponseList)
+
+aiIntroString = aiIntro.aiIntro(arliaiKey, arliaiModel, arliaiUrl, "\n\n".join(aiResponseList))
+postHelper.postCuration(commentList, aiResponseList, aiIntroString )
 print("Posting finished.")

@@ -22,6 +22,7 @@ When evaluating any article, prioritize content that demonstrates:
 Always be vigilant and filter out content that:
 *   Appears AI-generated or plagiarized.
 *   Exhibits generic phrasing, lacks a personal voice, or aligns with known AI writing patterns.
+*   Contains excessive vulgarity or adults-only subject matter.
 *   Consists primarily of lists, tables, or simple aggregations (e.g., statistics, hashtags, author names) without substantial original content.
 *   Announces contests, contest winners, giveaways, or similar promotions.
 *   Contains an excessive number of unexplained links, hashtags, or account mentions.

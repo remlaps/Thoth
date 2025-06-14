@@ -8,8 +8,6 @@ import contentValidation
 import delegationInfo
 import threading
 
-import replyHelper # From the thoth package
-
 # Create a ConfigParser object
 config = configparser.ConfigParser()
 
@@ -67,31 +65,10 @@ def create_beneficiary_list(beneficiary_list):
     return beneficiary_dicts
 
 def vote_in_background(postingAccount, permlink, voteWeight=100):
-    """
-    Waits for an initial period, then attempts to vote in a loop until successful.
-    Retries every 3 seconds upon any failure.
-    """
-    s_vote = Steem()
-    initial_wait_seconds = 303  # 5 minutes
-    retry_delay_seconds = 3
+    time.sleep(300)
+    Steem().commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
 
-    print(f"Waiting {initial_wait_seconds // 60} minutes before attempting to vote for @{postingAccount}/{permlink}...")
-    time.sleep(initial_wait_seconds)
-    max_retries=20
-    retries=0
-
-    while retries < max_retries:
-        try:
-            print(f"Attempting to vote for @{postingAccount}/{permlink}...")
-            s_vote.commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
-            print(f"Successfully voted for @{postingAccount}/{permlink}")
-            break  # Exit loop on successful vote
-        except Exception as e:
-            print(f"Vote for @{postingAccount}/{permlink} failed: {e}. Retrying in {retry_delay_seconds} seconds...")
-            time.sleep(retry_delay_seconds)
-            retries += 1
-
-def postCuration (commentList, aiResponseList, aiIntroString):
+def postReply (commentList, aiResponseList, thothAccount, thothPermlink):
     postingKey=config.get('STEEM', 'POSTING_KEY')
     steemApi=config.get('STEEM', 'STEEM_API')
 
@@ -114,69 +91,22 @@ AI Curation by [Thoth](https://github.com/remlaps/Thoth)
 
 This post was generated with the assistance of the following AI model: <i>{config.get('ARLIAI','ARLIAI_MODEL')}</i>
     """
+    body += "\n\nHere are the AI responses:\n\n"
 
-    body+='<div class=pull-right>\n\n[![](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)<h6><sup>Image by AI</sup></h6>\n\n</div>\n\n'
-
-    body += f'\n\n{aiIntroString}\n\n<hr>'
-
-    body+=f"""
-Here are the posts that are featured in this curation post:<br><br>
-"""
-
-    body+="<hr><table>"
-    for lcv, comment in enumerate(commentList):
-        steemPost=s.get_content(comment['author'],comment['permlink'])
-        tags = contentValidation.getTags(steemPost)
-        tagString=""
-        for index, tag in enumerate(tags):
-            if ( tag != "" ):
-                tagString+=f"<A HREF='/hot/{tag}'>{tag}</A>"
-                if ( index < len(tags)-1):
-                    tagString +=", "
-        body += "<tr>\n"
-        body += f'   <td><b>{lcv + 1}</b>: </td>\n'
-        body += f'   <td><A HREF="/thoth/@{comment["author"]}/{comment["permlink"]}" target="_blank">{repr(comment["title"])}</A>'
-        body += f'      <hr>\n'
-        body += f'      <b>Tags</b>: {tagString}</td>\n'
-        body += f'   <td>@{commentList[lcv]["author"]}'
-        body += f'      <hr>\n'
-        body += f'      <b>Created</b>: {steemPost["created"]}</td>\n'
-        body += '</tr>\n'
-
-    body +="</table><hr>"
-
-    # body += "\n\nAnd here is the AI response for each post:\n\n"
-
-
-    # for lcv, aiResponse in enumerate(aiResponseList):
-    #     body += '<table border="1">\n'
-    #     body += '   <tr>\n'
-    #     body += f'     <td><b>Post #</b></td>\n'
-    #     body += f'     <td><b>Title</b></td>\n'
-    #     body += f'     <td><b>Author</b></td>\n'
-    #     body += f'  </tr><tr>\n'
-    #     body += f'     <td>{lcv + 1}</td>\n'
-    #     body += f'     <td><a href="/thoth/@{commentList[lcv]["author"]}/{commentList[lcv]["permlink"]}">{repr(commentList[lcv]["title"])}</a></td>\n'
-    #     body += f'     <td>@{commentList[lcv]["author"]}</td>\n'
-    #     body += f'   </tr>\n'
-    #     body += f'</table>'
-    #     body += f'<table><tr><td>\n\n{aiResponse}\n\n'
-    #     body += '</td></tr></table><br><br>\n'  ## Whitespace needed by Steemit/Upvu web sites.  No idea wy.
-
-    body += "<br>Obviously, inclusion in this list does not imply endorsement of the author's ideas.  The list was built by AI and other automated tools, so the results may contain halucinations, errors, or controversial opinions.  If you see content that should be filtered in the future, please let the operator know.<br>\n"
-    body += "<br>If the highlighted post has already paid out, you can upvote this post in order to send rewards to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br><hr>\n"
-
-    body+=f"""
-About <b><i>Thoth</i></b>:
-Named after the ancient Egyptian god of writing, science, art, wisdom, judgment, and magic, <b><i>Thoth</i></i> is an Open Source curation bot that is intended to align incentives for authors and investors towards the production and support of creativity that attracts human eyeballs to the Steem blockchain.<br><br>
-
-This will be done by:
-1. Identifying attractive posts on the blockchain - past and present;
-2. Highlighting those posts for curators;
-3. Delivering beneficiary rewards to the creators who are producing blockchain content with lasting value; and
-4. Delivering beneficiary rewards to the delegators who support the curation initiative.<br><br>
-
-"""
+    for lcv, aiResponse in enumerate(aiResponseList):
+        body += '<table border="1">\n'
+        body += '   <tr>\n'
+        body += f'     <td><b>Post #</b></td>\n'
+        body += f'     <td><b>Title</b></td>\n'
+        body += f'     <td><b>Author</b></td>\n'
+        body += f'  </tr><tr>\n'
+        body += f'     <td>{lcv + 1}</td>\n'
+        body += f'     <td><a href="/thoth/@{commentList[lcv]["author"]}/{commentList[lcv]["permlink"]}">{repr(commentList[lcv]["title"])}</a></td>\n'
+        body += f'     <td>@{commentList[lcv]["author"]}</td>\n'
+        body += f'   </tr>\n'
+        body += f'</table>'
+        body += f'<table><tr><td>\n\n{aiResponse}\n\n'
+        body += '</td></tr></table><br><br>\n'  ## Whitespace needed by Steemit/Upvu web sites.  No idea wy.
 
     body += f"<br>This Thoth instance is operated by {config.get('BLOG', 'THOTH_OPERATOR')}<br>\n"
     body += "<br>\n\nYou can contribute to Thoth or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
@@ -211,8 +141,6 @@ This will be done by:
     
     body += "</table><br><br>\n"
 
-    permlink = f"thoth{randValue}"
-
     metadata = {
         "app": "Thoth/0.0.1"
     }
@@ -225,36 +153,40 @@ This will be done by:
         'extensions': [[0, { }]]
     }
 
+    # Generate a unique permlink for the reply before the retry loop
+    # randValue is already generated at the beginning of the function
+    reply_permlink = f"re-{thothAccount.replace('@','').lower()}-{thothPermlink}-{randValue}"
+    # A more descriptive title for logging purposes
+    log_display_title = f"reply to @{thothAccount}/{thothPermlink} ({reply_permlink})"
+
     print (f"Body: {body}")
     print (f"Body length:  {len(body)}")
     print (f"Tags: {taglist}")
     print (f"Beneficiaries: {beneficiaryList}")
-    postDone=False
+
+    replyDone=False
     retryCount = 0
-    while not postDone and retryCount < 3:
-        now = datetime.datetime.now(datetime.timezone.utc)
-        timeStamp = now.strftime("%Y-%m-%d %H:%M")
-        title = f"Curated by Thoth - {timeStamp}Z"
-        print(f"Posting: {title}")
+    while not replyDone and retryCount < 3:
+        title = "" # Title for a reply is typically empty
+        print(f"Attempting to post {log_display_title}")
         print(body)
         with open('data/fakepost.html', 'w', encoding='utf-8') as f:
             print(f"{body}", file=f)
         try:
-            s.commit.post(title, body, postingAccount, permlink=permlink, tags=taglist,
-                comment_options=comment_options, json_metadata=metadata, 
-                beneficiaries=beneficiaryList)
-            postDone=True
-            replyHelper.postReply(commentList, aiResponseList, postingAccount, permlink )
+            s.commit.post(title, body, postingAccount, permlink=reply_permlink, tags=taglist,
+                comment_options=comment_options, json_metadata=metadata,
+                beneficiaries=beneficiaryList, reply_identifier=f"@{thothAccount}/{thothPermlink}")
+            replyDone = True
         except Exception as E:
             print (E)
             print ("Sleeping 1 minute before retry...")
             time.sleep(60)
             retryCount += 1
-    if ( not postDone ):
-        print (f"Post {title} failed.  Exiting.")
+    if ( not replyDone ):
+        print (f"Posting {log_display_title} failed after multiple retries. Exiting reply process.")
         return False
     
-    voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, 100))
+    # Vote on the newly created reply, not the parent post
+    voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, reply_permlink, 100))
     voting_thread.start()
-    print (f"Post completed and vote for {title} scheduled.")
-
+    print (f"Reply {log_display_title} completed and vote scheduled.")
