@@ -144,25 +144,7 @@ Here are the posts that are featured in this curation post:<br><br>
         body += '</tr>\n'
 
     body +="</table><hr>"
-
-    # body += "\n\nAnd here is the AI response for each post:\n\n"
-
-
-    # for lcv, aiResponse in enumerate(aiResponseList):
-    #     body += '<table border="1">\n'
-    #     body += '   <tr>\n'
-    #     body += f'     <td><b>Post #</b></td>\n'
-    #     body += f'     <td><b>Title</b></td>\n'
-    #     body += f'     <td><b>Author</b></td>\n'
-    #     body += f'  </tr><tr>\n'
-    #     body += f'     <td>{lcv + 1}</td>\n'
-    #     body += f'     <td><a href="/thoth/@{commentList[lcv]["author"]}/{commentList[lcv]["permlink"]}">{repr(commentList[lcv]["title"])}</a></td>\n'
-    #     body += f'     <td>@{commentList[lcv]["author"]}</td>\n'
-    #     body += f'   </tr>\n'
-    #     body += f'</table>'
-    #     body += f'<table><tr><td>\n\n{aiResponse}\n\n'
-    #     body += '</td></tr></table><br><br>\n'  ## Whitespace needed by Steemit/Upvu web sites.  No idea wy.
-
+    
     body += "<br>Obviously, inclusion in this list does not imply endorsement of the author's ideas.  The list was built by AI and other automated tools, so the results may contain halucinations, errors, or controversial opinions.  If you see content that should be filtered in the future, please let the operator know.<br>\n"
     body += "<br>If the highlighted post has already paid out, you can upvote this post in order to send rewards to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br><hr>\n"
 
@@ -243,8 +225,30 @@ This will be done by:
             s.commit.post(title, body, postingAccount, permlink=permlink, tags=taglist,
                 comment_options=comment_options, json_metadata=metadata, 
                 beneficiaries=beneficiaryList)
-            postDone=True
-            replyHelper.postReply(commentList, aiResponseList, postingAccount, permlink )
+            postDone = True
+
+            # After the main curation post is successful, post individual AI summary replies
+            print(f"Main curation post '{title}' successful. Now posting individual AI summary replies...")
+            for idx, (cmt_item, ai_resp_item) in enumerate(zip(commentList, aiResponseList)):
+                print(f"Preparing to post AI summary reply for item {idx + 1} (Original author: @{cmt_item['author']})...")
+                try:
+                    # Call the modified postReply for each item
+                    # postingAccount is the author of the main Thoth post (thothAccount for the reply)
+                    # permlink is the permlink of the main Thoth post (thothPermlink for the reply)
+                    reply_successful = replyHelper.postReply(
+                        comment_item=cmt_item,
+                        ai_response_item=ai_resp_item,
+                        item_index=idx, # 0-based index
+                        thothAccount=postingAccount, # The account that made the main curation post
+                        thothPermlink=permlink       # The permlink of the main curation post
+                    )
+                    # Wait for 6 seconds between posting replies to avoid API rate limits or other issues
+                    print(f"Waiting 6 seconds before posting next reply...")
+                    time.sleep(6)
+                except Exception as e_reply:
+                    print(f"Error occurred while trying to post AI summary reply for item {idx + 1} (Original author: @{cmt_item['author']}): {e_reply}")
+                    print(f"Waiting 6 seconds before attempting next reply, if any...")
+                    time.sleep(6) # Also wait if an error occurs before trying the next one
         except Exception as E:
             print (E)
             print ("Sleeping 1 minute before retry...")
@@ -257,4 +261,3 @@ This will be done by:
     voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, 100))
     voting_thread.start()
     print (f"Post completed and vote for {title} scheduled.")
-

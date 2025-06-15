@@ -19,8 +19,6 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, combinedComment, maxTokens=1024):
        Each of the entries in the text will be posted later, as separate replies.
        
        Refer to people on the Steem blockchain as "steemizens", not "steemians".
-
-       Optionally, include a relevant riddle at the end of the blog post.
        
        Here is the text: {combinedComment}
     """

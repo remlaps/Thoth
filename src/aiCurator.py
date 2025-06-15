@@ -2,7 +2,6 @@ import requests
 import json
 import time
 import random
-import utils
 from datetime import datetime
 import logging
 import configparser

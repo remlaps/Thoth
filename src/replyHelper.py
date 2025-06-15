@@ -2,9 +2,7 @@ from steem import Steem
 import random
 import string
 import configparser
-import datetime
 import time
-import contentValidation
 import delegationInfo
 import threading
 
@@ -16,14 +14,14 @@ config.read('config/config.ini')
 postingAccount=config.get('STEEM', 'POSTING_ACCOUNT')
 postingAccountWeight=config.getint('BLOG','POSTING_ACCOUNT_WEIGHT')
 curatedPostCount=config.getint('BLOG','NUMBER_OF_REVIEWED_POSTS')
-curatedAuthorWeight=config.getint('BLOG','CURATED_AUTHOR_WEIGHT')
+curatedAuthorWeight=config.getint('BLOG','CURATED_AUTHOR_WEIGHT') * curatedPostCount
 delegatorCount=config.getint('BLOG','NUMBER_OF_DELEGATORS_PER_POST')
 delegatorWeight=config.getint('BLOG','DELEGATOR_WEIGHT')
 post_tags_config_string = config.get("BLOG", "POST_TAGS", fallback="") # Add fallback for safety
 parsed_tags = [tag.strip() for tag in post_tags_config_string.split(',') if tag.strip()]
 taglist = parsed_tags # taglist is the list of all parsed tags
 
-def create_beneficiary_list(beneficiary_list):
+def create_beneficiary_list(beneficiary_list, curatedAuthorWeight, delegatorWeight):
     # Initialize empty dictionary to track accounts and their weights
     account_weights = {}
     
@@ -68,7 +66,16 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
     time.sleep(300)
     Steem().commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
 
-def postReply (commentList, aiResponseList, thothAccount, thothPermlink):
+def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPermlink):
+    """
+    Posts a single AI summary as a reply to the main Thoth curation post.
+
+    :param comment_item: dict, the comment data for the post being summarized.
+    :param ai_response_item: str, the AI-generated summary for the comment_item.
+    :param item_index: int, the 0-based index of this item from the original list (for display purposes).
+    :param thothAccount: str, the author of the main Thoth curation post to reply to.
+    :param thothPermlink: str, the permlink of the main Thoth curation post to reply to.
+    """
     postingKey=config.get('STEEM', 'POSTING_KEY')
     steemApi=config.get('STEEM', 'STEEM_API')
 
@@ -91,35 +98,54 @@ AI Curation by [Thoth](https://github.com/remlaps/Thoth)
 
 This post was generated with the assistance of the following AI model: <i>{config.get('ARLIAI','ARLIAI_MODEL')}</i>
     """
-    body += "\n\nHere are the AI responses:\n\n"
+    display_index = item_index + 1 # Convert 0-based index to 1-based for display
 
-    for lcv, aiResponse in enumerate(aiResponseList):
-        body += '<table border="1">\n'
-        body += '   <tr>\n'
-        body += f'     <td><b>Post #</b></td>\n'
-        body += f'     <td><b>Title</b></td>\n'
-        body += f'     <td><b>Author</b></td>\n'
-        body += f'  </tr><tr>\n'
-        body += f'     <td>{lcv + 1}</td>\n'
-        body += f'     <td><a href="/thoth/@{commentList[lcv]["author"]}/{commentList[lcv]["permlink"]}">{repr(commentList[lcv]["title"])}</a></td>\n'
-        body += f'     <td>@{commentList[lcv]["author"]}</td>\n'
-        body += f'   </tr>\n'
-        body += f'</table>'
-        body += f'<table><tr><td>\n\n{aiResponse}\n\n'
-        body += '</td></tr></table><br><br>\n'  ## Whitespace needed by Steemit/Upvu web sites.  No idea wy.
+    body += '<table border="1">\n'
+    body += '   <tr>\n'
+    body += f'     <td><b>Original Post Reference #</b></td>\n'
+    body += f'     <td><b>Title</b></td>\n'
+    body += f'     <td><b>Author</b></td>\n'
+    body += f'  </tr><tr>\n'
+    body += f'     <td>{display_index}</td>\n'
+    body += f'     <td><a href="/thoth/@{comment_item["author"]}/{comment_item["permlink"]}">{repr(comment_item["title"])}</a></td>\n'
+    body += f'     <td>{comment_item["author"]}</td>\n'
+    body += f'   </tr>\n'
+    body += f'</table>'
+    body += f'<table><tr><td>\n\n{ai_response_item}\n\n' # Use the single ai_response_item
+    body += '</td></tr></table><br><br>\n'
 
     body += f"<br>This Thoth instance is operated by {config.get('BLOG', 'THOTH_OPERATOR')}<br>\n"
     body += "<br>\n\nYou can contribute to Thoth or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
 
-    beneficiaryList = ['null', postingAccount ]
-    # The "a/d account types is a kludge"
-    for comment in commentList:
-        beneficiaryList.append(f"a-{comment['author']}")
-    delegatorList = delegationInfo.shuffled_delegators_by_weight(delegationInfo.get_delegations(postingAccount))
-    for delegator in delegatorList[:delegatorCount]:
-        beneficiaryList.append(f"d-{delegator}")
+    # --- Beneficiary Calculation ---
+    # For a single reply, there's always 1 author.
+    num_authors_in_this_reply = 1
+    
+    # Calculate how many author slots (from the main post's potential count) are "freed up".
+    # curatedPostCount and delegatorCount are module-level globals read from config.
+    freed_author_slots = max(0, curatedPostCount - num_authors_in_this_reply)
+    
+    # Determine the total number of delegators to include for this reply.
+    total_delegators_to_include_for_reply = delegatorCount + freed_author_slots
+    
+    all_delegators_list = []
+    try:
+        delegations = delegationInfo.get_delegations(postingAccount)
+        if delegations: # Only shuffle if there are actual delegations
+            all_delegators_list = delegationInfo.shuffled_delegators_by_weight(delegations)
+    except Exception as e:
+        print(f"Warning: Could not retrieve or shuffle delegators for reply: {e}")
+        # all_delegators_list will remain empty
+
+    adjustedDelegatorWeight = int( ( delegatorCount * delegatorWeight ) / min( total_delegators_to_include_for_reply, len(all_delegators_list) ))
+
+    selected_delegators = all_delegators_list[:min(total_delegators_to_include_for_reply, len(all_delegators_list))]
+    
+    raw_beneficiaries_input = [postingAccount, f"a-{comment_item['author']}"] # Bot and original author
+    for delegator_name in selected_delegators:
+        raw_beneficiaries_input.append(f"d-{delegator_name}") # Add selected delegators
         
-    beneficiaryList = create_beneficiary_list ( beneficiaryList )
+    beneficiaryList = create_beneficiary_list(raw_beneficiaries_input, curatedAuthorWeight, adjustedDelegatorWeight)
     body += f"\n\n<br><br>Beneficiaries:<br><br>"
     body += "<table>"
     
@@ -155,9 +181,10 @@ This post was generated with the assistance of the following AI model: <i>{confi
 
     # Generate a unique permlink for the reply before the retry loop
     # randValue is already generated at the beginning of the function
-    reply_permlink = f"re-{thothAccount.replace('@','').lower()}-{thothPermlink}-{randValue}"
+    sanitized_thoth_account_for_permlink = thothAccount.replace('@','').replace('.', '-').lower()
+    reply_permlink = f"re-{sanitized_thoth_account_for_permlink}-{thothPermlink}-{randValue}"
     # A more descriptive title for logging purposes
-    log_display_title = f"reply to @{thothAccount}/{thothPermlink} ({reply_permlink})"
+    log_display_title = f"AI summary reply for post #{display_index} (to @{thothAccount}/{thothPermlink}, permlink: {reply_permlink})"
 
     print (f"Body: {body}")
     print (f"Body length:  {len(body)}")
