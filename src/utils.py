@@ -19,7 +19,7 @@ def detect_language(text):
     except langdetect.lang_detect_exception.LangDetectException:
         return "Unable to detect language"
 
-def screenPost(comment):    
+def screenPost(comment):
     if ( contentValidation.isEdit (comment)):
         return "Post edit"
     
@@ -34,19 +34,30 @@ def screenPost(comment):
     if ( not contentValidation.hasRequiredTag(latestComment)):
         return "Required tag missing"
     
-    tmpBody=remove_formatting(latestComment['body'])
-    if ( contentValidation.isTooShort (tmpBody)):
-        return "Too short"
-
-    if ( authorValidation.isAuthorScreened(comment)):
-        return "Author screening"
-    
     targetLanguage = [lang.strip() for lang in config.get('CONTENT', 'LANGUAGE').split(',') if lang]
+    tmpBody=remove_formatting(latestComment['body'])
     bodyLanguage = detect_language(tmpBody)
     titleLanguage = detect_language(latestComment['title'])
     if not ( bodyLanguage in targetLanguage and titleLanguage in targetLanguage ):
         return "Not a target language"
+
+    if ( authorValidation.isAuthorScreened(comment)):
+        return "Author screened"
+      
+    if ( authorValidation.isAuthorWhitelisted(comment['author'])):
+        return "Accept"
     
+    whiteListRequired = config.get('CONTENT', 'WHITELIST_REQUIRED')
+    if ( whiteListRequired == "True"):
+        return ("Non-whitelisted author")
+    
+    ### Additional checks for non-whitelisted authors
+    if ( contentValidation.isTooShort (tmpBody)):
+        return "Too short"
+    
+    if ( contentValidation.hasTooManyTags (latestComment)):
+        return "Too many tags"
+       
     return "Accept"
 
 def remove_formatting(text):

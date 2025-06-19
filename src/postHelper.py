@@ -8,6 +8,8 @@ import contentValidation
 import delegationInfo
 import threading
 
+import replyHelper # From the thoth package
+
 # Create a ConfigParser object
 config = configparser.ConfigParser()
 
@@ -30,14 +32,10 @@ def create_beneficiary_list(beneficiary_list):
     # Process each account in the list
     totalWeight=0
     for account in beneficiary_list:
-        if account == 'null':                ### Reward burning
-            account_weights[account] = \
-                10000 - ( postingAccountWeight + (curatedPostCount * curatedAuthorWeight) + (delegatorCount * delegatorWeight))
-            totalWeight += account_weights[account]
-        elif account == postingAccount:      ### Account submitting the post
+        if account == postingAccount:      ### Account submitting the post
             account_weights[account] = postingAccountWeight
             totalWeight += postingAccountWeight
-        else:
+        elif account != 'null':
             print(f"Account: {account}")
             accountType=account.split('-')[0]
             tmpAccount='-'.join(account.split('-')[1:])
@@ -47,6 +45,9 @@ def create_beneficiary_list(beneficiary_list):
             elif accountType == 'd':
                 account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + delegatorWeight
                 totalWeight += delegatorWeight
+
+    account_weights['null'] = max(0, 10000 - totalWeight)
+    totalWeight += account_weights['null']
 
     if ( totalWeight != 10000 ):
         print (f"Total Weight: {totalWeight}")
@@ -66,10 +67,31 @@ def create_beneficiary_list(beneficiary_list):
     return beneficiary_dicts
 
 def vote_in_background(postingAccount, permlink, voteWeight=100):
-    time.sleep(300)
-    Steem().commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
+    """
+    Waits for an initial period, then attempts to vote in a loop until successful.
+    Retries every 3 seconds upon any failure.
+    """
+    s_vote = Steem()
+    initial_wait_seconds = 303  # 5 minutes
+    retry_delay_seconds = 3
 
-def postCuration (commentList, aiResponseList):
+    print(f"Waiting {initial_wait_seconds // 60} minutes before attempting to vote for @{postingAccount}/{permlink}...")
+    time.sleep(initial_wait_seconds)
+    max_retries=20
+    retries=0
+
+    while retries < max_retries:
+        try:
+            print(f"Attempting to vote for @{postingAccount}/{permlink}...")
+            s_vote.commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
+            print(f"Successfully voted for @{postingAccount}/{permlink}")
+            break  # Exit loop on successful vote
+        except Exception as e:
+            print(f"Vote for @{postingAccount}/{permlink} failed: {e}. Retrying in {retry_delay_seconds} seconds...")
+            time.sleep(retry_delay_seconds)
+            retries += 1
+
+def postCuration (commentList, aiResponseList, aiIntroString):
     postingKey=config.get('STEEM', 'POSTING_KEY')
     steemApi=config.get('STEEM', 'STEEM_API')
 
@@ -95,19 +117,13 @@ This post was generated with the assistance of the following AI model: <i>{confi
 
     body+='<div class=pull-right>\n\n[![](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)<h6><sup>Image by AI</sup></h6>\n\n</div>\n\n'
 
+    body += f'\n\n{aiIntroString}\n\n<hr>'
+
     body+=f"""
-Named after the ancient Egyptian god of writing, science, art, wisdom, judgment, and magic, <i>Thoth</i> is an Open Source curation bot that is intended to align incentives for authors and investors towards the production and support of creativity that attracts human eyeballs to the Steem blockchain.<br><br>
-
-This will be done by:
-1. Identifying attractive posts on the blockchain - past and present;
-2. Highlighting those posts for curators;
-3. Delivering beneficiary rewards to the creators who are producing blockchain content with lasting value; and
-4. Delivering beneficiary rewards to the delegators who support the curation initiative.<br><br>
-
 Here are the posts that are featured in this curation post:<br><br>
 """
 
-    body+="<table>"
+    body+="<hr><table>"
     for lcv, comment in enumerate(commentList):
         steemPost=s.get_content(comment['author'],comment['permlink'])
         tags = contentValidation.getTags(steemPost)
@@ -127,25 +143,24 @@ Here are the posts that are featured in this curation post:<br><br>
         body += f'      <b>Created</b>: {steemPost["created"]}</td>\n'
         body += '</tr>\n'
 
-    body += "</table><br><br>And here is the AI response for each post:<br><br><hr>"
-
-    for lcv, aiResponse in enumerate(aiResponseList):
-        body += '<table border="1">\n'
-        body += '   <tr>\n'
-        body += f'     <td><b>Post #</b></td>\n'
-        body += f'     <td><b>Title</b></td>\n'
-        body += f'     <td><b>Author</b></td>\n'
-        body += f'  </tr><tr>\n'
-        body += f'     <td>{lcv + 1}</td>\n'
-        body += f'     <td><a href="/thoth/@{commentList[lcv]["author"]}/{commentList[lcv]["permlink"]}">{repr(commentList[lcv]["title"])}</a></td>\n'
-        body += f'     <td>@{commentList[lcv]["author"]}</td>\n'
-        body += f'   </tr>\n'
-        body += f'</table>'
-        body += f'<table><tr><td>{aiResponse}\n\n'
-        body += '</td></tr></table><br><br>\n'  ## Whitespace needed by Steemit/Upvu web sites.  No idea wy.
-
+    body +="</table><hr>"
+    
     body += "<br>Obviously, inclusion in this list does not imply endorsement of the author's ideas.  The list was built by AI and other automated tools, so the results may contain halucinations, errors, or controversial opinions.  If you see content that should be filtered in the future, please let the operator know.<br>\n"
-    body += "<br>If the highlighted post has already paid out, you can upvote this post in order to send rewards to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br>\n"
+    body += "<br>If the highlighted post has already paid out, you can upvote this post in order to send rewards to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br><hr>\n"
+
+    body+=f"""
+### About <b><i>Thoth</i></b>:
+
+Named after the ancient Egyptian god of writing, science, art, wisdom, judgment, and magic, <b><i>Thoth</i></i> is an Open Source curation bot that is intended to align incentives for authors and investors towards the production and support of creativity that attracts human eyeballs to the Steem blockchain.<br><br>
+
+This will be done by:
+1. Identifying attractive posts on the blockchain - past and present;
+2. Highlighting those posts for curators;
+3. Delivering beneficiary rewards to the creators who are producing blockchain content with lasting value; and
+4. Delivering beneficiary rewards to the delegators who support the curation initiative.<br><br>
+
+"""
+
     body += f"<br>This Thoth instance is operated by {config.get('BLOG', 'THOTH_OPERATOR')}<br>\n"
     body += "<br>\n\nYou can contribute to Thoth or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
 
@@ -211,7 +226,30 @@ Here are the posts that are featured in this curation post:<br><br>
             s.commit.post(title, body, postingAccount, permlink=permlink, tags=taglist,
                 comment_options=comment_options, json_metadata=metadata, 
                 beneficiaries=beneficiaryList)
-            postDone=True
+            postDone = True
+
+            # After the main curation post is successful, post individual AI summary replies
+            print(f"Main curation post '{title}' successful. Now posting individual AI summary replies...")
+            for idx, (cmt_item, ai_resp_item) in enumerate(zip(commentList, aiResponseList)):
+                print(f"Preparing to post AI summary reply for item {idx + 1} (Original author: @{cmt_item['author']})...")
+                try:
+                    # Call the modified postReply for each item
+                    # postingAccount is the author of the main Thoth post (thothAccount for the reply)
+                    # permlink is the permlink of the main Thoth post (thothPermlink for the reply)
+                    reply_successful = replyHelper.postReply(
+                        comment_item=cmt_item,
+                        ai_response_item=ai_resp_item,
+                        item_index=idx, # 0-based index
+                        thothAccount=postingAccount, # The account that made the main curation post
+                        thothPermlink=permlink       # The permlink of the main curation post
+                    )
+                    # Wait for 6 seconds between posting replies to avoid API rate limits or other issues
+                    print(f"Waiting 6 seconds before posting next reply...")
+                    time.sleep(6)
+                except Exception as e_reply:
+                    print(f"Error occurred while trying to post AI summary reply for item {idx + 1} (Original author: @{cmt_item['author']}): {e_reply}")
+                    print(f"Waiting 6 seconds before attempting next reply, if any...")
+                    time.sleep(6) # Also wait if an error occurs before trying the next one
         except Exception as E:
             print (E)
             print ("Sleeping 1 minute before retry...")

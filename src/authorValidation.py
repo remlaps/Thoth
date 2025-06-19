@@ -51,16 +51,33 @@ def isBlacklisted(account):
     
     return False
 
+def isAuthorWhitelisted(account):
+    whiteListFile = config.get('CONTENT', 'AUTHOR_WHITELIST_FILE')
+    try:
+        with open(whiteListFile, 'r') as wlf:
+            # Read lines, strip whitespace from each, and filter out empty lines
+            whiteList = {line.strip() for line in wlf if line.strip()}
+    except FileNotFoundError:
+        # Handle the case where the whitelist file doesn't exist
+        # You might want to log this or return False by default
+        print(f"Warning: Whitelist file '{whiteListFile}' not found.")
+        return False
+    
+    return account in whiteList
+
 def isAuthorScreened(comment):
     if ( isBlacklisted(comment['author']) ):
+        return True
+    
+    if ( isAuthorWhitelisted(comment['author']) ):
+        return False
+    
+    if isHiveActivityTooRecent(comment['author']):
         return True
 
     if isFollowerCountTooLow(comment['author']):
         return True
-    
-    if isHiveActivityTooRecent(comment['author']):
-        return True
-    
+       
     steemApi = config.get('STEEM', 'STEEM_API')
     if ( steemApi ):
         s=Steem(node=steemApi)

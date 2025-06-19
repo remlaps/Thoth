@@ -1,4 +1,9 @@
 
+# Thoth
+
+## Project Diagram
+![Description of Diagram](images/thothGen5Framework.png)
+
 ## Installation
 
 1.  **Clone the repository:**
