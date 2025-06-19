@@ -32,7 +32,7 @@ def create_beneficiary_list(beneficiary_list):
     # Process each account in the list
     totalWeight=0
     for account in beneficiary_list:
-        if account == postingAccount:      ### Account submitting the post
+        if account == postingAccount and postingAccountWeight != 0:      ### Account submitting the post
             account_weights[account] = postingAccountWeight
             totalWeight += postingAccountWeight
         elif account != 'null':
@@ -40,11 +40,13 @@ def create_beneficiary_list(beneficiary_list):
             accountType=account.split('-')[0]
             tmpAccount='-'.join(account.split('-')[1:])
             if accountType == 'a':
-                account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + curatedAuthorWeight
-                totalWeight += curatedAuthorWeight
+                if curatedAuthorWeight != 0:
+                    account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + curatedAuthorWeight
+                    totalWeight += curatedAuthorWeight
             elif accountType == 'd':
-                account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + delegatorWeight
-                totalWeight += delegatorWeight
+                if delegatorWeight != 0:
+                    account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + delegatorWeight
+                    totalWeight += delegatorWeight
 
     account_weights['null'] = max(0, 10000 - totalWeight)
     totalWeight += account_weights['null']
