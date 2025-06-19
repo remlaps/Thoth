@@ -217,5 +217,6 @@ This post was generated with the assistance of the following AI model: <i>{confi
     
     # Vote on the newly created reply, not the parent post
     voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, reply_permlink, 100))
+    voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
     voting_thread.start()
     print (f"Reply {log_display_title} completed and vote scheduled.")

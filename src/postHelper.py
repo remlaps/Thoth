@@ -262,5 +262,6 @@ This will be done by:
         return False
     
     voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, 100))
+    voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
     voting_thread.start()
     print (f"Post completed and vote for {title} scheduled.")
