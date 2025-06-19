@@ -2,7 +2,7 @@
 # Thoth
 
 ## Project Diagram
-![Description of Diagram](images\thothGen5Framework.png)
+![Description of Diagram](images/thothGen5Framework.png)
 
 ## Installation
 
