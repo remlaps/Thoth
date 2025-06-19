@@ -149,7 +149,8 @@ Here are the posts that are featured in this curation post:<br><br>
     body += "<br>If the highlighted post has already paid out, you can upvote this post in order to send rewards to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br><hr>\n"
 
     body+=f"""
-About <b><i>Thoth</i></b>:
+### About <b><i>Thoth</i></b>:
+
 Named after the ancient Egyptian god of writing, science, art, wisdom, judgment, and magic, <b><i>Thoth</i></i> is an Open Source curation bot that is intended to align incentives for authors and investors towards the production and support of creativity that attracts human eyeballs to the Steem blockchain.<br><br>
 
 This will be done by:
