@@ -28,7 +28,7 @@ def create_beneficiary_list(beneficiary_list, curatedAuthorWeight, delegatorWeig
     # Process each account in the list
     totalWeight=0
     for account in beneficiary_list:
-        if account == postingAccount:      ### Account submitting the post
+        if account == postingAccount and postingAccountWeight != 0:      ### Account submitting the post
             account_weights[account] = postingAccountWeight
             totalWeight += postingAccountWeight
         elif account != 'null':
@@ -36,11 +36,13 @@ def create_beneficiary_list(beneficiary_list, curatedAuthorWeight, delegatorWeig
             accountType=account.split('-')[0]
             tmpAccount='-'.join(account.split('-')[1:])
             if accountType == 'a':
-                account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + curatedAuthorWeight
-                totalWeight += curatedAuthorWeight
+                if curatedAuthorWeight != 0:
+                    account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + curatedAuthorWeight
+                    totalWeight += curatedAuthorWeight
             elif accountType == 'd':
-                account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + delegatorWeight
-                totalWeight += delegatorWeight
+                if delegatorWeight != 0:
+                    account_weights[tmpAccount] = account_weights.get(tmpAccount, 0) + delegatorWeight
+                    totalWeight += delegatorWeight
 
     account_weights['null'] = max(0, 10000 - totalWeight)
     totalWeight += account_weights['null']
@@ -215,5 +217,6 @@ This post was generated with the assistance of the following AI model: <i>{confi
     
     # Vote on the newly created reply, not the parent post
     voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, reply_permlink, 100))
+    voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
     voting_thread.start()
     print (f"Reply {log_display_title} completed and vote scheduled.")
