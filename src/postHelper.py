@@ -214,6 +214,8 @@ This will be done by:
     print (f"Body length:  {len(body)}")
     print (f"Tags: {taglist}")
     print (f"Beneficiaries: {beneficiaryList}")
+    
+    active_voting_threads = [] # List to keep track of all voting threads
     postDone=False
     retryCount = 0
     while not postDone and retryCount < 3:
@@ -238,13 +240,16 @@ This will be done by:
                     # Call the modified postReply for each item
                     # postingAccount is the author of the main Thoth post (thothAccount for the reply)
                     # permlink is the permlink of the main Thoth post (thothPermlink for the reply)
-                    reply_successful = replyHelper.postReply(
+                    reply_voting_thread = replyHelper.postReply(
                         comment_item=cmt_item,
                         ai_response_item=ai_resp_item,
                         item_index=idx, # 0-based index
                         thothAccount=postingAccount, # The account that made the main curation post
                         thothPermlink=permlink       # The permlink of the main curation post
                     )
+                    if reply_voting_thread: # If a thread was successfully started by postReply
+                        active_voting_threads.append(reply_voting_thread)
+                        
                     # Wait for 6 seconds between posting replies to avoid API rate limits or other issues
                     print(f"Waiting 6 seconds before posting next reply...")
                     time.sleep(6)
@@ -264,4 +269,15 @@ This will be done by:
     voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, 100))
     voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
     voting_thread.start()
-    print (f"Post completed and vote for {title} scheduled.")
+    active_voting_threads.append(voting_thread) # Add the main post's voting thread
+    print (f"All content posted. Main post vote for '{title}' scheduled in background.")
+
+    if active_voting_threads:
+        print(f"\nWaiting for all {len(active_voting_threads)} background votes to be cast (this may take several minutes)...")
+        print("Press Ctrl-C to interrupt and exit if needed.")
+        for i, thread_to_join in enumerate(active_voting_threads):
+            while thread_to_join.is_alive(): # Loop to allow join to be interrupted by Ctrl-C
+                thread_to_join.join(timeout=1.0) # Wait for 1 second, then check again
+            print(f"Vote thread {i + 1}/{len(active_voting_threads)} has completed.")
+        print("All background vote processing finished.")
+    return True
