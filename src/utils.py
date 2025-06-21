@@ -74,3 +74,93 @@ def remove_formatting(text):
     text = re.sub(r'<script>.*?</script>', '', text)  # Remove HTML scripts
     text = re.sub(r'<style>.*?</style>', '', text)  # Remove HTML styles
     return text
+
+def generate_beneficiary_display_html(beneficiary_list, author_accounts, delegator_accounts, thoth_account, columns=2):
+    """
+    Generates an HTML block to display beneficiaries, categorized by role.
+
+    Args:
+        beneficiary_list (list): The final list of beneficiary dicts [{'account': name, 'weight': w}, ...].
+        author_accounts (list): A list of author account names.
+        delegator_accounts (list): A list of delegator account names.
+        thoth_account (str): The name of the bot/operator account.
+        columns (int): The number of columns for the tables.
+
+    Returns:
+        str: The generated HTML string.
+    """
+    
+    # Create a lookup map for weights for easy access
+    beneficiary_weights = {b['account']: b['weight'] for b in beneficiary_list}
+    null_account = 'null'
+    
+    def _generate_table_html(title, accounts, weights_map, gratitude_message=""):
+        """Nested helper to generate a single HTML table."""
+        # Filter for accounts that are actually in the final beneficiary list and have a weight > 0
+        display_items = []
+        for acc in accounts:
+            if acc in weights_map and weights_map[acc] > 0:
+                display_items.append({'account': acc, 'weight': weights_map[acc]})
+
+        if not display_items:
+            return ""
+
+        # Sort alphabetically by account name
+        display_items.sort(key=lambda x: x['account'])
+
+        html = f"<h4>{title}</h4>\n"
+        if gratitude_message:
+            html += f'<p><i>{gratitude_message}</i></p>\n'
+        html += "<table>\n"
+        
+        for i, item in enumerate(display_items):
+            if i % columns == 0:
+                html += "<tr>\n"
+            
+            percentage = item['weight'] / 100.0
+            formatted_percentage = f"{percentage:g}" # Use :g to remove trailing .0
+            html += f'   <td>{item["account"]} / {formatted_percentage}%</td>\n'
+            
+            if (i + 1) % columns == 0:
+                html += "</tr>\n"
+                
+        # Fill remaining cells in the last row if it's not full
+        remaining_cells = len(display_items) % columns
+        if remaining_cells != 0:
+            for _ in range(columns - remaining_cells):
+                html += "   <td></td>\n"
+            html += "</tr>\n"
+            
+        html += "</table>\n"
+        return html
+
+    # Start building the main HTML string
+    body = f"\n\n<br><br><h3>Beneficiaries</h3>"
+
+    # 1. Thoth Operator
+    if thoth_account in beneficiary_weights and beneficiary_weights[thoth_account] > 0:
+        percentage = beneficiary_weights[thoth_account] / 100.0
+        formatted_percentage = f"{percentage:g}"
+        body += f'<h4>Thoth Operator</h4>\n<p>{thoth_account} / {formatted_percentage}%</p>\n' # No @ sign
+
+    # 2. Curated Authors
+    unique_authors = sorted(list(set(author_accounts)))
+    if unique_authors:
+        author_title = "Curated Author" if len(unique_authors) == 1 else "Curated Authors"
+        author_gratitude = "Thank you for creating the content that makes Steem a vibrant and interesting place. Your creativity is the foundation of our social ecosystem."
+        body += _generate_table_html(author_title, unique_authors, beneficiary_weights, gratitude_message=author_gratitude)
+
+    # 3. Delegators
+    if delegator_accounts:
+        delegator_title = "Delegator" if len(delegator_accounts) == 1 else "Delegators"
+        delegator_gratitude = "Delegator support is crucial for the Thoth project's ability to find and reward attractive content. Thank you for investing in the Steem ecosystem and the Thoth project."
+        body += _generate_table_html(delegator_title, sorted(delegator_accounts), beneficiary_weights, gratitude_message=delegator_gratitude)
+
+    # 4. Burn Account (@null)
+    if null_account in beneficiary_weights and beneficiary_weights[null_account] > 0:
+        percentage = beneficiary_weights[null_account] / 100.0
+        formatted_percentage = f"{percentage:g}"
+        body += f'<h4>Burn Account</h4>\n<p>{null_account} / {formatted_percentage}%</p>\n'
+
+    body += "<br><br>\n"
+    return body

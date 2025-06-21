@@ -7,6 +7,7 @@ import time
 import contentValidation
 import delegationInfo
 import threading
+import utils
 
 import replyHelper # From the thoth package
 
@@ -174,27 +175,15 @@ This will be done by:
     for delegator in delegatorList[:delegatorCount]:
         beneficiaryList.append(f"d-{delegator}")
         
-    beneficiaryList = create_beneficiary_list ( beneficiaryList )
-    body += f"\n\n<br><br>Beneficiaries:<br><br>"
-    body += "<table>"
-    
-    # Define the number of columns
-    columns = 2
-    for i, beneficiary in enumerate(beneficiaryList):
-        if i % columns == 0:  # Start a new row for every 'columns' items
-            body += "<tr>\n"
-        body += f'   <td>{beneficiary["account"]} / {beneficiary["weight"] / 100}%</td>\n'
-        if (i + 1) % columns == 0:  # Close the row after 'columns' items
-            body += "</tr>\n"
-    
-    # Fill remaining cells in the last row, if necessary
-    remaining_cells = columns - (len(beneficiaryList) % columns)
-    if remaining_cells != columns:  # Only add if the last row isn't full
-        for _ in range(remaining_cells):
-            body += "   <td></td>\n"  # Add empty cells
-        body += "</tr>\n"
-    
-    body += "</table><br><br>\n"
+    beneficiaryList = create_beneficiary_list(beneficiaryList)
+    author_accounts = [c['author'] for c in commentList]
+    selected_delegators = delegatorList[:delegatorCount]
+    body += utils.generate_beneficiary_display_html(
+        beneficiary_list=beneficiaryList,
+        author_accounts=author_accounts,
+        delegator_accounts=selected_delegators,
+        thoth_account=postingAccount
+    )
 
     permlink = f"thoth{randValue}"
 

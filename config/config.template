@@ -2,13 +2,18 @@
 
 ###
 ### DO NOT COPY KEYS into config.template
+###    - Make sure ARLIAI/ARLIAI_KEY and STEEM/POSTING_KEY are both empty before saving!!!
 ###
 
 [ARLIAI]
-# You can get values from https://www.arliai.com/quick-start
-ARLIAI_URL = https://api.arliai.com/v1/chat/completions
+# ArliAI info here - https://www.arliai.com/quick-start
+# Gemini info here - https://ai.google.dev/gemini-api/docs/quickstart
 ARLIAI_KEY = 
 ARLIAI_MODEL = Mistral-Nemo-12B-Instruct-2407
+ARLIAI_URL = https://api.arliai.com/v1/chat/completions
+INITIAL_BACKOFF_SECONDS = 1.0
+JITTER_FACTOR = 0.2
+MAX_RETRIES = 9
 SYSTEM_PROMPT_FILE = config\systemPrompt.txt
 SYSTEM_PROMPT_TEMPLATE = config\systemPromptTemplate.txt
 USER_PROMPT_FILE = config\userPrompt.txt
@@ -29,34 +34,54 @@ STREAM_TYPE = RANDOM
 ####
 
 [CONTENT]
-EXCLUDE_TAGS = actifit, appics, booming, contest, erotic, nsfw, porn, pornography, \
-   nobots, promo-steem, realrobinhood, steemzzang, test, upgoat, yehey, zzan
-INCLUDE_TAGS = 
+AUTHOR_WHITELIST_FILE = config\authorWhiteList.txt
+EXCLUDE_TAGS = actifit, appics, bible, booming, christianity, contest, cross-post, curation,
+   curatorapplication, erotic, heartchurch, islam, jesuschrist, minnowsupport, nsfw, partiko, porn,
+   pornography, promo-steem, realrobinhood, religion, splinterlands, steemmonsters, steemzzang,
+   test, thediarygame, thoth, weeklyreport, yehey, zzan
+INCLUDE_TAGS =
 LANGUAGE = de, en, es, fr, it, ukr
+MAX_DOWNVOTES = 5
+MAX_MENTION_COUNT = 10
+MAX_TAG_COUNT = 10
 MAX_VOTING_SERVICE_PCT = 25
 MIN_FEED_REACH = 200
-MIN_WORDS = 500
+MIN_RESTEEMS = 0
+MIN_REPLIES = 0
+MIN_WORDS = 400
 REGISTRY_ACCOUNT = penny4thoughts
-### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS, EXCLUDE_TAGS, LANGUAGE, INCLUDE_TAGS
+WHITELIST_REQUIRED = False
+### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS, EXCLUDE_TAGS, INCLUDE_TAGS, LANGUAGE, AUTHOR_WHITELIST_FILE
+###              WHITELIST_REQUIRED, MAX_TAG_COUNT
 
 [AUTHOR]
+FOLLOWER_HALFLIFE_YEARS = 2
 # required days since the account was active on Blurt
-LAST_BLURT_ACTIVITY_AGE = 60
+LAST_BLURT_ACTIVITY_AGE = 0
 # required days since the account was active on Hive
-LAST_HIVE_ACTIVITY_AGE = 1461
-MAX_INACTIVITY_DAYS = 3650
-MIN_ACCOUNT_AGE = 30 
+LAST_HIVE_ACTIVITY_AGE = 60
+MAX_INACTIVITY_DAYS = 4000
+MIN_ACCOUNT_AGE = 30
 MIN_ACTIVE_FOLLOWERS = 10
-MIN_FOLLOWERS = 200
-MIN_FOLLOWERS_PER_MONTH = 5
-MIN_FOLLOWER_MEDIAN_REP = 35
-MIN_REPUTATION = 50
+MIN_ADJUSTED_FOLLOWERS_PER_MONTH=3
+MIN_FOLLOWERS = 350
+MIN_FOLLOWERS_PER_MONTH = 10
+MIN_FOLLOWER_MEDIAN_REP = 40
+MIN_REPUTATION = 60
 ### Implemented: MIN_REPUTATION, MIN_FOLLOWERS, MIN_FOLLOWERS_PER_MONTH, MAX_INACTIVITY_DAYS, MIN_FOLLOWER_MEDIAN_REP
+###              LAST_HIVE_ACTIVITY_AGE
 
 [BLOG]
-CURATED_AUTHOR_WEIGHT = 500
+CURATED_AUTHOR_WEIGHT = 900
+DELEGATOR_WEIGHT = 2000
+#
+# Delegators + reviewed posts cannot exceed 6 with a soft limit of 8 beneficiaries.
+#
+NUMBER_OF_DELEGATORS_PER_POST = 1
 NUMBER_OF_REVIEWED_POSTS = 5
 POSTING_ACCOUNT_WEIGHT = 500
+# POST_TAGS = thoth-ai, payitbackwards, curation, gen-5, authorboost
+POST_TAGS = test, thoth-test, lifetime-rewards
 # [Name, alias, or Acccount info here (will be published in the post)]
 THOTH_OPERATOR = 
 ### Implemented: CURATED_AUTHOR_WEIGHT, NUMBER_OF_REVIEWED_POSTS, POSTING_ACCOUNT, POSTING_ACCOUNT_WEIGHT
