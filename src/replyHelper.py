@@ -5,6 +5,8 @@ import configparser
 import time
 import delegationInfo
 import threading
+import utils
+import steembase.exceptions # Required for specific exception handling
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -65,8 +67,44 @@ def create_beneficiary_list(beneficiary_list, curatedAuthorWeight, delegatorWeig
     return beneficiary_dicts
 
 def vote_in_background(postingAccount, permlink, voteWeight=100):
-    time.sleep(300)
-    Steem().commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
+    """
+    Waits for an initial period, then attempts to vote in a loop until successful.
+    Retries upon failure, especially for vote timing errors.
+    """
+    initial_wait_seconds = 300  # 5 minutes
+    retry_delay_seconds = 5     # Base retry delay for general errors
+    vote_interval_retry_delay_base = 3 # Base delay for vote interval errors (Steem rule)
+    max_retries = 20
+    retries = 0
+
+    print(f"Vote for @{postingAccount}/{permlink} scheduled. Waiting {initial_wait_seconds // 60} minutes before first attempt...")
+    time.sleep(initial_wait_seconds)
+
+    while retries < max_retries:
+        try:
+            # Using simple Steem() instantiation as per current design in this function
+            s_instance = Steem()
+            print(f"Attempting to vote for @{postingAccount}/{permlink} (Attempt {retries + 1}/{max_retries})...")
+            s_instance.commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
+            print(f"Successfully voted for @{postingAccount}/{permlink}")
+            break  # Exit loop on successful vote
+        except steembase.exceptions.RPCError as rpc_e:
+            retries += 1
+            if "STEEM_MIN_VOTE_INTERVAL_SEC" in str(rpc_e) or "Can only vote once every 3 seconds" in str(rpc_e):
+                # Add a small random jitter to the 3-second base to avoid thundering herd
+                wait_time = vote_interval_retry_delay_base + random.uniform(0.1, 1.0)
+                print(f"Vote for @{postingAccount}/{permlink} failed due to rate limit: {rpc_e}. Retrying in {wait_time:.2f} seconds (Attempt {retries}/{max_retries})...")
+                time.sleep(wait_time)
+            else:
+                print(f"Vote for @{postingAccount}/{permlink} failed with RPCError: {rpc_e}. Retrying in {retry_delay_seconds} seconds (Attempt {retries}/{max_retries})...")
+                time.sleep(retry_delay_seconds)
+        except Exception as e:
+            retries += 1
+            print(f"Vote for @{postingAccount}/{permlink} failed with an unexpected error: {e}. Retrying in {retry_delay_seconds} seconds (Attempt {retries}/{max_retries})...")
+            time.sleep(retry_delay_seconds)
+
+    if retries >= max_retries:
+        print(f"Failed to vote for @{postingAccount}/{permlink} after {max_retries} attempts.")
 
 def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPermlink):
     """
@@ -148,26 +186,14 @@ This post was generated with the assistance of the following AI model: <i>{confi
         raw_beneficiaries_input.append(f"d-{delegator_name}") # Add selected delegators
         
     beneficiaryList = create_beneficiary_list(raw_beneficiaries_input, curatedAuthorWeight, adjustedDelegatorWeight)
-    body += f"\n\n<br><br>Beneficiaries:<br><br>"
-    body += "<table>"
-    
-    # Define the number of columns
-    columns = 2
-    for i, beneficiary in enumerate(beneficiaryList):
-        if i % columns == 0:  # Start a new row for every 'columns' items
-            body += "<tr>\n"
-        body += f'   <td>{beneficiary["account"]} / {beneficiary["weight"] / 100}%</td>\n'
-        if (i + 1) % columns == 0:  # Close the row after 'columns' items
-            body += "</tr>\n"
-    
-    # Fill remaining cells in the last row, if necessary
-    remaining_cells = columns - (len(beneficiaryList) % columns)
-    if remaining_cells != columns:  # Only add if the last row isn't full
-        for _ in range(remaining_cells):
-            body += "   <td></td>\n"  # Add empty cells
-        body += "</tr>\n"
-    
-    body += "</table><br><br>\n"
+    author_account = [comment_item['author']]
+    # selected_delegators is already defined above
+    body += utils.generate_beneficiary_display_html(
+        beneficiary_list=beneficiaryList,
+        author_accounts=author_account,
+        delegator_accounts=selected_delegators,
+        thoth_account=postingAccount
+    )
 
     metadata = {
         "app": "Thoth/0.0.1"
