@@ -39,7 +39,7 @@ def screenPost(comment):
     bodyLanguage = detect_language(tmpBody)
     titleLanguage = detect_language(latestComment['title'])
     if not ( bodyLanguage in targetLanguage and titleLanguage in targetLanguage ):
-        return "Not a target language"
+        return f"Not a target language - body: {bodyLanguage}, title: {titleLanguage}"
 
     if ( authorValidation.isAuthorScreened(comment)):
         return "Author screened"
@@ -57,7 +57,11 @@ def screenPost(comment):
     
     if ( contentValidation.hasTooManyTags (latestComment)):
         return "Too many tags"
-       
+    
+    ### Do this separately and last because it is VERY slow.
+    if ( authorValidation.isActiveFollowerCountTooLow(comment['author'])):
+        return "Follower count too low"
+           
     return "Accept"
 
 def remove_formatting(text):

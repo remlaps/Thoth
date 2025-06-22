@@ -33,12 +33,10 @@ def rep_log10(rep):
     out = (out * 9) + 25          # 9 points per magnitude. center at 25
     return round(out, 2)
 
-def isBlacklisted(account):
+def isBlacklisted(account, steem_instance=None):
     steemApi = config.get('STEEM', 'STEEM_API')
-    if (steemApi):
-        s = Steem(node=steemApi)
-    else:
-        s = Steem()
+    # Use provided Steem instance or create a new one
+    s = steem_instance or Steem(node=steemApi if steemApi else None)
     registryAccount = config.get('CONTENT', 'REGISTRY_ACCOUNT')
     
     try:
@@ -66,7 +64,11 @@ def isAuthorWhitelisted(account):
     return account in whiteList
 
 def isAuthorScreened(comment):
-    if ( isBlacklisted(comment['author']) ):
+    steemApi = config.get('STEEM', 'STEEM_API')
+    # Create a single Steem instance to be reused by all validation functions
+    s = Steem(node=steemApi if steemApi else None)
+
+    if ( isBlacklisted(comment['author'], steem_instance=s) ):
         return True
     
     if ( isAuthorWhitelisted(comment['author']) ):
@@ -75,29 +77,25 @@ def isAuthorScreened(comment):
     if isHiveActivityTooRecent(comment['author']):
         return True
 
-    if isFollowerCountTooLow(comment['author']):
+    if isFollowerCountTooLow(comment['author'], steem_instance=s):
         return True
        
-    steemApi = config.get('STEEM', 'STEEM_API')
-    if ( steemApi ):
-        s=Steem(node=steemApi)
-    else:
-        s=Steem()
     accountInfo = s.get_account(comment['author'])
      
-    if isInactive(accountInfo) :
+    if isInactive(accountInfo, steem_instance=s) :
         return True
         
     if isRepTooLow(accountInfo['reputation']) :
         return True
     
-    if isMonthlyFollowersTooLow(accountInfo, comment):
+    if isMonthlyFollowersTooLow(accountInfo, comment, steem_instance=s):
         return True
     
-    if isAdjustedMonthlyFollowersTooLow ( accountInfo, comment):
+    if isAdjustedMonthlyFollowersTooLow ( accountInfo, comment, steem_instance=s):
         return True
 
-    if ( getMedianFollowerRep ( comment['author'] ) < config.getint( 'AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP' )):
+    median_rep = getMedianFollowerRep(comment['author'], steem_instance=s)
+    if median_rep is not None and median_rep < config.getint('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP'):
         return True
         
     return False
@@ -105,14 +103,13 @@ def isAuthorScreened(comment):
 def isRepTooLow(reputation):
     return rep_log10(reputation) < config.getint('AUTHOR','MIN_REPUTATION')
 
-def isFollowerCountTooLow(commentAuthor):
-    s=Steem()
+def isFollowerCountTooLow(commentAuthor, steem_instance=None):
+    s = steem_instance or Steem()
     followerCount = s.get_follow_count(commentAuthor)['follower_count']
     return followerCount < config.getint('AUTHOR','MIN_FOLLOWERS')
 
-# If you used "import datetime"
-def followersPerMonth(accountInfo, comment):
-    s = Steem()
+def followersPerMonth(accountInfo, comment, steem_instance=None):
+    s = steem_instance or Steem()
     followerCount = s.get_follow_count(comment['author'])['follower_count']
     accountCreated = datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
     now = datetime.now()
@@ -123,8 +120,8 @@ def followersPerMonth(accountInfo, comment):
 
 import math
 
-def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1):
-    s = Steem()
+def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_instance=None):
+    s = steem_instance or Steem()
     followerCount = s.get_follow_count(comment['author'])['follower_count']
     accountCreated = datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
     now = datetime.now()
@@ -139,27 +136,77 @@ def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1):
     
     return adjustedFollowersPerMonth
 
-def isMonthlyFollowersTooLow (accountInfo, comment):
-    return followersPerMonth(accountInfo, comment) < config.getint('AUTHOR','MIN_FOLLOWERS_PER_MONTH')
+def isMonthlyFollowersTooLow (accountInfo, comment, steem_instance=None):
+    return followersPerMonth(accountInfo, comment, steem_instance=steem_instance) < config.getint('AUTHOR','MIN_FOLLOWERS_PER_MONTH')
 
-def isAdjustedMonthlyFollowersTooLow (accountInfo, comment):
+def isAdjustedMonthlyFollowersTooLow (accountInfo, comment, steem_instance=None):
     halfLife = config.getint('AUTHOR','FOLLOWER_HALFLIFE_YEARS')
     if ( halfLife ):
         return \
-            adjustedFollowersPerMonth(accountInfo, comment, halfLife * 365.25) < \
+            adjustedFollowersPerMonth(accountInfo, comment, halfLife * 365.25, steem_instance=steem_instance) < \
                 config.getint('AUTHOR','MIN_ADJUSTED_FOLLOWERS_PER_MONTH')
     else:
         return \
-            adjustedFollowersPerMonth(accountInfo, comment) < \
+            adjustedFollowersPerMonth(accountInfo, comment, steem_instance=steem_instance) < \
                 config.getint('AUTHOR','MIN_ADJUSTED_FOLLOWERS_PER_MONTH')
 
-def isInactive ( accountInfo ):
-    return inactiveDays(accountInfo['name']) > config.getint('AUTHOR','MAX_INACTIVITY_DAYS')
+def isActiveFollowerCountTooLow(accountName, steem_instance=None):
+    """
+    Checks if an account has too few recently active followers.
+    This function is optimized to terminate as soon as the threshold is met.
 
-def inactiveDays ( accountName ):
-    s=Steem()
-    lastPost = s.get_account(accountName)['last_post']
-    lastVote = s.get_account(accountName)['last_vote_time']
+    Args:
+        accountName (str): The account name whose followers are to be checked.
+        steem_instance (Steem, optional): An existing Steem instance to reuse. Defaults to None.
+
+    Returns:
+        bool: True if the active follower count is too low or an error occurs.
+              False if the account has enough active followers.
+    """
+    try:
+        max_inactivity_days = config.getint('AUTHOR', 'MAX_FOLLOWER_INACTIVITY_DAYS')
+        min_followers_needed = config.getint('AUTHOR', 'MIN_ACTIVE_FOLLOWERS')
+        
+        s = steem_instance or Steem()
+        followers_data = getAllFollowers(accountName, steem_instance=s)
+        active_followers_found = 0
+
+        for follower_entry in followers_data:
+            print(f"Checking activity time for {accountName} -> {follower_entry}: {active_followers_found}/{min_followers_needed}")
+            follower_account_name = follower_entry['follower']
+            try:
+                days_inactive = inactiveDays(follower_account_name, steem_instance=s)
+                if days_inactive is not None and days_inactive <= max_inactivity_days:
+                    active_followers_found += 1
+                    if active_followers_found >= min_followers_needed:
+                        # Success: enough active followers found. Count is NOT too low.
+                        print(f"DEBUG: isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: True. Result (is_too_low): False")
+                        return False
+            except Exception as e:
+                # This handles errors for a single follower (e.g., account deleted)
+                # We just log it and continue checking other followers.
+                print(f"Warning: Could not determine inactivity for follower {follower_account_name}: {e}")
+        
+        # If the loop completes without reaching the threshold, the count is too low.
+        has_enough = active_followers_found >= min_followers_needed
+        is_too_low = not has_enough
+        print(f"DEBUG: isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: {has_enough}. Result (is_too_low): {is_too_low}")
+        return is_too_low
+
+    except Exception as e:
+        # This catches errors from config.getint, getAllFollowers, etc.
+        print(f"Error during active follower check for {accountName}: {e}")
+        print(f"DEBUG: isActiveFollowerCountTooLow({accountName}) -> Exception occurred. Returning True.")
+        return True # Fail safe: if we can't check, screen the author (i.e., count is "too low").
+
+def isInactive(accountInfo, steem_instance=None):
+    return inactiveDays(accountInfo['name'], steem_instance=steem_instance) > config.getint('AUTHOR','MAX_INACTIVITY_DAYS')
+
+def inactiveDays(accountName, steem_instance=None):
+    s = steem_instance or Steem()
+    account_data = s.get_account(accountName)
+    lastPost = account_data['last_post']
+    lastVote = account_data['last_vote_time']
 
     lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
     lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
@@ -169,7 +216,7 @@ def inactiveDays ( accountName ):
 
     return inactiveDays
 
-def getAllFollowers(account, account_type='blog'):
+def getAllFollowers(account, account_type='blog', steem_instance=None):
    """
    Retrieve all followers for a specific account.
    
@@ -180,7 +227,7 @@ def getAllFollowers(account, account_type='blog'):
    Returns:
        list: A list of all follower data
    """
-   s=Steem()
+   s = steem_instance or Steem()
    all_followers = []
    batch_size = 1000
    last_account = ''
@@ -208,7 +255,7 @@ def getAllFollowers(account, account_type='blog'):
    
    return all_followers
 
-def getMedianFollowerRep(author):
+def getMedianFollowerRep(author, steem_instance=None):
    """
    Calculate the median reputation from a list of follower data.
    
@@ -218,7 +265,7 @@ def getMedianFollowerRep(author):
    Returns:
        float: The median reputation value
    """
-   followersData = getAllFollowers(author)
+   followersData = getAllFollowers(author, steem_instance=steem_instance)
    
    # Extract reputation values from the data
    reputations = [follower['reputation'] for follower in followersData]
