@@ -201,7 +201,7 @@ This post was generated with the assistance of the following AI model: <i>{confi
 
     comment_options = {
         'max_accepted_payout': '1000000.000 SBD',
-        'percent_steem_dollars': 0,
+        'percent_steem_dollars': 10000,
         'allow_votes': True,
         'allow_curation_rewards': True,
         'extensions': [[0, { }]]

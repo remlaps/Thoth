@@ -58,7 +58,6 @@ def isAuthorWhitelisted(account):
     except FileNotFoundError:
         # Handle the case where the whitelist file doesn't exist
         # You might want to log this or return False by default
-        print(f"Warning: Whitelist file '{whiteListFile}' not found.")
         return False
     
     return account in whiteList
@@ -172,7 +171,7 @@ def isActiveFollowerCountTooLow(accountName, steem_instance=None):
         active_followers_found = 0
 
         for follower_entry in followers_data:
-            print(f"Checking activity time for {accountName} -> {follower_entry}: {active_followers_found}/{min_followers_needed}")
+            # print(f"Checking activity time for {accountName} -> {follower_entry}: {active_followers_found}/{min_followers_needed}")
             follower_account_name = follower_entry['follower']
             try:
                 days_inactive = inactiveDays(follower_account_name, steem_instance=s)
