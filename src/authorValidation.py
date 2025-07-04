@@ -5,6 +5,8 @@ from datetime import datetime
 import requests
 import json
 
+import utils
+
 # Create a ConfigParser object
 config = configparser.ConfigParser()
 
@@ -72,6 +74,9 @@ def isAuthorScreened(comment):
     
     if ( isAuthorWhitelisted(comment['author']) ):
         return False
+    
+    if ( not check_author_wallet(comment['author']) ):
+        return True
     
     if isHiveActivityTooRecent(comment['author']):
         return True
@@ -319,9 +324,81 @@ def hiveInactiveDays(account):
     
     return daysPassed
 
-import requests
-import json
-from datetime import datetime
+def check_author_wallet(author: str) -> bool:
+    """
+    Checks an author's holdings against delegation and undelegated SP thresholds.
+
+    Args:
+        author: The Steem account name of the author.
+        max_delegation_pct: The maximum allowed percentage of SP to be delegated.
+        min_undelegated_sp: The minimum required amount of undelegated Steem Power.
+
+    Returns:
+        True if the author passes the screening, False otherwise.
+    """
+    try:
+        max_delegation_pct = config.getfloat('AUTHOR', 'MAX_DELEGATION_PCT')
+        min_undelegated_sp = config.getfloat('AUTHOR', 'MIN_UNDELEGATED_SP')
+        
+        s = Steem()
+        
+        # 1. Get account details
+        account = s.get_account(author)
+        if not account:
+            print(f"Error: Account '{author}' not found.")
+            return False
+
+        # Extract float values from strings like "123.456 VESTS"
+        vesting_shares = float(account['vesting_shares'].split()[0])
+        delegated_vesting_shares = float(account['delegated_vesting_shares'].split()[0]) - \
+            float(account['received_vesting_shares'].split()[0])
+        delegated_vesting_shares = max(delegated_vesting_shares, 0)
+
+        print(f"\n--- Checking author: @{author} ---")
+        print(f"Vesting Shares: {vesting_shares:,.6f} VESTS")
+        print(f"Delegated Vesting Shares: {delegated_vesting_shares:,.6f} VESTS")
+
+        # 2. Calculate delegation percentage
+        if vesting_shares > 0:
+            delegation_percentage = (delegated_vesting_shares / vesting_shares) * 100
+        else:
+            delegation_percentage = 0.0
+        
+        print(f"Delegation Percentage: {delegation_percentage:.2f}%")
+
+        # 3. Calculate undelegated Steem Power (SP)
+        steem_per_mvest = utils.get_steem_per_mvest(s)
+        if steem_per_mvest == 0.0:
+            return False # Stop if we can't get the conversion rate
+            
+        print(f"Current STEEM per MVEST: {steem_per_mvest:.6f}")
+
+        undelegated_vests = vesting_shares - delegated_vesting_shares
+        undelegated_sp = (undelegated_vests / 1_000_000) * steem_per_mvest
+        print(f"Undelegated SP: {undelegated_sp:,.3f}")
+
+        # 4. Screen based on the criteria
+        print(f"\n--- Screening Criteria ---")
+        print(f"Max Delegation Pct Threshold: {max_delegation_pct:.2f}%")
+        print(f"Min Undelegated SP Threshold: {min_undelegated_sp:,.3f}")
+
+        passes_screen = True
+        if delegation_percentage > max_delegation_pct:
+            print(f"FAIL: Delegation ({delegation_percentage:.2f}%) exceeds max ({max_delegation_pct:.2f}%).")
+            passes_screen = False
+        
+        if undelegated_sp < min_undelegated_sp:
+            print(f"FAIL: Undelegated SP ({undelegated_sp:,.3f}) is below min ({min_undelegated_sp:,.3f}).")
+            passes_screen = False
+
+        if passes_screen:
+            print("\nPASS: Author meets all criteria.")
+        
+        return passes_screen
+
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+        return False
 
 def getLastHiveActivityDate(account):
     """
