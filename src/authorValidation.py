@@ -5,6 +5,8 @@ from datetime import datetime
 import requests
 import json
 
+import utils
+
 # Create a ConfigParser object
 config = configparser.ConfigParser()
 
@@ -318,10 +320,6 @@ def hiveInactiveDays(account):
     daysPassed = (now - lastHiveActivityDt).days
     
     return daysPassed
-
-import requests
-import json
-from datetime import datetime
 
 def getLastHiveActivityDate(account):
     """

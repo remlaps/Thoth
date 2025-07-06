@@ -3,9 +3,9 @@ import configparser
 import re
 import authorValidation
 import contentValidation
+import walletValidation
 
 from steem import Steem
-
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -50,7 +50,10 @@ def screenPost(comment):
     whiteListRequired = config.get('CONTENT', 'WHITELIST_REQUIRED')
     if ( whiteListRequired == "True"):
         return ("Non-whitelisted author")
-    
+
+    if ( walletValidation.walletScreened(comment['author'])):
+        return "Wallet screened"
+        
     ### Additional checks for non-whitelisted authors
     if ( contentValidation.isTooShort (tmpBody)):
         return "Too short"
@@ -168,3 +171,23 @@ def generate_beneficiary_display_html(beneficiary_list, author_accounts, delegat
 
     body += "<br><br>\n"
     return body
+
+def get_steem_per_mvest(s: Steem) -> float:
+    """
+    Calculates the STEEM per MVEST ratio from the blockchain's global properties.
+    This value is used to convert VESTS to Steem Power.
+    """
+    try:
+        props = s.get_dynamic_global_properties()
+        total_vesting_fund_steem = float(props['total_vesting_fund_steem'].split()[0])
+        total_vesting_shares = float(props['total_vesting_shares'].split()[0])
+        
+        if total_vesting_shares == 0:
+            return 0.0
+            
+        # The ratio is STEEM / VESTS, and we want it per Million VESTS (MVESTS)
+        steem_per_mvest = (total_vesting_fund_steem / (total_vesting_shares / 1_000_000))
+        return steem_per_mvest
+    except Exception as e:
+        print(f"Error fetching global properties: {e}")
+        return 0.0
