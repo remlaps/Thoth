@@ -12,3 +12,4 @@ config/configActive.ini
 config/systemPrompt.txt
 config/userPrompt.txt
 config/authorWhiteList.txt
+config/delegationScreen.txt

@@ -3,9 +3,9 @@ import configparser
 import re
 import authorValidation
 import contentValidation
+import walletValidation
 
 from steem import Steem
-
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -50,7 +50,10 @@ def screenPost(comment):
     whiteListRequired = config.get('CONTENT', 'WHITELIST_REQUIRED')
     if ( whiteListRequired == "True"):
         return ("Non-whitelisted author")
-    
+
+    if ( walletValidation.walletScreened(comment['author'])):
+        return "Wallet screened"
+        
     ### Additional checks for non-whitelisted authors
     if ( contentValidation.isTooShort (tmpBody)):
         return "Too short"
