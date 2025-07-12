@@ -111,7 +111,7 @@ def postCuration (commentList, aiResponseList, aiIntroString):
 
     body=f"""
 AI Curation by [Thoth](https://github.com/remlaps/Thoth)
-| <h6>Unlocking #lifetime-rewards for Steem's creators</h6> |
+| <h6>Unlocking #lifetime-rewards for Steem's creators and #passive-rewards for delegators</h6> |
 | --- |
 
 

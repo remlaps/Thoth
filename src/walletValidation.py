@@ -17,11 +17,10 @@ screenedDelegateeFile = config.get('WALLET', 'SCREENED_DELEGATEE_FILE')
 
 def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, float | None]:
     """
-    Fetches and parses an account's total and delegated vesting shares.
+    Fetches and parses an account's total, delegated, and received vesting shares.
 
     Args:
         author: The Steem account name.
-        steem_instance: An active Steem instance.
 
     Returns:
         A tuple of (vesting_shares, delegated_vesting_shares, received_vesting_shares) as floats,
@@ -62,12 +61,12 @@ def walletScreened(account, steem_instance=None):
     screened_vests = totalScreenedDelegationVests(account)
     
     # Avoid ZeroDivisionError if account has 0 SP.
-    if vesting_shares == 0.0:
+    if vesting_shares == 0.0:  # Minimum vesting_shares was already checked by check_author_wallet.  At this point, 0 is ok.
         return False
 
     print (f"Vesting Shares: {vesting_shares:,.6f} VESTS")
     print (f"Screened Delegations: {screened_vests:,.6f} VESTS")
-    print (f"Percentate screened: {(screened_vests / vesting_shares) * 100:.2f}%")
+    print (f"Percentage screened: {(screened_vests / vesting_shares) * 100:.2f}%")
     return (screened_vests / vesting_shares) > maxScreenedDelegationPct
 
 def totalScreenedDelegationVests (delegator, screenedDelegateeFile=screenedDelegateeFile):
