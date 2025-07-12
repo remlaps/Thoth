@@ -50,9 +50,6 @@ def screenPost(comment):
     whiteListRequired = config.get('CONTENT', 'WHITELIST_REQUIRED')
     if ( whiteListRequired == "True"):
         return ("Non-whitelisted author")
-
-    if ( walletValidation.walletScreened(comment['author'])):
-        return "Wallet screened"
         
     ### Additional checks for non-whitelisted authors
     if ( contentValidation.isTooShort (tmpBody)):
@@ -60,6 +57,10 @@ def screenPost(comment):
     
     if ( contentValidation.hasTooManyTags (latestComment)):
         return "Too many tags"
+    
+    ### This is slow.  Screen everything else first.
+    if ( walletValidation.walletScreened(comment['author'])):
+        return "Wallet screened"
     
     ### Do this separately and last because it is VERY slow.
     if ( authorValidation.isActiveFollowerCountTooLow(comment['author'])):

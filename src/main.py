@@ -3,6 +3,7 @@ import re
 import os
 import time
 import random
+from datetime import datetime
 
 import aiIntro
 import utils  # From the thoth package
@@ -37,6 +38,9 @@ maxSize=config.getint('BLOG', 'NUMBER_OF_REVIEWED_POSTS')
 
 commentList = []
 aiResponseList = []
+
+earliest_timestamp = None
+latest_timestamp = None
 
 postCount=0
 retry_count=0
@@ -111,6 +115,14 @@ while retry_count <= max_retries:
                 comment = operation
 
                 if 'parent_author' in comment and comment['parent_author'] == '': # top-level posts only
+                    current_timestamp = comment['timestamp']
+                    # The timestamp from the stream is a datetime object.
+                    if earliest_timestamp is None or current_timestamp < earliest_timestamp:
+                        earliest_timestamp = current_timestamp
+                    
+                    if latest_timestamp is None or current_timestamp > latest_timestamp:
+                        latest_timestamp = current_timestamp
+
                     screenResult = utils.screenPost(comment)
                     if screenResult == "Accept": 
                         ### Retrieve the latest version of the post
@@ -168,6 +180,14 @@ while retry_count <= max_retries:
                 raise
             time.sleep(retry_delay)
 
-aiIntroString = aiIntro.aiIntro(arliaiKey, arliaiModel, arliaiUrl, "\n\n".join(aiResponseList))
-postHelper.postCuration(commentList, aiResponseList, aiIntroString )
-print("Posting finished.")
+if earliest_timestamp and latest_timestamp:
+    # The timestamps from the stream are already datetime objects.
+    print(f"Posts processed ranged from {earliest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')} to {latest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')}")
+
+    aiIntroString = aiIntro.aiIntro(arliaiKey, arliaiModel, arliaiUrl,
+                                    earliest_timestamp, latest_timestamp,
+                                    "\n\n".join(aiResponseList))
+    postHelper.postCuration(commentList, aiResponseList, aiIntroString)
+    print("Posting finished.")
+else:
+    print("No posts were found to curate in the specified block range. Exiting.")
