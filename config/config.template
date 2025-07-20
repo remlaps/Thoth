@@ -8,8 +8,9 @@
 [ARLIAI]
 # ArliAI info here - https://www.arliai.com/quick-start
 # Gemini info here - https://ai.google.dev/gemini-api/docs/quickstart
+# Word to the wise.  For Qwen3-14B, use "creative" models, not "reasoning" models.  Reasoning models are evil (for this purpose).
 ARLIAI_KEY = 
-ARLIAI_MODEL = Mistral-Nemo-12B-Instruct-2407
+ARLIAI_MODEL = Qwen3-14B-Gutenberg-Encore
 ARLIAI_URL = https://api.arliai.com/v1/chat/completions
 INITIAL_BACKOFF_SECONDS = 1.0
 JITTER_FACTOR = 0.2
@@ -56,7 +57,7 @@ WHITELIST_REQUIRED = False
 
 [AUTHOR]
 FOLLOWER_HALFLIFE_YEARS = 2
-# required days since the account was active on Blurt
+# required days since the account was active on Blurt (not yet implemented)
 LAST_BLURT_ACTIVITY_AGE = 0
 # required days since the account was active on Hive
 LAST_HIVE_ACTIVITY_AGE = 60
@@ -77,6 +78,8 @@ CURATED_AUTHOR_WEIGHT = 900
 DELEGATOR_WEIGHT = 2000
 #
 # Delegators + reviewed posts cannot exceed 6 with a soft limit of 8 beneficiaries.
+# ( NUMBER_OF_DELEGATORS_PER_POST * DELEGATOR_WEIGHT + NUMBER_OF_REVIEWED_POSTS * CURATED_AUTHOR_WEIGHT + POSTING_ACCOUNT_WEIGHT )
+#   ^^^ ===> Cannot exceed 10000 - divde by 100 to get percentages.
 #
 NUMBER_OF_DELEGATORS_PER_POST = 1
 NUMBER_OF_REVIEWED_POSTS = 5
