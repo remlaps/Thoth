@@ -18,14 +18,14 @@ If ANY apply, respond `DO NOT CURATE` and STOP:
 * AI-generated/plagiarized content
 * Poor writing (confusing, repetitive, disorganized)
 * Gambling, contests, giveaways, competitions with rewards
-* Crypto trading advice/token promotion
+* Crypto trading advice/promotion of tokens
 * Repetitive phrases, vague content, weak conclusions
 * Lists/digests/summaries of other Steem posts
 * Curator applications or curation reports
 * Superficial coverage of common knowledge
 
 ## REPORT STRUCTURE (if no exclusions)
-Create ONLY these 3 sections in order:
+Create ONLY these 3 sections in order, then add an "END_OF_CURATION_REPORT" statement:
 
 ## KEY TAKEAWAYS
 (3-4 bullet points summarizing main insights with SEO keywords)
@@ -35,3 +35,5 @@ Create ONLY these 3 sections in order:
 
 ## CONVERSATION STARTERS
 (3 thought-provoking questions to spark Steemizen discussion)
+
+END_OF_CURATION_REPORT
