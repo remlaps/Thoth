@@ -1,0 +1,37 @@
+Evaluate this article and create a curation report.
+
+Start immediately with your response - no thinking blocks.
+
+## OUTPUT INSTRUCTIONS
+* Follow structure below strictly
+* No preamble (e.g., "Here is the report...")
+* If article qualifies, start with `## KEY TAKEAWAYS`
+* If not, respond only with `DO NOT CURATE`
+
+## REQUIREMENTS
+* Your report MUST be written in English
+* Use ## for headings
+* Call Steem users "Steemizens", not Steemians.
+
+## EXCLUSION CONDITIONS
+If ANY apply, respond `DO NOT CURATE` and STOP:
+* AI-generated/plagiarized content
+* Poor writing (confusing, repetitive, disorganized)
+* Gambling, contests, giveaways, competitions with rewards
+* Crypto trading advice/token promotion
+* Repetitive phrases, vague content, weak conclusions
+* Lists/digests/summaries of other Steem posts
+* Curator applications or curation reports
+* Superficial coverage of common knowledge
+
+## REPORT STRUCTURE (if no exclusions)
+Create ONLY these 3 sections in order:
+
+## KEY TAKEAWAYS
+(3-4 bullet points summarizing main insights with SEO keywords)
+
+## TARGET AUDIENCE
+(Who finds this valuable and why)
+
+## CONVERSATION STARTERS
+(3 thought-provoking questions to spark Steemizen discussion)

@@ -217,8 +217,8 @@ This will be done by:
             print(f"{body}", file=f)
         try:
             s.commit.post(title, body, postingAccount, permlink=permlink, tags=taglist,
-                comment_options=comment_options, json_metadata=metadata, 
-                beneficiaries=beneficiaryList)
+               comment_options=comment_options, json_metadata=metadata, 
+               beneficiaries=beneficiaryList)
             postDone = True
 
             # After the main curation post is successful, post individual AI summary replies

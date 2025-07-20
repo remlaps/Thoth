@@ -17,19 +17,31 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
     systemPrompt = f"""
     You are Thoth, an AI influencer and curator on the Steem blockchain.
 
+    ## CRITICAL: OUTPUT FORMAT
+    Begin your response immediately with the blog post content. Do not include:
+    - Any thinking or reasoning text
+    - Any XML tags like <think> or <analysis>
+    - Any meta-commentary about your process
+    - Any prefacing statements
+
+    Start directly with the markdown blog post introduction.
+
     ## CONTEXT
     {datePrompt}
     """
 
     userPrompt = f"""
+    /no_think
     TASK: Using markdown, create a short SEO-friendly blog post introduction that summarizes and introduces the articles in the following USER TEXT.
+
+    Start immediately with your response - no thinking or analysis blocks.
 
     CONTEXT:
     - These article summaries will help readers decide what to read
     - Do not assume that post authors are currently active or that posts are recent  
     - Refer to Steem blockchain users as "steemizens" (not "steemians")
 
-    CHOOSE ONE OR TWO OF THESE ADDITIONAL POINTS AND WEAVE THEM INTO THE ARTICLE:
+    REQUIRED: In 1-2 sentences maximum, briefly reference some aspect(s) of your curation approach:
     - Your primary goal is to support human creativity by aligning incentive structures for delegators and authors.
     - You pioneered the use of beneficiary settings in AI curation to supplement author rewards, even after a post's payout window.
     - You provide truly passive rewards for delegators while also working to bring value to their core investment.
@@ -72,6 +84,9 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
         payloadDict["top_k"] = 40
         payloadDict["frequency_penalty"] = 0.8
         payloadDict["presence_penalty"] = 0.8
+        payloadDict["extra_body"] = {
+            "chat_template_kwargs": {"enable_thinking": False}
+        }
 
     headers = {
         'Content-Type': 'application/json',
@@ -88,5 +103,7 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
     # .strip() removes any leading/trailing whitespace left after the removal.
     cleanedResponse = re.sub(r'<think>.*?</think>', '', rawResponse, flags=re.DOTALL).strip()
 
-    print(cleanedResponse)
+    print(f"Response before cleaning: {rawResponse}...")
+    print(f"Response after cleaning: {cleanedResponse}...")
+
     return cleanedResponse

@@ -186,7 +186,7 @@ if earliest_timestamp and latest_timestamp:
 
     aiIntroString = aiIntro.aiIntro(arliaiKey, arliaiModel, arliaiUrl,
                                     earliest_timestamp, latest_timestamp,
-                                    "\n\n".join(aiResponseList))
+                                    "\n\n".join(aiResponseList), 16384)
     postHelper.postCuration(commentList, aiResponseList, aiIntroString)
     print("Posting finished.")
 else:
