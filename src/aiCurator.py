@@ -45,7 +45,7 @@ def ensurePromptFileExists(promptFilePath, templateFilePath, promptTypeName):
 ensurePromptFileExists(systemPromptFile, systemPromptTemplateFile, "System")
 ensurePromptFileExists(userPromptFile, userPromptTemplateFile, "User")
 
-def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=1024):
+def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192):
     today = datetime.now()
     arliaiKey = arliaiKey.split()[0]  # Eliminate comments after the key (should be redundant)
     
@@ -111,7 +111,11 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=1024):
             logging.debug(f"Attempt {attempt + 1}/{MAX_RETRIES + 1} to call AI API: {arliaiUrl} with model {arliaiModel}")
             response = requests.post(arliaiUrl, headers=headers, data=payload)
             response.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
-            aiResponse = response.json()['choices'][0]['message']['content']
+            try:
+                aiResponse = response.json()['choices'][0]['message']['content']
+            except KeyError:
+                logging.error(f"KeyError accessing response data: 'content'. Response JSON: {response.json()}")
+                return "Response Error"
 
             if len(aiResponse) < 100: # Or another threshold for "suspiciously short"
                 logging.warning(f"Received suspiciously short AI response: '{aiResponse}'.")
