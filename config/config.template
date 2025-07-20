@@ -28,7 +28,7 @@ POSTING_ACCOUNT = social
 POSTING_KEY = 
 STEEM_API = 
 # ACTIVE, HISTORY, or RANDOM
-STREAM_TYPE = RANDOM
+STREAM_TYPE = HISTORY
 
 ####
 #### From here down copy content from config.ini to config.template
