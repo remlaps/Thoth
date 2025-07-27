@@ -11,9 +11,7 @@ Evaluate this article and create a curation report.
 * Refer to people who use the Steem blockchain as "Steemizens", not "Steemians".
 
 ## EXCLUSION CONDITIONS (IMMEDIATE ACTION)
-If ANY of the following conditions are true for the article, you MUST respond with:
-`DO NOT CURATE.`
-Then STOP.
+If ANY of the following conditions are true for the article, you MUST respond with: `DO NOT CURATE` then STOP.
 * Content appears AI-generated or plagiarized
 * Poor writing quality (confusing, repetitive, disorganized)
 * Focuses on gambling, prize contests, giveaways, or any online competitions involving rewards

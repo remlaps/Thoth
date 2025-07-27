@@ -13,3 +13,5 @@ config/systemPrompt.txt
 config/userPrompt.txt
 config/authorWhiteList.txt
 config/delegationScreen.txt
+config/config-social.ini
+config/config-thothtest.ini
