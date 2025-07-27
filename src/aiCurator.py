@@ -90,7 +90,7 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192):
             },
             {
                 "role": "user",
-                "content": f"{curationPrompt} - {postBody}"
+                "content": f"{curationPrompt}\n\n## ARTICLE FOR EVALUATION\n\n{postBody}"
             }
         ],
         "temperature": 0.3,
@@ -105,6 +105,7 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192):
         payloadDict["top_k"] = 40
         payloadDict["frequency_penalty"] = 0.3
         payloadDict["presence_penalty"] = 0.3
+        payloadDict["min_p"] = 0.0
         payloadDict["extra_body"] = {
             "chat_template_kwargs": {"enable_thinking": False}
         }

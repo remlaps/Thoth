@@ -1,3 +1,5 @@
+/no_think
+
 Evaluate this article and create a curation report.
 
 Start immediately with your response - no thinking blocks.
@@ -8,32 +10,32 @@ Start immediately with your response - no thinking blocks.
 * If article qualifies, start with `## KEY TAKEAWAYS`
 * If not, respond only with `DO NOT CURATE`
 
-## REQUIREMENTS
-* Your report MUST be written in English
-* Use ## for headings
-* Call Steem users "Steemizens", not Steemians.
+## MANDATORY REQUIREMENTS & TERMS
+* The curation report MUST be written in English.
+* Use level 2 heading formats for section titles (e.g., "## HEADING").
+* Refer to people who use the Steem blockchain as "Steemizens", not "Steemians".
 
-## EXCLUSION CONDITIONS
-If ANY apply, respond `DO NOT CURATE` and STOP:
-* AI-generated/plagiarized content
-* Poor writing (confusing, repetitive, disorganized)
-* Gambling, contests, giveaways, competitions with rewards
-* Crypto trading advice/promotion of tokens
-* Repetitive phrases, vague content, weak conclusions
-* Lists/digests/summaries of other Steem posts
-* Curator applications or curation reports
-* Superficial coverage of common knowledge
+## EXCLUSION CONDITIONS (IMMEDIATE ACTION)
+If ANY of the following conditions are true for the article, you MUST respond with: `DO NOT CURATE` Then STOP.
+* Content appears AI-generated or plagiarized
+* Poor writing quality (confusing, repetitive, disorganized)
+* Focuses on gambling, prize contests, giveaways, or any online competitions involving rewards
+* Focuses primarily on cryptocurrency trading advice or token promotion
+* Repetitive phrases, vague generalizations, or a weak or disconnected conclusion
+* Consists mainly of lists, digests, or summaries of other Steem posts
+* Is a curator application or another curation report
+* Cursory or superficial coverage of widely known information
 
-## REPORT STRUCTURE (if no exclusions)
-Create ONLY these 3 sections in order, then add an "END_OF_CURATION_REPORT" statement:
+## CURATION REPORT STRUCTURE (IF NO EXCLUSION CONDITIONS ARE MET)
+If NONE of the EXCLUSION CONDITIONS are met, and the post qualifies for curation, then create a curation report with ONLY the following three sections, 
+in this exact order.
 
 ## KEY TAKEAWAYS
-(3-4 bullet points summarizing main insights with SEO keywords)
+(Provide 3–4 bullet points. Each bullet should summarize a main insight from the article. Aim for clarity and
+use SEO-friendly keywords where natural.)
 
 ## TARGET AUDIENCE
-(Who finds this valuable and why)
+(Identify who would find this content most valuable and explain why..)
 
 ## CONVERSATION STARTERS
-(3 thought-provoking questions to spark Steemizen discussion)
-
-END_OF_CURATION_REPORT
+(Formulate 3 distinct, thought-provoking questions related to the article's topic that could spark discussion among Steemizens.)
