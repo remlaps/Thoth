@@ -28,13 +28,23 @@ config = configparser.ConfigParser()
 config.read('config/config.ini')
 
 arliaiKey = os.getenv('LLMAPIKEY')
-if arliaiKey:
-    print("Using LLM API key from environment variable 'LLMAPIKEY'.")
-else:
-    print("LLMAPIKEY environment variable not set, falling back to config file.")
-    arliaiKey = config.get('ARLIAI', 'ARLIAI_KEY')
+source_msg = "Using LLM API key from environment variable 'LLMAPIKEY'."
 
-arliaiKey = arliaiKey.split()[0]  # Eliminate comments after the key
+if not arliaiKey:
+    source_msg = "LLMAPIKEY environment variable not set, falling back to config file."
+    # Use fallback to prevent an error if the key is missing in the config.
+    arliaiKey = config.get('ARLIAI', 'ARLIAI_KEY', fallback='')
+
+# It's crucial to have a key. Exit if it's missing or empty.
+if not arliaiKey.strip():
+    print("FATAL: LLM API key is missing or empty. Please set LLMAPIKEY or configure ARLIAI_KEY in config.ini.")
+    exit(1)
+
+print(source_msg)
+
+# Clean the key. This handles comments from the config file (e.g., "key # comment")
+# and also strips quotes or whitespace that might be included from an environment variable.
+arliaiKey = arliaiKey.split('#', 1)[0].strip().strip('"\'')
 arliaiModel=config.get('ARLIAI', 'ARLIAI_MODEL')
 arliaiUrl=config.get('ARLIAI', 'ARLIAI_URL')
 
