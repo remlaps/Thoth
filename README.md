@@ -7,11 +7,11 @@
 
 Thoth is a curation bot that runs on the Steem blockchain.  It filters posts based upon the Thoth operator's preferences, and then does an evaluation through an LLM API call.  If the LLM decides to curate the post, it will write a summary and include links to the source article.  When all articles have been selected, it also creates a summary/overview post.  These are then posted to the Steem blockchain, as follows:
 
-- Introductory/overview post
----> Reply 1 # Summary of curated post 1
----> Reply 2 # Summary of curated post 2
----> ...
----> Reply N #  # Summary of curated post N
+- Introductory/overview post  
+---> Reply 1 # Summary of curated post 1  
+---> Reply 2 # Summary of curated post 2  
+---> ...  
+---> Reply N #  # Summary of curated post N  
 
 Each post and reply provides the ability to direct beneficiary rewards to the following recipient roles:
 - Included authors
