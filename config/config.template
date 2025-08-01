@@ -9,7 +9,7 @@
 # ArliAI info here - https://www.arliai.com/quick-start
 # Gemini info here - https://ai.google.dev/gemini-api/docs/quickstart
 # Word to the wise.  For Qwen3-14B, use "creative" models, not "reasoning" models.  Reasoning models are evil (for this purpose).
-ARLIAI_KEY = 
+# ARLIAI_KEY = # This can be pulled from an environment variable.
 ARLIAI_MODEL = Qwen3-14B-Gutenberg-Encore
 ARLIAI_URL = https://api.arliai.com/v1/chat/completions
 INITIAL_BACKOFF_SECONDS = 1.0
