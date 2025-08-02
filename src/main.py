@@ -9,6 +9,7 @@ import aiIntro
 import utils  # From the thoth package
 import aiCurator # From the thoth package
 import postHelper # From the thoth package
+from configValidator import ConfigValidator
 
 from steem.blockchain import Blockchain
 from steem import Steem
@@ -38,7 +39,6 @@ if not arliaiKey:
 # It's crucial to have a key. Exit if it's missing or empty.
 if not arliaiKey.strip():
     print("FATAL: LLM API key is missing or empty. Please set LLMAPIKEY or configure ARLIAI_KEY in config.ini.")
-    exit(1)
 
 print(source_msg)
 
@@ -47,6 +47,18 @@ print(source_msg)
 arliaiKey = arliaiKey.split('#', 1)[0].strip().strip('"\'')
 arliaiModel=config.get('ARLIAI', 'ARLIAI_MODEL')
 arliaiUrl=config.get('ARLIAI', 'ARLIAI_URL')
+
+### Validate the config to avoid failures at posting time.
+validator = ConfigValidator()
+    
+if validator.validate_config():
+    print("Configuration is valid!")
+    # Continue with your application logic
+else:
+    print("Configuration validation failed:")
+    for error in validator.get_errors():
+        print(f"  - {error}")
+    exit(1)
 
 steemApi=config.get('STEEM', 'STEEM_API')
 streamType = config.get('STEEM', 'STREAM_TYPE')
