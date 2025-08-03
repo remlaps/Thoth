@@ -176,11 +176,16 @@ This post was generated with the assistance of the following AI model: <i>{confi
     except Exception as e:
         print(f"Warning: Could not retrieve or shuffle delegators for reply: {e}")
         # all_delegators_list will remain empty
-
-    adjustedDelegatorWeight = int( ( delegatorCount * delegatorWeight ) / min( total_delegators_to_include_for_reply, len(all_delegators_list) ))
-
-    selected_delegators = all_delegators_list[:min(total_delegators_to_include_for_reply, len(all_delegators_list))]
     
+    num_delegators_to_select = min(total_delegators_to_include_for_reply, len(all_delegators_list))
+    selected_delegators = all_delegators_list[:num_delegators_to_select]
+
+    # Safely calculate the adjusted weight, avoiding division by zero.
+    if num_delegators_to_select > 0:
+        adjustedDelegatorWeight = int((delegatorCount * delegatorWeight) / num_delegators_to_select)
+    else:
+        adjustedDelegatorWeight = 0
+
     raw_beneficiaries_input = [postingAccount, f"a-{comment_item['author']}"] # Bot and original author
     for delegator_name in selected_delegators:
         raw_beneficiaries_input.append(f"d-{delegator_name}") # Add selected delegators

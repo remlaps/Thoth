@@ -95,8 +95,9 @@ def shuffled_delegators_by_weight(delegations):
         total_vests = sum(d[1] for d in remaining)
         
         # Generate a random point within the total VESTS range
-        # Convert to float for random.uniform, then back to Decimal
-        random_point = Decimal(str(random.uniform(0, float(total_vests))))
+        # Use random.random() to get a float between 0 and 1, convert to Decimal
+        # for precision, then multiply by total_vests.
+        random_point = Decimal(str(random.random())) * total_vests
         
         # Find which delegator this point corresponds to
         cumulative = Decimal('0')
