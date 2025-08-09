@@ -192,7 +192,6 @@ This post was generated with the assistance of the following AI model: <i>{confi
         
     beneficiaryList = create_beneficiary_list(raw_beneficiaries_input, curatedAuthorWeight, adjustedDelegatorWeight)
     author_account = [comment_item['author']]
-    # selected_delegators is already defined above
     body += utils.generate_beneficiary_display_html(
         beneficiary_list=beneficiaryList,
         author_accounts=author_account,
