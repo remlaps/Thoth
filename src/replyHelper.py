@@ -223,6 +223,8 @@ This post was generated with the assistance of the following AI model: <i>{confi
     print (f"Body length:  {len(body)}")
     print (f"Tags: {taglist}")
     print (f"Beneficiaries: {beneficiaryList}")
+    print(f"Delegator list (shuffled): {all_delegators_list}")
+    print(f"Selected delegator(s): {selected_delegators[:delegatorCount]}")
 
     replyDone=False
     retryCount = 0

@@ -120,6 +120,18 @@ pause
 
 Contributions are welcome! If you find a bug or have a feature request, please open an issue on GitHub. If you'd like to contribute code, please fork the repository and submit a pull request.
 
+### Needs
+- Check the [Issues](https://github.com/remlaps/Thoth/issues) section
+- Improve the appearance and information content for Thoth's posts and replies
+- Provide options for Thoth to create posts in languages other than English
+- Provide options to use additional LLM models
+- Preprocessing before handing off to the LLM
+   - Replace screening with scoring where possible/appropriate
+   - Add a ML/reinforcement learning layer for post recommendations in order to improve picks over time
+   - Screen for uniqueness (plagiarism, syndication, cross-posting, repetitive posting, etc.)
+   - Screen for AI authorship
+- What are your ideas?
+
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.

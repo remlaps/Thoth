@@ -203,6 +203,8 @@ This will be done by:
     print (f"Body length:  {len(body)}")
     print (f"Tags: {taglist}")
     print (f"Beneficiaries: {beneficiaryList}")
+    print(f"Delegator list (shuffled): {delegatorList}")
+    print(f"Selected delegator(s): {delegatorList[:delegatorCount]}")
     
     active_voting_threads = [] # List to keep track of all voting threads
     postDone=False

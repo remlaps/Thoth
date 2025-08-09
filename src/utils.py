@@ -162,7 +162,7 @@ def generate_beneficiary_display_html(beneficiary_list, author_accounts, delegat
     if delegator_accounts:
         delegator_title = "Delegator" if len(delegator_accounts) == 1 else "Delegators"
         delegator_gratitude = "Delegator support is crucial for the Thoth project's ability to find and reward attractive content. Thank you for investing in the Steem ecosystem and the Thoth project."
-        body += _generate_table_html(delegator_title, sorted(delegator_accounts), beneficiary_weights, gratitude_message=delegator_gratitude)
+        body += _generate_table_html(delegator_title, delegator_accounts, beneficiary_weights, gratitude_message=delegator_gratitude)
 
     # 4. Burn Account (@null)
     if null_account in beneficiary_weights and beneficiary_weights[null_account] > 0:
