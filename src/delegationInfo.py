@@ -57,7 +57,6 @@ def random_delegator(delegations):
     delegators = [d[0] for d in delegations]
     vests = [d[1] for d in delegations]
     
-    # Use random.choices with weights parameter for weighted random selection
     # This returns a list with one item, so we take the first element [0]
     selected_delegator = random.choices(
         population=delegators,
@@ -91,27 +90,25 @@ def shuffled_delegators_by_weight(delegations):
     result = []
     
     while remaining:
-        # Calculate total VESTS of remaining delegations
-        total_vests = sum(d[1] for d in remaining)
+        # Calculate total VESTS of remaining delegations (as Decimal)
+        total_vests = sum(d[1] for d in remaining)  # This is already a Decimal since d[1] are Decimals
         
         # Generate a random point within the total VESTS range
-        # Convert to float for random.uniform, then back to Decimal
-        random_point = Decimal(str(random.uniform(0, float(total_vests))))
+        random_point = Decimal(str(random.random())) * total_vests
         
         # Find which delegator this point corresponds to
         cumulative = Decimal('0')
         selected_idx = 0
         
         for i, (_, vests) in enumerate(remaining):
-            cumulative += vests
-            if cumulative >= random_point:
+            if cumulative + vests > random_point:
                 selected_idx = i
                 break
+            cumulative += vests
         
         # Add the selected delegator to our result list
         result.append(remaining[selected_idx][0])
         
         # Remove the selected delegator from the remaining list
         remaining.pop(selected_idx)
-    
     return result

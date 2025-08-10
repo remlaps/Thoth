@@ -172,12 +172,12 @@ This will be done by:
     for comment in commentList:
         beneficiaryList.append(f"a-{comment['author']}")
     delegatorList = delegationInfo.shuffled_delegators_by_weight(delegationInfo.get_delegations(postingAccount))
-    for delegator in delegatorList[:delegatorCount]:
+    selected_delegators = delegatorList[:delegatorCount]
+    for delegator in selected_delegators:
         beneficiaryList.append(f"d-{delegator}")
         
     beneficiaryList = create_beneficiary_list(beneficiaryList)
     author_accounts = [c['author'] for c in commentList]
-    selected_delegators = delegatorList[:delegatorCount]
     body += utils.generate_beneficiary_display_html(
         beneficiary_list=beneficiaryList,
         author_accounts=author_accounts,
@@ -203,6 +203,8 @@ This will be done by:
     print (f"Body length:  {len(body)}")
     print (f"Tags: {taglist}")
     print (f"Beneficiaries: {beneficiaryList}")
+    print(f"Delegator list (shuffled): {delegatorList}")
+    print(f"Selected delegator(s): {selected_delegators}")
     
     active_voting_threads = [] # List to keep track of all voting threads
     postDone=False

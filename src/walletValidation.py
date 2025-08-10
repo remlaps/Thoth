@@ -15,6 +15,50 @@ s = Steem(node=steemApi) if steemApi else Steem()
 
 screenedDelegateeFile = config.get('WALLET', 'SCREENED_DELEGATEE_FILE')
 
+def _get_thoth_incoming_delegations(author: str) -> list:
+    """
+    Fetches incoming delegations to a Thoth author.
+
+    Args: the Steem account name of the author
+
+    TechDebt: At some point, this should be changed to happen only once per program execution.
+
+    Returns the total amount of vesting shares delegated to Thoth by the author.
+    If the author makes no delegations, returns 0.
+    """
+    steemApi = config.get('STEEM', 'STEEM_API')
+    s = Steem(node=steemApi) if steemApi else Steem()
+    thothAccount = config.get('STEEM', 'POSTING_ACCOUNT')
+                              
+    last_delegatee = None
+    batch_size = 100
+    is_first_batch = True
+                              
+    incomingVests = Decimal('0')
+
+    while True:
+        data = s.get_vesting_delegations(thothAccount, last_delegatee, batch_size)
+        if not data:
+            break
+
+        start_idx = 0 if is_first_batch else 1
+        is_first_batch = False
+
+        for delegation in data[start_idx:]:
+            delegatee = delegation['delegatee']
+            vests_str = delegation['vesting_shares'].split(' ')[0]
+            if delegatee == author:
+                incomingVests = Decimal(vests_str) 
+                print (f"Delegatee: {delegatee}, vests: {vests_str}, delegatedVests: {incomingVests}")
+                break
+            last_delegatee = delegatee
+            print (f"Delegatee: {delegatee}, vests: {vests_str}, delegatedVests: {incomingVests}")
+
+        if len(data) < batch_size:
+            break
+
+    return incomingVests
+
 def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, float | None]:
     """
     Fetches and parses an account's total, delegated, and received vesting shares.
@@ -38,6 +82,9 @@ def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, 
         vesting_shares = float(account.get('vesting_shares', '0.0 ').split()[0])
         delegated_vesting_shares = float(account.get('delegated_vesting_shares', '0.0 ').split()[0])
         received_vesting_shares = float(account.get('received_vesting_shares', '0.0 ').split()[0])
+
+        thothDelegation = _get_thoth_incoming_delegations(author)
+        delegated_vesting_shares -= float(thothDelegation)
         
         return vesting_shares, delegated_vesting_shares, received_vesting_shares
 

@@ -15,3 +15,6 @@ config/authorWhiteList.txt
 config/delegationScreen.txt
 config/config-social.ini
 config/config-thothtest.ini
+config/configBackups
+config/systemPromptTemplate_Gemma.txt
+config/userPromptTemplate_Gemma.txt
