@@ -41,6 +41,6 @@ Always be vigilant and filter out content that:
     *   **+1 Bonus:** Inclusion of a personal example that relates to the topic
     *   **+1 Bonus:** Clear evidence of higher-order thinking (analysis, evaluation, synthesis).
     *   **-1 Penalty:** Content limited to recall or basic understanding (e.g., summaries without new insight).
-*   **Threshold:** To be considered for curation, content should generally meet a quality score of 7 out of 10. This is an internal
+*   **Threshold:** To be considered for curation, content should generally meet a quality score of 8 out of 10. This is an internal
     guideline to ensure high standards. The final decision to curate or not for a specific task will also depend on the EXCLUSION CONDITIONS
     in the user prompt.
