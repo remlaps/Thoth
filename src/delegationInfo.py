@@ -1,6 +1,11 @@
 import requests
-import random
+import numpy as np
 from decimal import Decimal, getcontext
+import os
+import time
+
+# Create ONE high-quality RNG instance at module level with explicit entropy
+_rng = np.random.default_rng(int.from_bytes(os.urandom(4), 'big') ^ int(time.time() * 1000000))
 
 def get_delegations(account):
     """
@@ -40,6 +45,7 @@ def get_delegations(account):
 def random_delegator(delegations):
     """
     Randomly select a delegator with probability proportional to their delegated VESTS.
+    Uses module-level numpy RNG for consistent entropy across calls.
     
     Args:
         delegations (list): List of (delegator, vests) tuples returned by get_delegations()
@@ -55,20 +61,21 @@ def random_delegator(delegations):
     
     # Extract delegators and their VESTS
     delegators = [d[0] for d in delegations]
-    vests = [d[1] for d in delegations]
+    weights = [float(d[1]) for d in delegations]  # numpy needs float
     
-    # This returns a list with one item, so we take the first element [0]
-    selected_delegator = random.choices(
-        population=delegators,
-        weights=vests,
-        k=1
-    )[0]
+    # Normalize weights to probabilities
+    total_weight = sum(weights)
+    probabilities = [w / total_weight for w in weights]
+    
+    # Select using module-level RNG
+    selected_delegator = _rng.choice(delegators, p=probabilities)
     
     return selected_delegator
 
 def shuffled_delegators_by_weight(delegations):
     """
     Returns delegators in random order, with probability of each position proportional to delegation size.
+    Uses module-level numpy RNG for consistent high-quality entropy.
     
     Args:
         delegations (list): List of (delegator, vests) tuples returned by get_delegations()
@@ -85,30 +92,26 @@ def shuffled_delegators_by_weight(delegations):
     # Set precision high enough for our calculations
     getcontext().prec = 28
     
-    # Convert VESTS values to Decimal for precise arithmetic
-    remaining = [(d[0], Decimal(str(d[1]))) for d in delegations]
+    # Convert VESTS values to Decimal for precise arithmetic, but keep a working copy for numpy
+    remaining = [(d[0], Decimal(str(d[1])), float(d[1])) for d in delegations]  # (delegator, decimal_vests, float_vests)
     result = []
     
     while remaining:
-        # Calculate total VESTS of remaining delegations (as Decimal)
-        total_vests = sum(d[1] for d in remaining)  # This is already a Decimal since d[1] are Decimals
+        # Extract data for numpy operations
+        delegators = [d[0] for d in remaining]
+        float_weights = [d[2] for d in remaining]  # Use float weights for numpy
         
-        # Generate a random point within the total VESTS range
-        random_point = Decimal(str(random.random())) * total_vests
+        # Normalize weights to probabilities
+        total_weight = sum(float_weights)
+        probabilities = np.array(float_weights) / total_weight
         
-        # Find which delegator this point corresponds to
-        cumulative = Decimal('0')
-        selected_idx = 0
-        
-        for i, (_, vests) in enumerate(remaining):
-            if cumulative + vests > random_point:
-                selected_idx = i
-                break
-            cumulative += vests
+        # Use module-level RNG (consistent entropy across calls)
+        selected_delegator = _rng.choice(delegators, p=probabilities)
         
         # Add the selected delegator to our result list
-        result.append(remaining[selected_idx][0])
+        result.append(selected_delegator)
         
         # Remove the selected delegator from the remaining list
-        remaining.pop(selected_idx)
+        remaining = [d for d in remaining if d[0] != selected_delegator]
+    
     return result

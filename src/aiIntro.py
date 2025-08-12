@@ -2,6 +2,7 @@ from datetime import datetime
 import requests
 import json
 import re
+import time
 
 def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComment, maxTokens=8192):
     today = datetime.now()
@@ -101,18 +102,31 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
 
     payload = json.dumps(payloadDict)
 
-    response = requests.request("POST", arliaiUrl, headers=headers, data=payload)
-    data = response.json()
-    if isinstance(data, list):
-        data = data[0]
-    rawResponse = data['choices'][0]['message']['content']
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            response = requests.post(arliaiUrl, headers=headers, data=payload)
+            response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+            data = response.json()
+            if isinstance(data, list):
+                data = data[0]
+            rawResponse = data['choices'][0]['message']['content']
 
-    # Post-process to remove any <think>...</think> blocks that the model might still include.
-    # The re.DOTALL flag ensures that the pattern matches even if the block spans multiple lines.
-    # .strip() removes any leading/trailing whitespace left after the removal.
-    cleanedResponse = re.sub(r'<think>.*?</think>', '', rawResponse, flags=re.DOTALL).strip()
+            # Post-process to remove any <think>...</think> blocks that the model might still include.
+            cleanedResponse = re.sub(r'<think>.*?</think>', '', rawResponse, flags=re.DOTALL).strip()
 
-    print(f"Response before cleaning: {rawResponse}...")
-    print(f"Response after cleaning: {cleanedResponse}...")
+            print(f"Intro Response before cleaning: {rawResponse}")
+            print(f"Intro Response after cleaning: {cleanedResponse}")
 
-    return cleanedResponse
+            return cleanedResponse # Success, so we exit the function
+        except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError, IndexError) as e:
+            print(f"Error during AI Intro generation (Attempt {attempt + 1}/{max_retries}): {e}")
+            if 'response' in locals() and hasattr(response, 'text'):
+                print(f"Response body: {response.text}")
+            
+            if attempt < max_retries - 1:
+                print("Retrying in 60 seconds...")
+                time.sleep(60)
+
+    # This part is only reached if the loop completes without a successful return.
+    return "Thoth was unable to generate an introduction for this post due to an API error after multiple retries."
