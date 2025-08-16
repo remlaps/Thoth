@@ -76,6 +76,8 @@ MIN_REPUTATION = 60
 [BLOG]
 CURATED_AUTHOR_WEIGHT = 900
 DELEGATOR_WEIGHT = 2000
+# A comma-separated list of delegators who are ineligible for rewards for other reasons
+INELIGIBLE_DELEGATORS = 
 #
 # Delegators + reviewed posts cannot exceed 6 with a soft limit of 8 beneficiaries.
 # ( NUMBER_OF_DELEGATORS_PER_POST * DELEGATOR_WEIGHT + NUMBER_OF_REVIEWED_POSTS * CURATED_AUTHOR_WEIGHT + POSTING_ACCOUNT_WEIGHT )
@@ -86,6 +88,8 @@ NUMBER_OF_REVIEWED_POSTS = 5
 POSTING_ACCOUNT_WEIGHT = 500
 # POST_TAGS = thoth-ai, payitbackwards, curation, gen-5, authorboost
 POST_TAGS = test, thoth-test, lifetime-rewards
+# A comma-separated list of delegators who should not receive beneficiary rewards (e.g., for pro-bono support)
+PRO_BONO_DELEGATORS = 
 # [Name, alias, or Acccount info here (will be published in the post)]
 THOTH_OPERATOR = 
 ### Implemented: CURATED_AUTHOR_WEIGHT, NUMBER_OF_REVIEWED_POSTS, POSTING_ACCOUNT, POSTING_ACCOUNT_WEIGHT

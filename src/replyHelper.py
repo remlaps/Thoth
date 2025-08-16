@@ -168,21 +168,36 @@ This post was generated with the assistance of the following AI model: <i>{confi
     # Determine the total number of delegators to include for this reply.
     total_delegators_to_include_for_reply = delegatorCount + freed_author_slots
     
-    all_delegators_list = []
+    all_delegators_list = [] # Full shuffled list of eligible delegators
+    selected_delegators = [] # The subset we will actually use
     try:
-        delegations = delegationInfo.get_delegations(postingAccount)
-        if delegations: # Only shuffle if there are actual delegations
-            all_delegators_list = delegationInfo.shuffled_delegators_by_weight(delegations)
+        # Get all delegations and filter out excluded accounts
+        full_delegations = delegationInfo.get_delegations(postingAccount)
+
+        # Get lists of delegators to exclude from config
+        pro_bono_delegators = [d.strip() for d in config.get('BLOG', 'PRO_BONO_DELEGATORS', fallback='').split(',') if d.strip()]
+        ineligible_delegators = [d.strip() for d in config.get('BLOG', 'INELIGIBLE_DELEGATORS', fallback='').split(',') if d.strip()]
+        all_excluded = pro_bono_delegators + ineligible_delegators
+
+        # Filter the delegations using the new function
+        eligible_delegations = delegationInfo.removeExcludedDelegators(full_delegations, all_excluded)
+
+        if eligible_delegations: # Only shuffle if there are eligible delegations
+            all_delegators_list = delegationInfo.shuffled_delegators_by_weight(eligible_delegations)
+            
+            num_delegators_to_select = min(total_delegators_to_include_for_reply, len(all_delegators_list))
+            selected_delegators = all_delegators_list[:num_delegators_to_select]
+
     except Exception as e:
         print(f"Warning: Could not retrieve or shuffle delegators for reply: {e}")
-        # all_delegators_list will remain empty
-    
-    num_delegators_to_select = min(total_delegators_to_include_for_reply, len(all_delegators_list))
-    selected_delegators = all_delegators_list[:num_delegators_to_select]
+        # all_delegators_list and selected_delegators will remain empty
 
     # Safely calculate the adjusted weight, avoiding division by zero.
-    if num_delegators_to_select > 0:
-        adjustedDelegatorWeight = int((delegatorCount * delegatorWeight) / num_delegators_to_select)
+    if len(selected_delegators) > 0:
+        # The total weight pool for delegators is based on the main post's settings.
+        # This pool is then divided among the selected delegators for this reply.
+        total_delegator_weight_pool = delegatorCount * delegatorWeight
+        adjustedDelegatorWeight = int(total_delegator_weight_pool / len(selected_delegators))
     else:
         adjustedDelegatorWeight = 0
 

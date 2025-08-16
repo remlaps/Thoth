@@ -58,18 +58,11 @@ def count_hashtag_words(comment):
     Returns:
         int: The number of words starting with '#'.
     """
+    
+    post_metadata = json.loads(comment['json_metadata'])
+    tags = post_metadata['tags']
 
-    text = comment['body']
-    if not text or not isinstance(text, str):
-        return 0
-    
-    # Split the text into words. This handles various whitespace.
-    words = text.split()
-    
-    hashtag_count = 0
-    for word in words:
-        if word.startswith('#'):
-            hashtag_count += 1
+    hashtag_count = len(tags) if isinstance(tags, list) else 0
             
     return hashtag_count
 
