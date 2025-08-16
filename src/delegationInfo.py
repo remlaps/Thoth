@@ -1,11 +1,10 @@
 import requests
 import numpy as np
 from decimal import Decimal, getcontext
-import os
-import time
+import utils
 
 # Create ONE high-quality RNG instance at module level with explicit entropy
-_rng = np.random.default_rng(int.from_bytes(os.urandom(4), 'big') ^ int(time.time() * 1000000))
+_rng = utils.get_rng()
 
 def get_delegations(account):
     """

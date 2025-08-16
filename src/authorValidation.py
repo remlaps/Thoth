@@ -70,33 +70,42 @@ def isAuthorScreened(comment):
     s = Steem(node=steemApi if steemApi else None)
 
     if ( isBlacklisted(comment['author'], steem_instance=s) ):
+        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isBlacklisted: True")
         return True
     
     if ( isAuthorWhitelisted(comment['author']) ):
+        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isAuthorWhitelisted: True")
         return False
     
     if isHiveActivityTooRecent(comment['author']):
+        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isHiveActivityTooRecent: True")
         return True
 
     if isFollowerCountTooLow(comment['author'], steem_instance=s):
+        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isFollowerCountTooLow: True")
         return True
        
     accountInfo = s.get_account(comment['author'])
      
     if isInactive(accountInfo, steem_instance=s) :
+        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isInactive: True")
         return True
         
     if isRepTooLow(accountInfo['reputation']) :
+        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isRepTooLow: True")
         return True
     
     if isMonthlyFollowersTooLow(accountInfo, comment, steem_instance=s):
+        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isMonthlyFollowersTooLow: True")
         return True
     
     if isAdjustedMonthlyFollowersTooLow ( accountInfo, comment, steem_instance=s):
+        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isAdjustedMonthlyFollowersTooLow: True")
         return True
 
     median_rep = getMedianFollowerRep(comment['author'], steem_instance=s)
     if median_rep is not None and median_rep < config.getint('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP'):
+        print(f"DEBUG: isAuthorScreened({comment['author']}) -> median follower rep {median_rep} < MIN_FOLLOWER_MEDIAN_REP {config.getint('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP')}: True")
         return True
         
     return False
@@ -130,11 +139,21 @@ def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_i
         raise ValueError("Account creation date is in the future")
     age = now - accountCreated
 
-    ## halflife formula - https://www.calculator.net/half-life-calculator.html
-    adjustedHalfLife = max ( age.days - halfLife, 1 )  ## Give them one halving cycle for free
-    adjustedFollowerCount = followerCount * (0.5 ** (age.days / adjustedHalfLife))  
-    adjustedFollowersPerMonth = 30.44 * adjustedFollowerCount / age.days
-    
+    # The half-life formula is N(t) = N0 * (1/2)^(t/T), where:
+    # N(t) is the quantity remaining after time t
+    # N0 is the initial quantity (followerCount)
+    # t is the time elapsed (age of the account in days)
+    # T is the half-life period (in days)
+    exponent = age.days / halfLife
+    adjustedFollowerCount = followerCount * (0.5 ** exponent)
+
+    if age.days > 0:
+        adjustedFollowersPerMonth = 30.44 * adjustedFollowerCount / age.days
+    else:
+        # Avoid division by zero for accounts less than a day old.
+        adjustedFollowersPerMonth = 0.0
+
+    print(f"DEBUG: adjustedFollowersPerMonth({comment['author']}) -> followerCount: {followerCount}, age (days): {age.days}, halfLife (days): {halfLife}, adjustedFollowerCount: {adjustedFollowerCount:.2f}, adjustedFollowersPerMonth: {adjustedFollowersPerMonth:.2f}")
     return adjustedFollowersPerMonth
 
 def isMonthlyFollowersTooLow (accountInfo, comment, steem_instance=None):

@@ -7,8 +7,6 @@ images/aiThoth.jfif
 images/ThothAI2.png
 .vscode
 .env
-config/configHistorical.ini
-config/configActive.ini
 config/systemPrompt.txt
 config/userPrompt.txt
 config/authorWhiteList.txt
@@ -16,5 +14,3 @@ config/delegationScreen.txt
 config/config-social.ini
 config/config-thothtest.ini
 config/configBackups
-config/systemPromptTemplate_Gemma.txt
-config/userPromptTemplate_Gemma.txt

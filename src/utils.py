@@ -5,6 +5,9 @@ import authorValidation
 import contentValidation
 import walletValidation
 
+import numpy as np
+import os
+import time
 from steem import Steem
 
 # Create a ConfigParser object
@@ -12,6 +15,12 @@ config = configparser.ConfigParser()
 
 # Read the config.ini file
 config.read('config/config.ini')
+
+def get_rng():
+    """Creates and returns a high-quality seeded NumPy RNG instance."""
+    # Combine OS-level entropy with a high-resolution timestamp for a robust seed
+    seed = int.from_bytes(os.urandom(8), 'big') ^ time.time_ns()
+    return np.random.default_rng(seed)
 
 def detect_language(text):
     try:
