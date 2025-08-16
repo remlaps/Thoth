@@ -37,7 +37,7 @@ def _get_thoth_incoming_delegations(author: str) -> list:
     incomingVests = Decimal('0')
 
     while True:
-        data = s.get_vesting_delegations(thothAccount, last_delegatee, batch_size)
+        data = s.get_vesting_delegations(author, last_delegatee, batch_size)
         if not data:
             break
 
@@ -47,16 +47,15 @@ def _get_thoth_incoming_delegations(author: str) -> list:
         for delegation in data[start_idx:]:
             delegatee = delegation['delegatee']
             vests_str = delegation['vesting_shares'].split(' ')[0]
-            if delegatee == author:
+            if delegatee == thothAccount:
                 incomingVests = Decimal(vests_str) 
-                print (f"Delegatee: {delegatee}, vests: {vests_str}, delegatedVests: {incomingVests}")
                 break
             last_delegatee = delegatee
-            print (f"Delegatee: {delegatee}, vests: {vests_str}, delegatedVests: {incomingVests}")
 
         if len(data) < batch_size:
             break
 
+    print (f"Total incoming VESTS to Thoth from {author}: {incomingVests}")
     return incomingVests
 
 def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, float | None]:
@@ -85,7 +84,7 @@ def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, 
 
         thothDelegation = _get_thoth_incoming_delegations(author)
         delegated_vesting_shares -= float(thothDelegation)
-        
+
         return vesting_shares, delegated_vesting_shares, received_vesting_shares
 
     except Exception as e:

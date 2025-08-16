@@ -6,6 +6,25 @@ import utils
 # Create ONE high-quality RNG instance at module level with explicit entropy
 _rng = utils.get_rng()
 
+def removeExcludedDelegators(delegations, excluded_accounts):
+    """
+    Removes delegations from a list where the delegator is in the excluded list.
+
+    Args:
+        delegations (list): A list of (delegator, vests) tuples.
+        excluded_accounts (list): A list of account names to exclude.
+
+    Returns:
+        list: A new list of delegations with excluded accounts removed.
+    """
+    if not excluded_accounts:
+        return delegations
+    
+    # Use a set for efficient O(1) average time complexity lookups
+    excluded_set = set(excluded_accounts)
+    
+    return [(delegator, vests) for delegator, vests in delegations if delegator not in excluded_set]
+
 def get_delegations(account):
     """
     Get delegations for a Steem account.

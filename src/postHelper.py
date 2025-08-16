@@ -171,11 +171,34 @@ This will be done by:
     # The "a/d account types is a kludge"
     for comment in commentList:
         beneficiaryList.append(f"a-{comment['author']}")
-    delegatorList = delegationInfo.shuffled_delegators_by_weight(delegationInfo.get_delegations(postingAccount))
-    selected_delegators = delegatorList[:delegatorCount]
-    for delegator in selected_delegators:
-        beneficiaryList.append(f"d-{delegator}")
-        
+
+    # Get all delegations, filter out excluded accounts, and select beneficiaries
+    try:
+        full_delegations = delegationInfo.get_delegations(postingAccount)
+
+        # Get lists of delegators to exclude from config
+        pro_bono_delegators = [d.strip() for d in config.get('BLOG', 'PRO_BONO_DELEGATORS', fallback='').split(',') if d.strip()]
+        ineligible_delegators = [d.strip() for d in config.get('BLOG', 'INELIGIBLE_DELEGATORS', fallback='').split(',') if d.strip()]
+        all_excluded = pro_bono_delegators + ineligible_delegators
+
+        # Filter the delegations using the new function
+        eligible_delegations = delegationInfo.removeExcludedDelegators(full_delegations, all_excluded)
+
+        # Shuffle the remaining delegators by weight and select the top ones
+        if eligible_delegations:
+            delegatorList = delegationInfo.shuffled_delegators_by_weight(eligible_delegations)
+            selected_delegators = delegatorList[:delegatorCount]
+            for delegator in selected_delegators:
+                beneficiaryList.append(f"d-{delegator}")
+        else:
+            selected_delegators = []
+            delegatorList = []
+
+    except Exception as e:
+        print(f"Could not process delegator beneficiaries due to an error: {e}")
+        selected_delegators = []
+        delegatorList = []
+
     beneficiaryList = create_beneficiary_list(beneficiaryList)
     author_accounts = [c['author'] for c in commentList]
     body += utils.generate_beneficiary_display_html(
