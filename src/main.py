@@ -2,7 +2,6 @@ import configparser
 import re
 import os
 import time
-import random
 from datetime import datetime
 
 import aiIntro
@@ -13,6 +12,9 @@ from configValidator import ConfigValidator
 
 from steem.blockchain import Blockchain
 from steem import Steem
+
+# Create ONE high-quality RNG instance at module level with explicit entropy
+_rng = utils.get_rng()
 
 # Check if the UNLOCK environment variable exists
 if "UNLOCK" in os.environ:
@@ -100,8 +102,9 @@ else:
 
 
 if ( streamType == 'RANDOM' ):
-    streamFromBlock = random.randint(config.getint('STEEM', 'DEFAULT_START_BLOCK'), 
-        steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 30) )
+    streamFromBlock = _rng.integers(config.getint('STEEM', 'DEFAULT_START_BLOCK'), 
+        steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 30),
+        endpoint=True)
 elif ( streamType == 'ACTIVE' ):
     streamFromBlock = \
         max (steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 6), lastBlock ) # 6 days or last processed
@@ -196,7 +199,7 @@ while retry_count <= max_retries:
         
         if "this method is limited by 10r/s per ip" in str(e).lower():
             # Exponential backoff with jitter
-            jitter = random.uniform(0.1, 0.5)
+            jitter = _rng.uniform(0.1, 0.5)
             wait_time = (retry_delay * (2 ** (retry_count-1))) + jitter
             
             print(f"Rate limit exceeded. Retry {retry_count}/{max_retries} after {wait_time:.2f} seconds...")
