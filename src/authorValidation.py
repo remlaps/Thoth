@@ -138,13 +138,14 @@ def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_i
     if accountCreated > now:
         raise ValueError("Account creation date is in the future")
     age = now - accountCreated
+    adjustedAgeInDays = max(1, age.days - halfLife ) ### Give away 1 halflife cycle before followers stop dropping.
 
     # The half-life formula is N(t) = N0 * (1/2)^(t/T), where:
     # N(t) is the quantity remaining after time t
     # N0 is the initial quantity (followerCount)
     # t is the time elapsed (age of the account in days)
     # T is the half-life period (in days)
-    exponent = age.days / halfLife
+    exponent = adjustedAgeInDays / halfLife
     adjustedFollowerCount = followerCount * (0.5 ** exponent)
 
     if age.days > 0:
