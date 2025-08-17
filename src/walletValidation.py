@@ -37,7 +37,7 @@ def _get_thoth_incoming_delegations(author: str) -> list:
     incomingVests = Decimal('0')
 
     while True:
-        data = s.get_vesting_delegations(thothAccount, last_delegatee, batch_size)
+        data = s.get_vesting_delegations(author, last_delegatee, batch_size)
         if not data:
             break
 
@@ -47,16 +47,15 @@ def _get_thoth_incoming_delegations(author: str) -> list:
         for delegation in data[start_idx:]:
             delegatee = delegation['delegatee']
             vests_str = delegation['vesting_shares'].split(' ')[0]
-            if delegatee == author:
+            if delegatee == thothAccount:
                 incomingVests = Decimal(vests_str) 
-                print (f"Delegatee: {delegatee}, vests: {vests_str}, delegatedVests: {incomingVests}")
                 break
             last_delegatee = delegatee
-            print (f"Delegatee: {delegatee}, vests: {vests_str}, delegatedVests: {incomingVests}")
 
         if len(data) < batch_size:
             break
 
+    print (f"Total incoming VESTS to Thoth from {author}: {incomingVests}")
     return incomingVests
 
 def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, float | None]:
@@ -85,7 +84,7 @@ def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, 
 
         thothDelegation = _get_thoth_incoming_delegations(author)
         delegated_vesting_shares -= float(thothDelegation)
-        
+
         return vesting_shares, delegated_vesting_shares, received_vesting_shares
 
     except Exception as e:
@@ -103,18 +102,20 @@ def walletScreened(account, steem_instance=None):
     if not check_author_wallet(account):
         return True
 
-    # The config value is a ratio (e.g., 0.5 for 50%), not a percentage.
-    # The logic is to check if the ratio of screened delegations to total SP exceeds the threshold.
+    # The config value is a percentage (e.g., 15.0 for 15%).
+    # The logic is to check if the percentage of screened delegations to total SP exceeds the threshold.
     screened_vests = totalScreenedDelegationVests(account)
     
     # Avoid ZeroDivisionError if account has 0 SP.
     if vesting_shares == 0.0:  # Minimum vesting_shares was already checked by check_author_wallet.  At this point, 0 is ok.
         return False
 
+    screened_percentage = (screened_vests / vesting_shares) * 100
+
     print (f"Vesting Shares: {vesting_shares:,.6f} VESTS")
     print (f"Screened Delegations: {screened_vests:,.6f} VESTS")
-    print (f"Percentage screened: {(screened_vests / vesting_shares) * 100:.2f}%")
-    return (screened_vests / vesting_shares) > maxScreenedDelegationPct
+    print (f"Percentage screened: {screened_percentage:.2f}%")
+    return screened_percentage > maxScreenedDelegationPct
 
 def totalScreenedDelegationVests (delegator, screenedDelegateeFile=screenedDelegateeFile):
     # Optimization: If the user has no delegated shares at all, we can exit early.
