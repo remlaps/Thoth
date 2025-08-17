@@ -102,18 +102,20 @@ def walletScreened(account, steem_instance=None):
     if not check_author_wallet(account):
         return True
 
-    # The config value is a ratio (e.g., 0.5 for 50%), not a percentage.
-    # The logic is to check if the ratio of screened delegations to total SP exceeds the threshold.
+    # The config value is a percentage (e.g., 15.0 for 15%).
+    # The logic is to check if the percentage of screened delegations to total SP exceeds the threshold.
     screened_vests = totalScreenedDelegationVests(account)
     
     # Avoid ZeroDivisionError if account has 0 SP.
     if vesting_shares == 0.0:  # Minimum vesting_shares was already checked by check_author_wallet.  At this point, 0 is ok.
         return False
 
+    screened_percentage = (screened_vests / vesting_shares) * 100
+
     print (f"Vesting Shares: {vesting_shares:,.6f} VESTS")
     print (f"Screened Delegations: {screened_vests:,.6f} VESTS")
-    print (f"Percentage screened: {(screened_vests / vesting_shares) * 100:.2f}%")
-    return (screened_vests / vesting_shares) > maxScreenedDelegationPct
+    print (f"Percentage screened: {screened_percentage:.2f}%")
+    return screened_percentage > maxScreenedDelegationPct
 
 def totalScreenedDelegationVests (delegator, screenedDelegateeFile=screenedDelegateeFile):
     # Optimization: If the user has no delegated shares at all, we can exit early.
