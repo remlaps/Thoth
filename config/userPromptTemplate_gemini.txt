@@ -1,3 +1,5 @@
+/no_think
+
 Evaluate this article and create a curation report.
 
 ## OUTPUT INSTRUCTIONS
