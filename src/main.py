@@ -16,6 +16,43 @@ from steem import Steem
 # Create ONE high-quality RNG instance at module level with explicit entropy
 _rng = utils.get_rng()
 
+def initialize_steem_with_retry(node_api=None, max_retries=5, initial_delay=1.0):
+    """
+    Initializes the Steem instance with a retry mechanism for connection errors.
+    """
+    for attempt in range(max_retries):
+        try:
+            if node_api:
+                s = Steem(node=node_api)
+            else:
+                s = Steem()
+
+            # The Steem() constructor implicitly calls get_dynamic_global_properties(),
+            # which is where the UnboundLocalError from the traceback can occur.
+            # If we reach here, the connection was successful.
+            if node_api:
+                print(f"Successfully connected to Steem node: {node_api}")
+            else:
+                print("Successfully connected to default Steem node.")
+            return s
+        except UnboundLocalError as e:
+            # This specific error from the traceback indicates a probable transient issue in steem-python http_client
+            if "cannot access local variable 'error'" in str(e):
+                wait_time = initial_delay * (2 ** attempt)
+                print(f"Caught specific UnboundLocalError during Steem init (Attempt {attempt + 1}/{max_retries}). Retrying in {wait_time:.2f}s... Error: {e}")
+                time.sleep(wait_time)
+            else:
+                # If it's a different UnboundLocalError, we don't want to retry, so re-raise.
+                print(f"Caught an unexpected UnboundLocalError. This is not the target error for retry. Raising.")
+                raise
+        except Exception as e:
+            wait_time = initial_delay * (2 ** attempt)
+            print(f"Failed to initialize Steem (Attempt {attempt + 1}/{max_retries}). Retrying in {wait_time:.2f}s... Error: {e}")
+            time.sleep(wait_time)
+
+    print(f"FATAL: Could not initialize Steem after {max_retries} attempts.")
+    return None
+
 # Check if the UNLOCK environment variable exists
 if "UNLOCK" in os.environ:
     # The variable is set
@@ -86,20 +123,12 @@ if os.path.exists(BLOCK_FILE):
 else:
     lastBlock = 0
 
-if steemApi:
-    steemdInstance = Steem(node=steemApi)
-    print (f"Using Steem: {steemApi}")
-else:
-    steemdInstance = Steem()
-    print (f"Using Steem: default")
+steemdInstance = initialize_steem_with_retry(node_api=steemApi)
+if not steemdInstance:
+    exit(1) # Exit if Steem connection failed
 
-if steemApi:
-    blockchain = Blockchain(steemd_instance=steemdInstance)
-    print(f"Using blockchain: {steemApi}")
-else:
-    blockchain = Blockchain()
-    print(f"Using blockchain: default")
-
+blockchain = Blockchain(steemd_instance=steemdInstance)
+print(f"Using blockchain with nodes: {steemdInstance.steemd.nodes}")
 
 if ( streamType == 'RANDOM' ):
     streamFromBlock = _rng.integers(config.getint('STEEM', 'DEFAULT_START_BLOCK'), 
@@ -211,7 +240,8 @@ while retry_count <= max_retries:
             if retry_count >= max_retries:
                 raise
             time.sleep(retry_delay)
-
+            
+time.sleep(60)  # Give some time for rate limiting between AI Queries
 if earliest_timestamp and latest_timestamp:
     # The timestamps from the stream are already datetime objects.
     print(f"Posts processed ranged from {earliest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')} to {latest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')}")

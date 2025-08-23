@@ -153,7 +153,6 @@ def totalScreenedDelegationVests (delegator, screenedDelegateeFile=screenedDeleg
             if delegatee in screenedDelegatees:
                 total_vests += Decimal(vests_str)
             last_delegatee = delegatee
-            print (f"Delegator: {delegator}, delegatee: {delegatee}, vests: {vests_str}, total_vests: {total_vests}")
 
         if len(data) < batch_size:
             break
