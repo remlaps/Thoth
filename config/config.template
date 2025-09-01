@@ -95,6 +95,24 @@ THOTH_OPERATOR =
 ### Implemented: CURATED_AUTHOR_WEIGHT, NUMBER_OF_REVIEWED_POSTS, POSTING_ACCOUNT, POSTING_ACCOUNT_WEIGHT
 ### [ POSTING_ACCOUNT_WEIGHT + ( NUMBER_OF_REVIEWED_POSTS * CURATED_AUTHOR_WEIGHT ) ] must be less than 10000 (i.e. 500 == 5%)
 
+### Enable screening based on a post's engagement score.
+### Resteem scoring is not working yet.  Not sure how to get the resteem count back from the Steem API 
+###    without weeding through the account history.
+[ENGAGEMENT]
+COMMENT_MAX = 20
+COMMENT_MIN = -10
+COMMENT_WEIGHT = 2
+ENGAGEMENT_THRESHOLD = 5
+RESETEEM_MAX = 20
+RESTEEM_MIN = 2
+RESTEEM_WEIGHT = 0
+VALUE_MAX = 100.0
+VALUE_MIN = 0.25
+VALUE_WEIGHT = 1
+VOTE_COUNT_MAX = 200
+VOTE_COUNT_MIN = 10 
+VOTE_COUNT_WEIGHT = 1
+
 [WALLET]
 DELEGATION_FILE=config\delegationScreen.txt
 MAX_DELEGATION_PCT = 25.0
