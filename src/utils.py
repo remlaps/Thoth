@@ -4,6 +4,7 @@ import re
 import authorValidation
 import contentValidation
 import walletValidation
+import engagementValidation
 
 import numpy as np
 import os
@@ -66,6 +67,9 @@ def screenPost(comment):
     
     if ( contentValidation.hasTooManyTags (latestComment)):
         return "Too many tags"
+    
+    if ( engagementValidation.hasLowEngagement (comment)):
+        return "Low engagement"
     
     ### This is slow.  Screen everything else first.
     if ( walletValidation.walletScreened(comment['author'])):

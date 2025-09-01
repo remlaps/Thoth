@@ -21,6 +21,7 @@ from steem import Steem
 
 import authorValidation
 import walletValidation
+import engagementValidation
 import utils
 
 def main():
@@ -139,6 +140,27 @@ def main():
     # else:
     #     print("Median Follower Rep: Could not calculate (no followers).")
 
+    # --- Engagement Validation ---
+    print("\n--- Engagement Validation ---")
+    # We need a more complete comment object for engagement checks
+    try:
+        posts = s.get_discussions_by_author_before_date(author_name, None, datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'), 1)
+        if posts:
+            full_comment_object = posts[0]
+            print(f"Using post '{full_comment_object['title']}' for engagement test.")
+            # The timestamp in the object from get_discussions_by_author_before_date is a string
+            # but hasLowEngagement expects a datetime object. Let's fix that.
+            full_comment_object['timestamp'] = datetime.strptime(full_comment_object['created'], '%Y-%m-%dT%H:%M:%S')
+            
+            low_engagement = engagementValidation.hasLowEngagement(full_comment_object)
+            print(f"Has Low Engagement: {low_engagement}")
+        else:
+            print("Could not retrieve a recent post for the author to run engagement test.")
+            print("Skipping engagement test.")
+    except Exception as e:
+        print(f"Error during engagement test: {e}")
+        print("Skipping engagement test.")
+        
     # Wallet checks from walletValidation.py
     print("\n--- Wallet Validation ---")
     wallet_passes = walletValidation.check_author_wallet(author_name)
