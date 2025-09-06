@@ -1,7 +1,13 @@
-from steem import Steem
 import time
-import random
+import requests
+import configparser
+
+from steem import Steem
 from steem.blockchain import Blockchain
+
+# Read the config.ini file
+config = configparser.ConfigParser()
+config.read('config/config.ini')
 
 def initialize_steem_with_retry(node_api=None, max_retries=5, initial_delay=1.0):
     """
@@ -39,3 +45,40 @@ def initialize_steem_with_retry(node_api=None, max_retries=5, initial_delay=1.0)
 
     print(f"FATAL: Could not initialize Steem after {max_retries} attempts.")
     return None
+
+try:
+    SDS_API = config.get('STEEM', 'SDS_API')
+except (configparser.NoSectionError, configparser.NoOptionError):
+    SDS_API = None
+    print("SDS_API is not configured.")
+
+def get_resteem_count(author, permlink):
+    """
+    Fetch the resteem count for a given post using the SDS/SteemWorld API.
+
+    Args:
+        author (str): The author of the post.
+        permlink (str): The permlink of the post.
+
+    Returns:
+        int: The number of resteems for the post, or -1 if an error occurs.
+    """
+
+    if not SDS_API:
+        print("SDS_API is not configured.")
+        return 0
+    
+    url = f"{SDS_API}/post_resteems_api/getResteems/{author}/{permlink}"
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            if data["code"] == 0:
+                return len(data["result"]["rows"])
+            else:
+                print(f"Error: API returned code {data['code']}")
+        else:
+            print(f"Error: HTTP {response.status_code} for {url}")
+    except Exception as e:
+        print(f"Error fetching resteem count: {e}")
+    return 0

@@ -1,4 +1,5 @@
 from steemHelpers import initialize_steem_with_retry
+from steemHelpers import get_resteem_count
 import configparser
 
 # Read the config.ini file
@@ -43,8 +44,12 @@ def hasLowEngagement(comment):
 
     voteCountScore = scale(fullComment['net_votes'], voteCountMin, voteCountMax) * voteCountWeight
     commentScore = scale(fullComment['children'], commentMin, commentMax) * commentWeight
-    # Not sure how to get resteem count from the Steem python api.  The resteemedb_by field is empty.
-    resteemScore = scale(fullComment['reblogged_by'] and len(fullComment['reblogged_by']) or 0, resteemMin, resteemMax) * resteemWeight
+    # Fetch resteem count using the SDS API
+    resteemCount = get_resteem_count(comment['author'], comment['permlink'])
+    if resteemCount >= 0:  # Only use valid counts
+        resteemScore = scale(resteemCount, resteemMin, resteemMax) * resteemWeight
+    else:
+        resteemScore = 0  # Default to 0 if resteem count cannot be fetched
     postValue = float(fullComment["pending_payout_value"].split()[0])
     if ( postValue == 0.0 ):
         postValue = 2 * float(fullComment['curator_payout_value'].split()[0])
@@ -55,7 +60,7 @@ def hasLowEngagement(comment):
     print (f"Engagement for post {comment['author']}/{comment['permlink']}: "
            f"Votes: {fullComment['net_votes']} (Score: {voteCountScore}), "
            f"Comments: {fullComment['children']} (Score: {commentScore}), "
-              f"Resteems: {fullComment['reblogged_by'] and len(fullComment['reblogged_by']) or 0} (Score: {resteemScore}), "
+              f"Resteems: {resteemCount} (Score: {resteemScore}), "
                 f"Value: {postValue} (Score: {valueScore})")
     totalWeight = voteCountWeight + commentWeight + resteemWeight + valueWeight
 
