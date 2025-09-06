@@ -27,6 +27,8 @@ POSTING_ACCOUNT = social
 # It is recommended to set these in your wallet, using "steempy"
 POSTING_KEY = 
 STEEM_API = 
+SDS_API = https://sds.steemworld.org
+
 # ACTIVE, HISTORY, or RANDOM
 STREAM_TYPE = HISTORY
 
