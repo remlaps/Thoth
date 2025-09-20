@@ -94,8 +94,11 @@ if not steemdInstance:
 blockchain = Blockchain(steemd_instance=steemdInstance)
 print(f"Using blockchain with nodes: {steemdInstance.steemd.nodes}")
 
+defaultStartBlockStr = config.get('STEEM', 'DEFAULT_START_BLOCK').split()[0]
+defaultStartBlock = int(defaultStartBlockStr)
+
 if ( streamType == 'RANDOM' ):
-    streamFromBlock = _rng.integers(config.getint('STEEM', 'DEFAULT_START_BLOCK'), 
+    streamFromBlock = _rng.integers(defaultStartBlock, 
         steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 30),
         endpoint=True)
 elif ( streamType == 'ACTIVE' ):
@@ -108,7 +111,7 @@ elif ( streamType == 'HISTORY'):
     if (lastBlock != 0 and lastBlock < payoutBlock ):
         streamFromBlock = lastBlock
     else:
-        streamFromBlock = config.getint('STEEM', 'DEFAULT_START_BLOCK')
+        streamFromBlock = defaultStartBlock
 else:
     print (f"Invalid CONFIG -> STREAM_TYPE setting: {streamType}")
     exit()
