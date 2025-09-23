@@ -3,6 +3,7 @@ import re
 import os
 import time
 from datetime import datetime
+import math
 
 import aiIntro
 import utils  # From the thoth package
@@ -66,6 +67,12 @@ else:
 steemApi=config.get('STEEM', 'STEEM_API')
 streamType = config.get('STEEM', 'STREAM_TYPE')
 
+# Time-bias weight used by TIME_WEIGHTED_RANDOM stream type; 0 = uniform, >0 favors recent blocks
+try:
+    stream_time_weight = float(config.get('STEEM', 'STREAM_TIME_WEIGHT', fallback='1.0'))
+except Exception:
+    stream_time_weight = 1.0
+
 maxSize=config.getint('BLOG', 'NUMBER_OF_REVIEWED_POSTS')
 
 commentList = []
@@ -98,12 +105,43 @@ defaultStartBlockStr = config.get('STEEM', 'DEFAULT_START_BLOCK').split()[0]
 defaultStartBlock = int(defaultStartBlockStr)
 
 if ( streamType == 'RANDOM' ):
-    streamFromBlock = _rng.integers(defaultStartBlock, 
+    streamFromBlock = _rng.integers(defaultStartBlock,
         steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 30),
         endpoint=True)
+elif ( streamType == 'TIME_WEIGHTED_RANDOM' ):
+    # Choose a block randomly but favor more recent blocks.
+    # We define the available range from defaultStartBlock .. payoutBlock (30 days earlier than tip).
+    last_irreversible = steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num']
+    oneDayOld = last_irreversible - (20 * 60 * 24 * 1)
+    if oneDayOld <= defaultStartBlock:
+        # Fallback to uniform if range is invalid
+        streamFromBlock = _rng.integers(defaultStartBlock, last_irreversible, endpoint=True)
+    else:
+        a = defaultStartBlock
+        b = oneDayOld
+        # Generate a uniform sample u in [0,1). If stream_time_weight <= 0 -> uniform.
+        # Else apply complementary power transform to bias towards 1 (recent blocks):
+        #   t = 1 - (1 - u) ** (1 + stream_time_weight)
+        # Map continuous t in [0,1) to an inclusive integer in [a, b] by using
+        # N = (b - a + 1) and idx = floor(t * N), so indices are 0..N-1 -> a..b.
+        u = _rng.random()
+        if stream_time_weight <= 0:
+            t = u
+        else:
+            t = 1.0 - (1.0 - u) ** (1.0 + stream_time_weight)
+
+        N = (b - a) + 1
+        idx = int(math.floor(t * N))
+        # defensive clamp
+        if idx < 0:
+            idx = 0
+        elif idx >= N:
+            idx = N - 1
+        streamFromBlock = a + idx
 elif ( streamType == 'ACTIVE' ):
     streamFromBlock = \
-        max (steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 6), lastBlock ) # 6 days or last processed
+        max (steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 6),
+              lastBlock ) # 6 days or last processed
 elif ( streamType == 'HISTORY'):
     # Read the last processed block number from file, if exists
     payoutBlock = steemdInstance.get_dynamic_global_properties()['last_irreversible_block_num'] - (20 * 60 * 24 * 30)
