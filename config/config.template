@@ -29,8 +29,12 @@ POSTING_KEY =
 STEEM_API = 
 SDS_API = https://sds.steemworld.org
 
-# ACTIVE, HISTORY, or RANDOM
-STREAM_TYPE = HISTORY
+# ACTIVE, HISTORY, RANDOM, OR TIME_WEIGHTED_RANDOM
+STREAM_TYPE = TIME_WEIGHTED_RANDOM
+# When using the TIME_WEIGHTED_RANDOM stream type, this controls how strongly
+# recent blocks are favored. 0 = uniform random, larger values favor recent
+# blocks more strongly. Typical values: 0.0 (no bias), 0.5, 1.0, 2.0
+STREAM_TIME_WEIGHT = 0.4
 
 ####
 #### From here down copy content from config.ini to config.template
