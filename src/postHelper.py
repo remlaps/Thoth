@@ -25,6 +25,8 @@ delegatorWeight=config.getint('BLOG','DELEGATOR_WEIGHT')
 post_tags_config_string = config.get("BLOG", "POST_TAGS", fallback="") # Add fallback for safety
 parsed_tags = [tag.strip() for tag in post_tags_config_string.split(',') if tag.strip()]
 taglist = parsed_tags # taglist is the list of all parsed tags
+initialWaitSeconds = config.getint('BLOG', 'VOTE_DELAY_SECONDS', fallback=600) # Default to 5 minutes if not set
+votePercent = config.getint('BLOG', 'VOTE_PERCENT', fallback=100) # Default to 100% if not set
 
 def create_beneficiary_list(beneficiary_list):
     # Initialize empty dictionary to track accounts and their weights
@@ -75,11 +77,10 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
     Retries every 3 seconds upon any failure.
     """
     s_vote = Steem()
-    initial_wait_seconds = 303  # 5 minutes
     retry_delay_seconds = 3
 
-    print(f"Waiting {initial_wait_seconds // 60} minutes before attempting to vote for @{postingAccount}/{permlink}...")
-    time.sleep(initial_wait_seconds)
+    print(f"Waiting {initialWaitSeconds // 60} minutes before attempting to vote for @{postingAccount}/{permlink}...")
+    time.sleep(initialWaitSeconds)
     max_retries=20
     retries=0
 
@@ -280,7 +281,7 @@ This will be done by:
         print (f"Post {title} failed.  Exiting.")
         return False
     
-    voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, 100))
+    voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, votePercent))
     voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
     voting_thread.start()
     active_voting_threads.append(voting_thread) # Add the main post's voting thread
