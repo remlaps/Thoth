@@ -26,7 +26,7 @@ post_tags_config_string = config.get("BLOG", "POST_TAGS", fallback="") # Add fal
 parsed_tags = [tag.strip() for tag in post_tags_config_string.split(',') if tag.strip()]
 taglist = parsed_tags # taglist is the list of all parsed tags
 initialWaitSeconds = config.getint('BLOG', 'VOTE_DELAY_SECONDS', fallback=600) # Default to 5 minutes if not set
-votePercent = config.getint('BLOG', 'VOTE_PERCENT', fallback=10000) # Default to 100% if not set
+votePercent = config.getint('BLOG', 'VOTE_PERCENT', fallback=100) # Default to 100% if not set
 
 def create_beneficiary_list(beneficiary_list):
     # Initialize empty dictionary to track accounts and their weights
