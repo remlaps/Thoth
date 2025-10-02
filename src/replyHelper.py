@@ -22,6 +22,8 @@ delegatorWeight=config.getint('BLOG','DELEGATOR_WEIGHT')
 post_tags_config_string = config.get("BLOG", "POST_TAGS", fallback="") # Add fallback for safety
 parsed_tags = [tag.strip() for tag in post_tags_config_string.split(',') if tag.strip()]
 taglist = parsed_tags # taglist is the list of all parsed tags
+initialWaitSeconds = config.getint('BLOG', 'VOTE_DELAY_SECONDS', fallback=600) # Default to 5 minutes if not set
+votePercent = config.getint('BLOG', 'VOTE_PERCENT', fallback=10000)
 
 def create_beneficiary_list(beneficiary_list, curatedAuthorWeight, delegatorWeight):
     # Initialize empty dictionary to track accounts and their weights
@@ -71,14 +73,13 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
     Waits for an initial period, then attempts to vote in a loop until successful.
     Retries upon failure, especially for vote timing errors.
     """
-    initial_wait_seconds = 300  # 5 minutes
     retry_delay_seconds = 5     # Base retry delay for general errors
     vote_interval_retry_delay_base = 3 # Base delay for vote interval errors (Steem rule)
     max_retries = 20
     retries = 0
 
-    print(f"Vote for @{postingAccount}/{permlink} scheduled. Waiting {initial_wait_seconds // 60} minutes before first attempt...")
-    time.sleep(initial_wait_seconds)
+    print(f"Vote for @{postingAccount}/{permlink} scheduled. Waiting {initialWaitSeconds // 60} minutes before first attempt...")
+    time.sleep(initialWaitSeconds)
 
     while retries < max_retries:
         try:
@@ -263,7 +264,7 @@ This post was generated with the assistance of the following AI model: <i>{confi
         return False
     
     # Vote on the newly created reply, not the parent post
-    voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, reply_permlink, 100))
+    voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, reply_permlink, votePercent))
     voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
     voting_thread.start()
     print (f"Reply {log_display_title} posted and vote scheduled in background.")
