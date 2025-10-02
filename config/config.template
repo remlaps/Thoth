@@ -100,6 +100,8 @@ PRO_BONO_DELEGATORS =
 THOTH_OPERATOR = 
 ### Implemented: CURATED_AUTHOR_WEIGHT, NUMBER_OF_REVIEWED_POSTS, POSTING_ACCOUNT, POSTING_ACCOUNT_WEIGHT
 ### [ POSTING_ACCOUNT_WEIGHT + ( NUMBER_OF_REVIEWED_POSTS * CURATED_AUTHOR_WEIGHT ) ] must be less than 10000 (i.e. 500 == 5%)
+VOTE_DELAY_SECONDS = 300
+VOTE_PERCENT = 100
 
 ### Enable screening based on a post's engagement score.
 ### Resteem scoring is not working yet.  Not sure how to get the resteem count back from the Steem API 
