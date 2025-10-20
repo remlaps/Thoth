@@ -102,7 +102,7 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
 
     payload = json.dumps(payloadDict)
 
-    max_retries = 3
+    max_retries = 5
     for attempt in range(max_retries):
         try:
             response = requests.post(arliaiUrl, headers=headers, data=payload)
@@ -126,7 +126,7 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
             
             if attempt < max_retries - 1:
                 print("Retrying in 60 seconds...")
-                time.sleep(60)
+                time.sleep(90)
 
     # This part is only reached if the loop completes without a successful return.
     return "Thoth was unable to generate an introduction for this post due to an API error after multiple retries."

@@ -12,7 +12,7 @@
 # ARLIAI_KEY = # This can be pulled from an environment variable.
 ARLIAI_MODEL = Gemma-3-27B-it
 ARLIAI_URL = https://api.arliai.com/v1/chat/completions
-INITIAL_BACKOFF_SECONDS = 1.0
+INITIAL_BACKOFF_SECONDS = 15.0
 JITTER_FACTOR = 0.2
 MAX_RETRIES = 9
 SYSTEM_PROMPT_FILE = config\systemPrompt.txt
@@ -124,5 +124,6 @@ VOTE_COUNT_WEIGHT = 1
 [WALLET]
 DELEGATION_FILE=config\delegationScreen.txt
 MAX_DELEGATION_PCT = 25.0
+MAX_POWERDOWN_YEARLY_PCT = 50.0
 MAX_SCREENED_DELEGATION_PCT=25.0
 MIN_UNDELEGATED_SP = 0.0

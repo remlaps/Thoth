@@ -92,14 +92,16 @@ def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, 
         return None, None, None
 
 def walletScreened(account, steem_instance=None):
-    maxScreenedDelegationPct = config.getfloat('WALLET', 'MAX_SCREENED_DELEGATION_PCT')
-    vesting_shares, _, _ = _get_account_vesting_info(account)
-
-    if vesting_shares is None:
-        # Account not found, cannot be screened.
+    if not check_author_wallet(account):
         return True
     
-    if not check_author_wallet(account):
+    if _isPowerDownTooHigh(account):
+        return True
+    
+    maxScreenedDelegationPct = config.getfloat('WALLET', 'MAX_SCREENED_DELEGATION_PCT')
+    vesting_shares, _, _ = _get_account_vesting_info(account)
+    if vesting_shares is None:
+        # Account not found, cannot be screened.
         return True
 
     # The config value is a percentage (e.g., 15.0 for 15%).
@@ -160,6 +162,47 @@ def totalScreenedDelegationVests (delegator, screenedDelegateeFile=screenedDeleg
     print (f"Delegator: {delegator}, total_vests: {total_vests}")
     return float(total_vests)
 
+def _isPowerDownTooHigh(author: str, steemInstance=None) -> bool:
+    """
+    Checks if the author's yearly powerdown percentage exceeds the configured maximum.
+
+    Args: 
+        author: The Steem account name of the author
+
+    Returns:
+        True if the author's yearly powerdown percentage is above the limit, False otherwise.
+    """
+
+    maxPowerdownYearlyPct = config.getfloat('WALLET', 'MAX_POWERDOWN_YEARLY_PCT')
+
+    if ( not steemInstance ):
+        steemApi = config.get('STEEM', 'STEEM_API')
+        s = Steem(node=steemApi) if steemApi else Steem()
+    else:
+        s = steemInstance
+
+    try:
+        authorAccountJson = s.get_account(author)
+        if not authorAccountJson:
+            print(f"Warning: Account '{author}' not found.")
+            return False
+
+        totalVests = float(authorAccountJson['vesting_shares'].split()[0])
+        withdrawRate=float(authorAccountJson['vesting_withdraw_rate'].split()[0])
+
+        yearlyPowerdownRate = 100 * withdrawRate * 52 / totalVests if totalVests > 0 else 0.0
+
+        print(f"Yearly Powerdown Percentage for @{author}: {yearlyPowerdownRate:.2f}%")
+        if yearlyPowerdownRate > maxPowerdownYearlyPct:
+            print(f"FAIL: Yearly powerdown percentage ({yearlyPowerdownRate:.2f}%) exceeds max ({maxPowerdownYearlyPct:.2f}%).")
+            return True
+
+        print("PASS: Yearly powerdown percentage is below the limit.")
+        return False
+    except Exception as e:
+        print(f"An unexpected error occurred while checking powerdown percentage: {e}")
+
+    return False
 
 def check_author_wallet(author: str) -> bool:
     """

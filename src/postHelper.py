@@ -162,6 +162,9 @@ This will be done by:
 2. Highlighting those posts for curators;
 3. Delivering beneficiary rewards to the creators who are producing blockchain content with lasting value; and
 4. Delivering beneficiary rewards to the delegators who support the curation initiative.<br><br>
+   - No rate of return is guaranteed or implied.
+   - Reward amounts are entirely determined by blockchain consensus.
+   - Delegator beneficiaries are randomly selected for inclusion in each post and reply with a weighting based on the amount of Steem Power delegated.
 
 """
 
