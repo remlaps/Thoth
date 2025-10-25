@@ -14,6 +14,7 @@ steemApi = config.get('STEEM', 'STEEM_API')
 s = Steem(node=steemApi) if steemApi else Steem()
 
 screenedDelegateeFile = config.get('WALLET', 'SCREENED_DELEGATEE_FILE')
+uncountedDelegateeFile = config.get('WALLET', 'UNCOUNTED_DELEGATEE_FILE')
 
 def _get_thoth_incoming_delegations(author: str) -> list:
     """
@@ -106,20 +107,20 @@ def walletScreened(account, steem_instance=None):
 
     # The config value is a percentage (e.g., 15.0 for 15%).
     # The logic is to check if the percentage of screened delegations to total SP exceeds the threshold.
-    screened_vests = totalScreenedDelegationVests(account)
+    screenedVests = totalScreenedOrIgnoredDelegations(account, delegateeFile=screenedDelegateeFile)
     
     # Avoid ZeroDivisionError if account has 0 SP.
     if vesting_shares == 0.0:  # Minimum vesting_shares was already checked by check_author_wallet.  At this point, 0 is ok.
         return False
 
-    screened_percentage = (screened_vests / vesting_shares) * 100
+    screened_percentage = (screenedVests / vesting_shares) * 100
 
     print (f"Vesting Shares: {vesting_shares:,.6f} VESTS")
-    print (f"Screened Delegations: {screened_vests:,.6f} VESTS")
+    print (f"Screened Delegations: {screenedVests:,.6f} VESTS")
     print (f"Percentage screened: {screened_percentage:.2f}%")
     return screened_percentage > maxScreenedDelegationPct
 
-def totalScreenedDelegationVests (delegator, screenedDelegateeFile=screenedDelegateeFile):
+def totalScreenedOrIgnoredDelegations (delegator, delegateeFile=screenedDelegateeFile) -> float:
     # Optimization: If the user has no delegated shares at all, we can exit early.
     _, delegated_vests_total, _ = _get_account_vesting_info(delegator)
     if delegated_vests_total is None or delegated_vests_total == 0.0:
@@ -129,10 +130,10 @@ def totalScreenedDelegationVests (delegator, screenedDelegateeFile=screenedDeleg
     s = Steem(node=steemApi) if steemApi else Steem()
 
     try:
-        with open(screenedDelegateeFile, 'r') as f:
+        with open(delegateeFile, 'r') as f:
             screenedDelegatees = {line.strip() for line in f if line.strip()}
     except FileNotFoundError:
-        print(f"Warning: Screened delegatee file not found at '{screenedDelegateeFile}'. Returning 0.")
+        print(f"Warning: Screened delegatee file not found at '{delegateeFile}'. Returning 0.")
         return 0.0
 
     total_vests = Decimal('0')
@@ -224,13 +225,18 @@ def check_author_wallet(author: str) -> bool:
             # Error already printed in helper function
             return False
 
+        unCountedVests = totalScreenedOrIgnoredDelegations(delegator=author, delegateeFile=uncountedDelegateeFile)
+        delegationPenalty = delegated_vesting_shares - unCountedVests
+
         print(f"\n--- Checking author: @{author} ---")
         print(f"Vesting Shares: {vesting_shares:,.6f} VESTS")
         print(f"Delegated Vesting Shares: {delegated_vesting_shares:,.6f} VESTS")
+        print(f"Uncounted Delegations: {unCountedVests:,.6f} VESTS")
+        print(f"Delegation Penalty (after uncounted): {delegationPenalty:,.6f} VESTS")
 
         # 2. Calculate delegation percentage
         if vesting_shares > 0:
-            delegation_percentage = (delegated_vesting_shares / vesting_shares) * 100
+            delegation_percentage = (delegationPenalty / vesting_shares) * 100
         else:
             delegation_percentage = 0.0
         
