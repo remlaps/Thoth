@@ -9,9 +9,16 @@
 # ArliAI info here - https://www.arliai.com/quick-start
 # Gemini info here - https://ai.google.dev/gemini-api/docs/quickstart
 ##### ArliAI switched again.  This time to Gemma3-27B models for free tier.  These are mostly untested.
+
 # ARLIAI_KEY = # This can be pulled from an environment variable.
-ARLIAI_MODEL = Gemma-3-27B-it
-ARLIAI_URL = https://api.arliai.com/v1/chat/completions
+#ARLIAI example
+### ARLIAI_MODEL = Gemma-3-27B-it
+### ARLIAI_URL = https://api.arliai.com/v1/chat/completions
+
+#Gemini example
+ARLIAI_MODEL = gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash-lite, gemini-2.0-flash
+ARLIAI_URL = https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+
 INITIAL_BACKOFF_SECONDS = 15.0
 JITTER_FACTOR = 0.2
 MAX_RETRIES = 9

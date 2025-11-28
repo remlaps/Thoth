@@ -65,7 +65,7 @@ Customize the `config/config.ini` file to your preferences.
 | Section | Key                             | Description                                                                                             |
 |---------|---------------------------------|---------------------------------------------------------------------------------------------------------|
 | `ARLIAI`  | `ARLIAI_KEY`                    | Your LLM API Key (used as a fallback if `LLMAPIKEY` env var is not set).                                  |
-| `ARLIAI`  | `ARLIAI_MODEL`                  | The specific model for the LLM API (e.g., `gemini-2.5-pro`).                                                 |
+| `ARLIAI`  | `ARLIAI_MODEL`                  | The specific model(s) for the LLM API. Use a single model (e.g., `gemini-2.5-pro`) or comma-separated list for fallback (e.g., `gemini-2.5-pro,gemini-2.5-flash`). If the primary model is rate-limited, the system automatically switches to the next available model.                                                 |
 | `ARLIAI`  | `ARLIAI_URL`                    | The base URL for the LLM API endpoint (tested with Google Gemini and ArliAI endpoints).                   |
 | `STEEM`   | `STEEM_API`                     | The Steem node to connect to (e.g., `https://api.steemit.com`). Leave blank for default.                  |
 | `STEEM`   | `STREAM_TYPE`                   | `ACTIVE` (recent posts), `HISTORY` (from last run), or `RANDOM`.                          |
