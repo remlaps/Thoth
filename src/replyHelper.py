@@ -107,7 +107,7 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
     if retries >= max_retries:
         print(f"Failed to vote for @{postingAccount}/{permlink} after {max_retries} attempts.")
 
-def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPermlink):
+def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPermlink, model_manager=None):
     """
     Posts a single AI summary as a reply to the main Thoth curation post.
 
@@ -116,6 +116,7 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
     :param item_index: int, the 0-based index of this item from the original list (for display purposes).
     :param thothAccount: str, the author of the main Thoth curation post to reply to.
     :param thothPermlink: str, the permlink of the main Thoth curation post to reply to.
+    :param model_manager: ModelManager instance for tracking which model was used.
     """
     postingKey=config.get('STEEM', 'POSTING_KEY')
     steemApi=config.get('STEEM', 'STEEM_API')
@@ -131,13 +132,20 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
     else:
         s = Steem()
 
+    # Get the model that was actually used (from model_manager if provided, otherwise use config)
+    if model_manager:
+        models_used = model_manager.get_models_used()
+        used_model = ", ".join(models_used) if len(models_used) > 1 else models_used[0] if models_used else "unknown"
+    else:
+        used_model = config.get('ARLIAI','ARLIAI_MODEL')
+
     body=f"""
 AI Curation by [Thoth](https://github.com/remlaps/Thoth)
 | <h6>Unlocking #lifetime-rewards for Steem's creators and #passive-rewards for delegators</h6> |
 | --- |
 
 
-This post was generated with the assistance of the following AI model: <i>{config.get('ARLIAI','ARLIAI_MODEL')}</i>
+This post was generated with the assistance of the following AI model(s): <i>{used_model}</i>
     """
     display_index = item_index + 1 # Convert 0-based index to 1-based for display
 

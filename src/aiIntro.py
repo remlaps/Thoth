@@ -3,9 +3,35 @@ import requests
 import json
 import re
 import time
+import logging
+from modelManager import ModelManager
 
-def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComment, maxTokens=8192):
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComment, maxTokens=8192, model_manager=None, enable_switching=False, dry_run=False):
+    """
+    Generate an introduction for a blog post using the AI API.
+    
+    Args:
+        arliaiKey: API key for the LLM service
+        arliaiModel: Model name (can be comma-separated list; will be handled by model_manager)
+        arliaiUrl: URL for the LLM API
+        startTime: Start time of the articles
+        endTime: End time of the articles
+        combinedComment: Combined summaries of articles
+        maxTokens: Maximum tokens for the response
+        model_manager: Optional ModelManager instance for handling multiple models
+        
+    Returns:
+        str: The AI-generated introduction or error message
+    """
     today = datetime.now()
+    
+    # Use provided model_manager or create one from the model string
+    if model_manager is None:
+        model_manager = ModelManager(arliaiModel)
+    
     if ( startTime.strftime('%Y-%m-%d') == endTime.strftime('%Y-%m-%d') ):
         datePrompt = f"Today is {today.strftime('%Y-%m-%d')}.  These articles were published on {startTime.strftime('%Y-%m-%d')}."
     else:
@@ -100,33 +126,89 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
         'Authorization': f"Bearer {arliaiKey}"
     }
 
-    payload = json.dumps(payloadDict)
-
     max_retries = 5
-    for attempt in range(max_retries):
-        try:
-            response = requests.post(arliaiUrl, headers=headers, data=payload)
-            response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
-            data = response.json()
-            if isinstance(data, list):
-                data = data[0]
-            rawResponse = data['choices'][0]['message']['content']
+    
+    # Try models in sequence if rate limiting occurs
+    while True:
+        current_model = model_manager.current_model
+        
+        payloadDict["model"] = current_model
+        payload = json.dumps(payloadDict)
 
-            # Post-process to remove any <think>...</think> blocks that the model might still include.
-            cleanedResponse = re.sub(r'<think>.*?</think>', '', rawResponse, flags=re.DOTALL).strip()
+        for attempt in range(max_retries):
+            try:
+                logging.debug(f"Attempt {attempt + 1}/{max_retries} to call AI API for intro: {arliaiUrl} with model {current_model}")
+                response = requests.post(arliaiUrl, headers=headers, data=payload)
+                response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
+                data = response.json()
+                if isinstance(data, list):
+                    data = data[0]
+                rawResponse = data['choices'][0]['message']['content']
 
-            print(f"Intro Response before cleaning: {rawResponse}")
-            print(f"Intro Response after cleaning: {cleanedResponse}")
+                # Post-process to remove any <think>...</think> blocks that the model might still include.
+                cleanedResponse = re.sub(r'<think>.*?</think>', '', rawResponse, flags=re.DOTALL).strip()
 
-            return cleanedResponse # Success, so we exit the function
-        except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError, IndexError) as e:
-            print(f"Error during AI Intro generation (Attempt {attempt + 1}/{max_retries}): {e}")
-            if 'response' in locals() and hasattr(response, 'text'):
-                print(f"Response body: {response.text}")
-            
-            if attempt < max_retries - 1:
-                print("Retrying in 60 seconds...")
-                time.sleep(90)
+                print(f"Intro Response before cleaning: {rawResponse}")
+                print(f"Intro Response after cleaning: {cleanedResponse}")
 
-    # This part is only reached if the loop completes without a successful return.
-    return "Thoth was unable to generate an introduction for this post due to an API error after multiple retries."
+                return cleanedResponse # Success, so we exit the function
+                
+            except requests.exceptions.HTTPError as e:
+                is_rate_limited = False
+                status_code = e.response.status_code if e.response is not None else "Unknown"
+                
+                # Check for rate limiting
+                if status_code == 429:
+                    is_rate_limited = True
+                elif status_code == 503:
+                    try:
+                        error_details = e.response.json()
+                        if isinstance(error_details, list) and len(error_details) > 0 and \
+                           isinstance(error_details[0], dict) and 'error' in error_details[0] and \
+                           isinstance(error_details[0]['error'], dict) and \
+                           "overloaded" in error_details[0]['error'].get('message', '').lower():
+                            is_rate_limited = True
+                    except (json.JSONDecodeError, KeyError, AttributeError):
+                        pass
+                
+                # If rate limited and we have another model available, mark it and optionally switch
+                if is_rate_limited and model_manager.has_next_model():
+                    logging.warning(
+                        f"Model {current_model} is rate limited (status {status_code}). "
+                        f"Attempting to mark/switch to next available model."
+                    )
+                    if enable_switching:
+                        switched = model_manager.mark_rate_limited(dry_run=dry_run)
+                        if switched:
+                            break  # Break inner loop to retry with new model
+                        else:
+                            logging.info("No switch performed (dry-run or exhausted models). Continuing retries for current model.")
+                    else:
+                        logging.info("Model switching disabled by configuration. Continuing retries for current model.")
+                
+                # Otherwise, log error and continue retrying
+                logging.error(f"Error during AI Intro generation (Attempt {attempt + 1}/{max_retries}): {e}")
+                if 'response' in locals() and hasattr(response, 'text'):
+                    logging.error(f"Response body: {response.text}")
+                
+                if attempt < max_retries - 1:
+                    logging.info("Retrying in 60 seconds...")
+                    time.sleep(60)
+                    
+            except (json.JSONDecodeError, KeyError, IndexError) as e:
+                logging.error(f"Error during AI Intro generation (Attempt {attempt + 1}/{max_retries}): {e}")
+                if 'response' in locals() and hasattr(response, 'text'):
+                    logging.error(f"Response body: {response.text}")
+                
+                if attempt < max_retries - 1:
+                    logging.info("Retrying in 60 seconds...")
+                    time.sleep(60)
+            except Exception as e:
+                logging.error(f"Unexpected error during AI Intro generation (Attempt {attempt + 1}/{max_retries}): {e}")
+                if attempt < max_retries - 1:
+                    logging.info("Retrying in 60 seconds...")
+                    time.sleep(60)
+        else:
+            # If we exhaust retries for this model, log and exit
+            logging.error(f"Exhausted all retries for model {current_model}.")
+            return "Thoth was unable to generate an introduction for this post due to an API error after multiple retries."

@@ -95,7 +95,7 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
             time.sleep(retry_delay_seconds)
             retries += 1
 
-def postCuration (commentList, aiResponseList, aiIntroString):
+def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None):
     postingKey=config.get('STEEM', 'POSTING_KEY')
     steemApi=config.get('STEEM', 'STEEM_API')
 
@@ -110,13 +110,20 @@ def postCuration (commentList, aiResponseList, aiIntroString):
     else:
         s = Steem()
 
+    # Get the model that was actually used (from model_manager if provided, otherwise use config)
+    if model_manager:
+        models_used = model_manager.get_models_used()
+        used_model = ", ".join(models_used) if len(models_used) > 1 else models_used[0] if models_used else "unknown"
+    else:
+        used_model = config.get('ARLIAI','ARLIAI_MODEL')
+
     body=f"""
 AI Curation by [Thoth](https://github.com/remlaps/Thoth)
 | <h6>Unlocking #lifetime-rewards for Steem's creators and #passive-rewards for delegators</h6> |
 | --- |
 
 
-This post was generated with the assistance of the following AI model: <i>{config.get('ARLIAI','ARLIAI_MODEL')}</i>
+This post was generated with the assistance of the following AI model(s): <i>{used_model}</i>
     """
 
     body+='<div class=pull-right>\n\n[![](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)<h6><sup>Image by AI</sup></h6>\n\n</div>\n\n'
@@ -124,7 +131,7 @@ This post was generated with the assistance of the following AI model: <i>{confi
     body += f'\n\n{aiIntroString}\n\n<hr>'
 
     body+=f"""
-Here are the posts that are featured in this curation post:<br><br>
+Here are the articles that are featured in this curation post:<br><br>
 """
 
     body+="<hr><table>"
@@ -263,7 +270,8 @@ This will be done by:
                         ai_response_item=ai_resp_item,
                         item_index=idx, # 0-based index
                         thothAccount=postingAccount, # The account that made the main curation post
-                        thothPermlink=permlink       # The permlink of the main curation post
+                        thothPermlink=permlink,       # The permlink of the main curation post
+                        model_manager=model_manager
                     )
                     if reply_voting_thread: # If a thread was successfully started by postReply
                         active_voting_threads.append(reply_voting_thread)
