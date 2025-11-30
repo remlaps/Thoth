@@ -44,7 +44,45 @@ class ModelManager:
             bool: True if switched to a new model, False if already on the last model
         """
         if self.current_index < len(self.models) - 1:
-            self.rate_limited_models.append(self.models[self.current_index])
+            # Mark current as rate-limited before switching
+            if self.models[self.current_index] not in self.rate_limited_models:
+                self.rate_limited_models.append(self.models[self.current_index])
+            self.current_index += 1
+            logging.warning(
+                f"Switching to next model: {self.current_model} "
+                f"(Rate limited models: {self.rate_limited_models})"
+            )
+            return True
+        else:
+            logging.error(
+                f"No more models available. All models rate limited: {self.rate_limited_models}"
+            )
+            return False
+
+    def mark_rate_limited(self, dry_run=False):
+        """
+        Mark the current model as rate limited and optionally switch to the next model.
+
+        Args:
+            dry_run (bool): If True, record that the model is rate limited but do not
+                            actually switch to the next model. Useful for observation
+                            or dry-run modes.
+
+        Returns:
+            bool: True if an actual switch to the next model occurred, False otherwise.
+        """
+        # Avoid duplicate entries
+        if self.current_model not in self.rate_limited_models:
+            self.rate_limited_models.append(self.current_model)
+
+        logging.warning(f"Marking model as rate limited: {self.current_model}. Dry run: {dry_run}")
+
+        if dry_run:
+            logging.info("Dry-run mode: not switching to next model.")
+            return False
+
+        # Switch without re-appending (already marked above)
+        if self.current_index < len(self.models) - 1:
             self.current_index += 1
             logging.warning(
                 f"Switching to next model: {self.current_model} "

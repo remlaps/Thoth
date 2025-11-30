@@ -67,6 +67,8 @@ Customize the `config/config.ini` file to your preferences.
 | `ARLIAI`  | `ARLIAI_KEY`                    | Your LLM API Key (used as a fallback if `LLMAPIKEY` env var is not set).                                  |
 | `ARLIAI`  | `ARLIAI_MODEL`                  | The specific model(s) for the LLM API. Use a single model (e.g., `gemini-2.5-pro`) or comma-separated list for fallback (e.g., `gemini-2.5-pro,gemini-2.5-flash`). If the primary model is rate-limited, the system automatically switches to the next available model.                                                 |
 | `ARLIAI`  | `ARLIAI_URL`                    | The base URL for the LLM API endpoint (tested with Google Gemini and ArliAI endpoints).                   |
+| `ARLIAI`  | `ARLIAI_ENABLE_MODEL_SWITCHING` | Enable automatic model switching when the current model is rate-limited (HTTP 429 or 503 overloaded). Default: `False`. Set to `True` to enable fallback to the next model in the `ARLIAI_MODEL` list. Requires a comma-separated model list to be effective.                   |
+| `ARLIAI`  | `ARLIAI_MODEL_SWITCHING_DRY_RUN` | When enabled (`True`) along with `ARLIAI_ENABLE_MODEL_SWITCHING`, logs rate-limit events and marks models as rate-limited, but does **not** actually switch to the next model. Useful for observation and testing before enabling live switching. Default: `False`.                   |
 | `STEEM`   | `STEEM_API`                     | The Steem node to connect to (e.g., `https://api.steemit.com`). Leave blank for default.                  |
 | `STEEM`   | `STREAM_TYPE`                   | `ACTIVE` (recent posts), `HISTORY` (from last run), or `RANDOM`.                          |
 | `STEEM`   | `DEFAULT_START_BLOCK`         | The block number to start from if no history is found.                                                  |
@@ -84,6 +86,43 @@ The distribution of post rewards to beneficiaries is highly configurable but mus
     `(`NUMBER_OF_DELEGATORS_PER_POST` * `DELEGATOR_WEIGHT`) + (`NUMBER_OF_REVIEWED_POSTS` * `CURATED_AUTHOR_WEIGHT`) + `POSTING_ACCOUNT_WEIGHT` <= 10000`
 *   **Beneficiary Count Limit:** Steem allows a maximum of 8 beneficiaries per post. The bot logic has a soft limit of 6 beneficiaries (delegators + curated authors) to leave room for other beneficiary types (i.e. @null and the posting account).
 *  **Value adjustments:** Author and delegator settings will be adjusted from the specified values for Thoth's reply posts.
+
+#### Model Switching for Rate-Limit Resilience
+
+If you provide a comma-separated list of models in `ARLIAI_MODEL`, Thoth can automatically switch to the next model if the current one becomes rate-limited. This provides built-in resilience against LLM API rate-limiting.
+
+**Configuration Example:**
+```ini
+[ARLIAI]
+ARLIAI_MODEL = gemini-2.5-pro,gemini-2.5-flash,gemini-2.0-flash
+ARLIAI_ENABLE_MODEL_SWITCHING = True
+ARLIAI_MODEL_SWITCHING_DRY_RUN = False
+```
+
+**Recommended Rollout Strategy:**
+
+1. **Initial Deployment (Safe Default)**
+   - `ARLIAI_ENABLE_MODEL_SWITCHING = False`
+   - `ARLIAI_MODEL_SWITCHING_DRY_RUN = False`
+   - Behavior: Falls back to standard retry/backoff if rate-limited; does not switch models.
+
+2. **Observation Phase (Dry-Run Mode)**
+   - `ARLIAI_ENABLE_MODEL_SWITCHING = True`
+   - `ARLIAI_MODEL_SWITCHING_DRY_RUN = True`
+   - Behavior: Logs rate-limit events and records which models *would* be switched to, but continues using the current model. Good for validating model list and observing behavior without production impact.
+
+3. **Live Rollout (Full Switching)**
+   - `ARLIAI_ENABLE_MODEL_SWITCHING = True`
+   - `ARLIAI_MODEL_SWITCHING_DRY_RUN = False`
+   - Behavior: When rate-limited, automatically switches to the next model in the list and retries the request. Provides automatic resilience against rate-limiting.
+
+**Logging and Monitoring:**
+When model switching is enabled, watch your logs for:
+- `WARNING - Marking model as rate limited: <model-name>`
+- `WARNING - Switching to next model: <new-model> (Rate limited models: [...])`
+- `ERROR - No more models available. All models rate limited: [...]`
+
+These messages indicate the bot's response to rate-limiting and help validate that fallback models are working as intended.
 
 
 ## Usage

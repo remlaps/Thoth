@@ -9,7 +9,7 @@ from modelManager import ModelManager
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
-def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComment, maxTokens=8192, model_manager=None):
+def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComment, maxTokens=8192, model_manager=None, enable_switching=False, dry_run=False):
     """
     Generate an introduction for a blog post using the AI API.
     
@@ -171,14 +171,20 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
                     except (json.JSONDecodeError, KeyError, AttributeError):
                         pass
                 
-                # If rate limited and we have another model available, switch and retry
+                # If rate limited and we have another model available, mark it and optionally switch
                 if is_rate_limited and model_manager.has_next_model():
                     logging.warning(
                         f"Model {current_model} is rate limited (status {status_code}). "
-                        f"Switching to next available model."
+                        f"Attempting to mark/switch to next available model."
                     )
-                    if model_manager.switch_to_next_model():
-                        break  # Break inner loop to retry with new model
+                    if enable_switching:
+                        switched = model_manager.mark_rate_limited(dry_run=dry_run)
+                        if switched:
+                            break  # Break inner loop to retry with new model
+                        else:
+                            logging.info("No switch performed (dry-run or exhausted models). Continuing retries for current model.")
+                    else:
+                        logging.info("Model switching disabled by configuration. Continuing retries for current model.")
                 
                 # Otherwise, log error and continue retrying
                 logging.error(f"Error during AI Intro generation (Attempt {attempt + 1}/{max_retries}): {e}")

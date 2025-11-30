@@ -57,6 +57,19 @@ arliaiUrl=config.get('ARLIAI', 'ARLIAI_URL')
 model_manager = ModelManager(arliaiModel)
 print(f"Initialized model manager with models: {model_manager.models}")
 
+# Feature flag: enable model switching and optional dry-run
+try:
+    enable_model_switching = config.getboolean('ARLIAI', 'ARLIAI_ENABLE_MODEL_SWITCHING', fallback=False)
+except Exception:
+    enable_model_switching = config.get('ARLIAI', 'ARLIAI_ENABLE_MODEL_SWITCHING', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+
+try:
+    model_switching_dry_run = config.getboolean('ARLIAI', 'ARLIAI_MODEL_SWITCHING_DRY_RUN', fallback=False)
+except Exception:
+    model_switching_dry_run = config.get('ARLIAI', 'ARLIAI_MODEL_SWITCHING_DRY_RUN', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+
+print(f"Model switching enabled: {enable_model_switching}. Dry run: {model_switching_dry_run}")
+
 ### Validate the config to avoid failures at posting time.
 validator = ConfigValidator()
     
@@ -202,7 +215,12 @@ while retry_count <= max_retries:
                         print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}\n{tmpBody[:100]}...")
 
                         ### Get the AI Evaluation
-                        aiResponse = aiCurator.aicurate(arliaiKey, arliaiModel, arliaiUrl, tmpBody, model_manager=model_manager)
+                        aiResponse = aiCurator.aicurate(
+                            arliaiKey, arliaiModel, arliaiUrl, tmpBody,
+                            model_manager=model_manager,
+                            enable_switching=enable_model_switching,
+                            dry_run=model_switching_dry_run
+                        )
                         with open('data/output.html', 'a', encoding='utf-8') as f:
                             print(f"URL: https://steemit.com/@{comment['author']}/{comment['permlink']}")
                             print(f"Title: {latestPostVersion['title']}")
@@ -256,9 +274,14 @@ if earliest_timestamp and latest_timestamp:
     # The timestamps from the stream are already datetime objects.
     print(f"Posts processed ranged from {earliest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')} to {latest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')}")
 
-    aiIntroString = aiIntro.aiIntro(arliaiKey, arliaiModel, arliaiUrl,
-                                    earliest_timestamp, latest_timestamp,
-                                    "\n\n".join(aiResponseList), 16384, model_manager=model_manager)
+    aiIntroString = aiIntro.aiIntro(
+        arliaiKey, arliaiModel, arliaiUrl,
+        earliest_timestamp, latest_timestamp,
+        "\n\n".join(aiResponseList), 16384,
+        model_manager=model_manager,
+        enable_switching=enable_model_switching,
+        dry_run=model_switching_dry_run
+    )
     postHelper.postCuration(commentList, aiResponseList, aiIntroString, model_manager=model_manager)
     print("Posting finished.")
 else:

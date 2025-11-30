@@ -57,7 +57,7 @@ def ensurePromptFileExists(promptFilePath, templateFilePath, promptTypeName):
 ensurePromptFileExists(systemPromptFile, systemPromptTemplateFile, "System")
 ensurePromptFileExists(userPromptFile, userPromptTemplateFile, "User")
 
-def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_manager=None):
+def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_manager=None, enable_switching=False, dry_run=False):
     """
     Curate a post using the AI API.
     
@@ -189,16 +189,20 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
                 except json.JSONDecodeError:
                     error_details_text = e.response.text if e.response is not None else "No response text available"
 
-                # If rate limited and we have another model available, switch and retry the entire post
+                # If rate limited and we have another model available, mark it and optionally switch
                 if is_rate_limited and model_manager.has_next_model():
                     logging.warning(
                         f"Model {current_model} is rate limited (status {status_code}). "
-                        f"Switching to next available model."
+                        f"Attempting to mark/switch to next available model."
                     )
-                    if model_manager.switch_to_next_model():
-                        break  # Break inner loop to retry with new model
+                    if enable_switching:
+                        switched = model_manager.mark_rate_limited(dry_run=dry_run)
+                        if switched:
+                            break  # Break inner loop to retry with new model
+                        else:
+                            logging.info("No switch performed (dry-run or exhausted models). Continuing retries for current model.")
                     else:
-                        logging.error("Failed to switch to next model.")
+                        logging.info("Model switching disabled by configuration. Continuing retries for current model.")
                 
                 # Handle retries for the same model (for non-rate-limit errors or last model)
                 if is_overloaded_error and attempt < MAX_RETRIES and not model_manager.has_next_model():

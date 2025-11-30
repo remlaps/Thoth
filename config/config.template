@@ -26,6 +26,11 @@ SYSTEM_PROMPT_FILE = config\systemPrompt.txt
 SYSTEM_PROMPT_TEMPLATE = config\systemPromptTemplate.txt
 USER_PROMPT_FILE = config\userPrompt.txt
 USER_PROMPT_TEMPLATE = config\userPromptTemplate.txt
+# Feature flags for model switching behavior
+# When True, enable automatic switching to the next model in the list if rate-limited
+ARLIAI_ENABLE_MODEL_SWITCHING = False
+# When True (and ARLIAI_ENABLE_MODEL_SWITCHING is True), log rate-limit events but do not actually switch models
+ARLIAI_MODEL_SWITCHING_DRY_RUN = False
 
 [STEEM]
 DEFAULT_START_BLOCK = 3250000
