@@ -5,6 +5,7 @@ import re
 import time
 import logging
 from modelManager import ModelManager
+from promptHelper import construct_messages
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -94,17 +95,6 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
         stop_param_name = "stop_sequences"
 
     payloadDict = {
-        "model": arliaiModel,
-        "messages": [
-            {
-                "role": "system",
-                "content": systemPrompt
-            },
-            {
-                "role": "user",
-                "content": userPrompt
-            }
-        ],
         "temperature": 0.3,
         "top_p": 0.85,
         "max_tokens": maxTokens,
@@ -133,6 +123,7 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
         current_model = model_manager.current_model
         
         payloadDict["model"] = current_model
+        payloadDict["messages"] = construct_messages(arliaiUrl, current_model, systemPrompt, userPrompt)
         payload = json.dumps(payloadDict)
 
         for attempt in range(max_retries):
