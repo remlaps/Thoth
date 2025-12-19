@@ -54,10 +54,10 @@ STREAM_TIME_WEIGHT = 0.4
 
 [CONTENT]
 AUTHOR_WHITELIST_FILE = config\authorWhiteList.txt
-EXCLUDE_TAGS = actifit, appics, bible, booming, christianity, contest, cross-post, curation,
-   curatorapplication, erotic, heartchurch, islam, jesuschrist, minnowsupport, nsfw, partiko, porn,
-   pornography, promo-steem, realrobinhood, religion, splinterlands, steemmonsters, steemzzang,
-   test, thediarygame, thoth, weeklyreport, yehey, zzan
+EXCLUDE_TAGS = actifit, appics, bible, booming, blurt, christianity, contest, cross-post, curation, curatorapplication,
+   dtube, erotic, heartchurch, hive, hive-108451, hive-119463, islam, jesuschrist, hive, hbd, minnowsupport, nobots, norobots, 
+   nsfw, partiko, pizzagate, porn, pornography, promo-steem, realrobinhood, religion, splinterlands, steemhostiletakeover,
+   steemmonsters, steemzzang, test, weeklyreport, whaleshares, yehey, zzan
 INCLUDE_TAGS =
 LANGUAGE = de, en, es, fr, it, ukr
 MAX_DOWNVOTES = 5

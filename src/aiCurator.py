@@ -8,6 +8,7 @@ import logging
 import configparser
 from pathlib import Path
 from modelManager import ModelManager
+from promptHelper import construct_messages
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -115,16 +116,7 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
         
         payloadDict = {
             "model": current_model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": systemPrompt
-                },
-                {
-                    "role": "user",
-                    "content": f"{curationPrompt}\n\n## ARTICLE FOR EVALUATION\n\n{postBody}"
-                }
-            ],
+            "messages": construct_messages(arliaiUrl, current_model, systemPrompt, f"{curationPrompt}\n\n## ARTICLE FOR EVALUATION\n\n{postBody}"),
             "temperature": 0.3,
             "top_p": 0.85,
             "max_tokens": maxTokens,
@@ -132,15 +124,15 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
             stop_param_name: ["END_OF_CURATION_REPORT", "DO NOT CURATE"]
         }
 
-        if arliaiUrl.startswith("https://api.arliai.com"):  # ARLIAI API/models (vllm API)
-            payloadDict["repetition_penalty"] = 1.1
-            payloadDict["top_k"] = 40
-            payloadDict["frequency_penalty"] = 0.3
-            payloadDict["presence_penalty"] = 0.3
-            payloadDict["min_p"] = 0.0
-            payloadDict["extra_body"] = {
-                "chat_template_kwargs": {"enable_thinking": False}
-            }
+        # if arliaiUrl.startswith("https://api.arliai.com"):  # ARLIAI API/models (vllm API)
+        #     payloadDict["repetition_penalty"] = 1.1
+        #     payloadDict["top_k"] = 40
+        #     payloadDict["frequency_penalty"] = 0.3
+        #     payloadDict["presence_penalty"] = 0.3
+        #     payloadDict["min_p"] = 0.0
+        #     payloadDict["extra_body"] = {
+        #         "chat_template_kwargs": {"enable_thinking": False}
+        #     }
 
         payload = json.dumps(payloadDict)
 
