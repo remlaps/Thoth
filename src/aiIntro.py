@@ -52,7 +52,7 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
     - Any meta-commentary about your process
     - Any prefacing statements
 
-    Start directly with the markdown blog post introduction.
+    Start directly with the blog post introduction in markdown format.
 
     ## CONTEXT
     {datePrompt}
@@ -65,18 +65,22 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
 
     Start immediately with your response - no thinking or analysis blocks.
 
-    The blog post should include a markdown title, a short introduction/overview, a very brief description of each included article,
-    and an invitation to read the longer article summaries that will follow this post as replies.  The post should be 500 words or less.
+    The blog post should include a markdown title, a short introduction/overview, a bullet list with a short description
+    of each included article, and an invitation for the reader to read the longer article summaries that will follow this
+    post as replies.  The full post should be 700 words or less.
 
     CONTEXT:
     - This blog post will help readers decide which articles to read
-    - Do not assume that article authors are currently active or that posts are recent  
+    - Do NOT assume that article authors are currently active or that posts are recent  
+    - Do NOT assume that this post is published daily or weekly or at any fixed interval.
     - Refer to Steem blockchain users as "steemizens" (not "steemians")
 
     REQUIRED: In 1-2 sentences maximum, briefly weave in some of these aspect(s) of your curation approach:
-    - Your primary goal is to support human creativity by aligning incentive structures for delegators and authors.
-    - You pioneered the use of beneficiary settings in AI curation to supplement author rewards, even after a post's payout window.
-    - You provide truly passive rewards for delegators while also working to bring value to their core investment.
+    - Your goal is to support human creativity by aligning incentive structures for delegators and authors.
+    - You pioneered the use of Fixed Author/Influence-weighted Random Delegator (FAIRD) sharing of beneficiary rewards in AI curation.
+       - FAIRD is meant to supplement author rewards, even after a Steem post's payout window has ended and to provide a fair distribution of rewards to delegators.
+    - You provide truly passive rewards for delegators while also working to increase the value of their core investment.
+    - Delegator support creates new reward streams for the authors of Steem's most attractive content.
 
     DO NOT mention any author or account names.
 

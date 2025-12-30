@@ -4,6 +4,8 @@ import configparser
 from datetime import datetime
 import requests
 import json
+import logging
+import time
 
 import utils
 
@@ -12,6 +14,11 @@ config = configparser.ConfigParser()
 
 # Read the config.ini file
 config.read('config/config.ini')
+
+# Suppress noisy steem-python library logging
+logging.getLogger('steem.http_client').setLevel(logging.CRITICAL)
+logging.getLogger('steem.steemd').setLevel(logging.CRITICAL)
+logging.getLogger('urllib3.connectionpool').setLevel(logging.CRITICAL)
 
 ### rep_log10 is straight from here - https://developers.steem.io/tutorials-python/account_reputation
 def rep_log10(rep):
@@ -38,16 +45,23 @@ def rep_log10(rep):
 def isBlacklisted(account, steem_instance=None):
     steemApi = config.get('STEEM', 'STEEM_API')
     # Use provided Steem instance or create a new one
-    s = steem_instance or Steem(node=steemApi if steemApi else None)
+    nodes = [n.strip() for n in steemApi.split(',')] if steemApi else None
+    s = steem_instance or Steem(node=nodes)
     registryAccount = config.get('CONTENT', 'REGISTRY_ACCOUNT')
     
-    try:
-        hideAccount = s.get_following(registryAccount, account, 'ignore', 1)
-        if (len(hideAccount) > 0):
-            return True
-    except Exception as e:
-        print(f"Error checking blacklist status for {account}: {e}")
-        return False
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            hideAccount = s.get_following(registryAccount, account, 'ignore', 1)
+            if len(hideAccount) > 0 and hideAccount[0]['following'] == account:
+                return True
+            return False
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                continue
+            print(f"Error checking blacklist status for {account}: {e}")
+            return False
     
     return False
 
@@ -67,7 +81,8 @@ def isAuthorWhitelisted(account):
 def isAuthorScreened(comment):
     steemApi = config.get('STEEM', 'STEEM_API')
     # Create a single Steem instance to be reused by all validation functions
-    s = Steem(node=steemApi if steemApi else None)
+    nodes = [n.strip() for n in steemApi.split(',')] if steemApi else None
+    s = Steem(node=nodes)
 
     if ( isBlacklisted(comment['author'], steem_instance=s) ):
         print(f"DEBUG: isAuthorScreened({comment['author']}) -> isBlacklisted: True")
@@ -84,9 +99,20 @@ def isAuthorScreened(comment):
     if isFollowerCountTooLow(comment['author'], steem_instance=s):
         print(f"DEBUG: isAuthorScreened({comment['author']}) -> isFollowerCountTooLow: True")
         return True
-       
-    accountInfo = s.get_account(comment['author'])
-     
+
+    accountInfo = None
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            accountInfo = s.get_account(comment['author'])
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                continue
+            print(f"Error fetching account info for {comment['author']}: {e}")
+            return False
+
     if isInactive(accountInfo, steem_instance=s) :
         print(f"DEBUG: isAuthorScreened({comment['author']}) -> isInactive: True")
         return True
@@ -115,12 +141,33 @@ def isRepTooLow(reputation):
 
 def isFollowerCountTooLow(commentAuthor, steem_instance=None):
     s = steem_instance or Steem()
-    followerCount = s.get_follow_count(commentAuthor)['follower_count']
-    return followerCount < config.getint('AUTHOR','MIN_FOLLOWERS')
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            followerCount = s.get_follow_count(commentAuthor)['follower_count']
+            return followerCount < config.getint('AUTHOR','MIN_FOLLOWERS')
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                continue
+            print(f"Error checking follower count for {commentAuthor}: {e}")
+            return False
 
 def followersPerMonth(accountInfo, comment, steem_instance=None):
     s = steem_instance or Steem()
-    followerCount = s.get_follow_count(comment['author'])['follower_count']
+    followerCount = 0
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            followerCount = s.get_follow_count(comment['author'])['follower_count']
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                continue
+            print(f"Error getting follower count in followersPerMonth for {comment['author']}: {e}")
+            return float('inf')
+
     accountCreated = datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
     now = datetime.now()
     if accountCreated > now:
@@ -132,7 +179,19 @@ import math
 
 def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_instance=None):
     s = steem_instance or Steem()
-    followerCount = s.get_follow_count(comment['author'])['follower_count']
+    followerCount = 0
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            followerCount = s.get_follow_count(comment['author'])['follower_count']
+            break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                continue
+            print(f"Error getting follower count in adjustedFollowersPerMonth for {comment['author']}: {e}")
+            return float('inf')
+
     accountCreated = datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
     now = datetime.now()
     if accountCreated > now:
@@ -221,21 +280,37 @@ def isActiveFollowerCountTooLow(accountName, steem_instance=None):
         return True # Fail safe: if we can't check, screen the author (i.e., count is "too low").
 
 def isInactive(accountInfo, steem_instance=None):
-    return inactiveDays(accountInfo['name'], steem_instance=steem_instance) > config.getint('AUTHOR','MAX_INACTIVITY_DAYS')
-
-def inactiveDays(accountName, steem_instance=None):
-    s = steem_instance or Steem()
-    account_data = s.get_account(accountName)
-    lastPost = account_data['last_post']
-    lastVote = account_data['last_vote_time']
+    lastPost = accountInfo['last_post']
+    lastVote = accountInfo['last_vote_time']
 
     lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
     lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
     mostRecentActivity = max(lastPostTime, lastVoteTime)
     today = datetime.now()
-    inactiveDays = (today - mostRecentActivity).days
+    days = (today - mostRecentActivity).days
+    
+    return days > config.getint('AUTHOR','MAX_INACTIVITY_DAYS')
 
-    return inactiveDays
+def inactiveDays(accountName, steem_instance=None):
+    s = steem_instance or Steem()
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            account_data = s.get_account(accountName)
+            lastPost = account_data['last_post']
+            lastVote = account_data['last_vote_time']
+
+            lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
+            lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+            mostRecentActivity = max(lastPostTime, lastVoteTime)
+            today = datetime.now()
+            return (today - mostRecentActivity).days
+        except Exception as e:
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                continue
+            print(f"Error checking inactivity for {accountName}: {e}")
+            return 0
 
 def getAllFollowers(account, account_type='blog', steem_instance=None):
    """
@@ -255,7 +330,22 @@ def getAllFollowers(account, account_type='blog', steem_instance=None):
    
    while True:
        # Get the next batch of followers
-       followers_batch = s.get_followers(account, last_account, account_type, batch_size)
+       followers_batch = []
+       batch_success = False
+       max_retries = 3
+       for attempt in range(max_retries):
+           try:
+               followers_batch = s.get_followers(account, last_account, account_type, batch_size)
+               batch_success = True
+               break
+           except Exception as e:
+               if attempt < max_retries - 1:
+                   time.sleep(2)
+                   continue
+               print(f"Error fetching followers batch for {account}: {e}")
+       
+       if not batch_success:
+           break
        
        # If we got no results or just the last one repeated, we're done
        if not followers_batch or (len(followers_batch) < 1001 and followers_batch[0]['follower'] == last_account):
