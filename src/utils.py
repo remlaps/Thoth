@@ -29,7 +29,7 @@ def detect_language(text):
     except langdetect.lang_detect_exception.LangDetectException:
         return "Unable to detect language"
 
-def screenPost(comment):
+def screenPost(comment, included_posts=None):
     if ( contentValidation.isEdit (comment)):
         return "Post edit"
     
@@ -51,7 +51,7 @@ def screenPost(comment):
     if not ( bodyLanguage in targetLanguage and titleLanguage in targetLanguage ):
         return f"Not a target language - body: {bodyLanguage}, title: {titleLanguage}"
 
-    if ( authorValidation.isAuthorScreened(comment)):
+    if ( authorValidation.isAuthorScreened(comment, included_posts=included_posts)):
         return "Author screened"
       
     if ( authorValidation.isAuthorWhitelisted(comment['author'])):

@@ -207,7 +207,7 @@ while retry_count <= max_retries:
                     if latest_timestamp is None or current_timestamp > latest_timestamp:
                         latest_timestamp = current_timestamp
 
-                    screenResult = utils.screenPost(comment)
+                    screenResult = utils.screenPost(comment, included_posts=commentList)
                     if screenResult == "Accept": 
                         ### Retrieve the latest version of the post
                         latestPostVersion=steemdInstance.get_content(comment['author'],comment['permlink'])
