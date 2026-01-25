@@ -1,4 +1,4 @@
-langdetect==1.0.9
-numpy==2.3.2
-Requests==2.32.4
+langdetect
+numpy
+Requests
 steem==1.0.2
