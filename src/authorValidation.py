@@ -78,11 +78,27 @@ def isAuthorWhitelisted(account):
     
     return account in whiteList
 
-def isAuthorScreened(comment):
+def isAuthorScreened(comment, included_posts=None):
     steemApi = config.get('STEEM', 'STEEM_API')
     # Create a single Steem instance to be reused by all validation functions
     nodes = [n.strip() for n in steemApi.split(',')] if steemApi else None
     s = Steem(node=nodes)
+
+    if included_posts is not None:
+        max_posts = config.getint('AUTHOR', 'MAX_INCLUDED_POSTS_PER_AUTHOR', fallback=1)
+
+        # DEBUG: Temporary logging for testing
+        all_counts = {}
+        for p in included_posts:
+            all_counts[p['author']] = all_counts.get(p['author'], 0) + 1
+        print(f"DEBUG: All included author counts: {all_counts}")
+        print(f"DEBUG: Current author '{comment['author']}' count: {all_counts.get(comment['author'], 0)}")
+
+        # Iterate through included_posts to count how many posts this author has
+        current_count = sum(1 for p in included_posts if p['author'] == comment['author'])
+        if current_count >= max_posts:
+            print(f"DEBUG: isAuthorScreened({comment['author']}) -> max posts reached ({current_count} >= {max_posts}): True")
+            return True
 
     if ( isBlacklisted(comment['author'], steem_instance=s) ):
         print(f"DEBUG: isAuthorScreened({comment['author']}) -> isBlacklisted: True")

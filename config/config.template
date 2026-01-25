@@ -60,13 +60,13 @@ EXCLUDE_TAGS = actifit, appics, bible, booming, blurt, christianity, contest, cr
    steemmonsters, steemzzang, test, weeklyreport, whaleshares, yehey, zzan
 INCLUDE_TAGS =
 LANGUAGE = de, en, es, fr, it, ukr
-MAX_DOWNVOTES = 5
-MAX_MENTION_COUNT = 10
+MAX_DOWNVOTES = 5 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+MAX_MENTION_COUNT = 10 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
 MAX_TAG_COUNT = 10
-MAX_VOTING_SERVICE_PCT = 25
-MIN_FEED_REACH = 200
-MIN_RESTEEMS = 0
-MIN_REPLIES = 0
+MAX_VOTING_SERVICE_PCT = 25 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+MIN_FEED_REACH = 200 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+MIN_RESTEEMS = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+MIN_REPLIES = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
 MIN_WORDS = 400
 REGISTRY_ACCOUNT = penny4thoughts
 WHITELIST_REQUIRED = False
@@ -76,18 +76,19 @@ WHITELIST_REQUIRED = False
 [AUTHOR]
 FOLLOWER_HALFLIFE_YEARS = 2
 # required days since the account was active on Blurt (not yet implemented)
-LAST_BLURT_ACTIVITY_AGE = 0
+LAST_BLURT_ACTIVITY_AGE = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
 # required days since the account was active on Hive
 LAST_HIVE_ACTIVITY_AGE = 60
 MAX_FOLLOWER_INACTIVITY_DAYS = 90
 MAX_INACTIVITY_DAYS = 4000
-MIN_ACCOUNT_AGE = 30
+MAX_INCLUDED_POSTS_PER_AUTHOR = 1
+MIN_ACCOUNT_AGE = 30 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
 MIN_ACTIVE_FOLLOWERS = 10
 MIN_ADJUSTED_FOLLOWERS_PER_MONTH=3
 MIN_FOLLOWERS = 350
 MIN_FOLLOWERS_PER_MONTH = 10
 MIN_FOLLOWER_MEDIAN_REP = 40
-MIN_REPUTATION = 60
+MIN_REPUTATION = 6
 ### Implemented: MIN_REPUTATION, MIN_FOLLOWERS, MIN_FOLLOWERS_PER_MONTH, MAX_INACTIVITY_DAYS, MIN_FOLLOWER_MEDIAN_REP
 ###              LAST_HIVE_ACTIVITY_AGE, MIN_UNDELEGATED_SP, MAX_DELEGATION_PCT
 
