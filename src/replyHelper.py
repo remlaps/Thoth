@@ -107,7 +107,7 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
     if retries >= max_retries:
         print(f"Failed to vote for @{postingAccount}/{permlink} after {max_retries} attempts.")
 
-def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPermlink, model_manager=None):
+def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPermlink, model_manager=None, full_delegations=None):
     """
     Posts a single AI summary as a reply to the main Thoth curation post.
 
@@ -179,9 +179,11 @@ This post was generated with the assistance of the following AI model(s): <i>{us
     
     all_delegators_list = [] # Full shuffled list of eligible delegators
     selected_delegators = [] # The subset we will actually use
+
     try:
-        # Get all delegations and filter out excluded accounts
-        full_delegations = delegationInfo.get_delegations(postingAccount)
+        # Use provided delegations list when available to avoid additional RPC calls
+        if full_delegations is None:
+            full_delegations = delegationInfo.get_delegations(postingAccount)
 
         # Get lists of delegators to exclude from config
         pro_bono_delegators = [d.strip() for d in config.get('BLOG', 'PRO_BONO_DELEGATORS', fallback='').split(',') if d.strip()]

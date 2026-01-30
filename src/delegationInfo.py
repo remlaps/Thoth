@@ -1,4 +1,6 @@
 import requests
+import time
+import random
 import numpy as np
 from decimal import Decimal, getcontext
 import utils
@@ -36,12 +38,34 @@ def get_delegations(account):
         list: A list of tuples (delegator, vests) showing all incoming delegations
     """
     url = f"https://sds1.steemworld.org/delegations_api/getIncomingDelegations/{account}"
-    response = requests.get(url)
-    
-    if response.status_code != 200:
-        raise Exception(f"API request failed with status code {response.status_code}")
-    
-    data = response.json()
+
+    max_retries = 5
+    initial_backoff = 1.0
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = requests.get(url, timeout=10)
+
+            # Retry on server errors or rate limiting
+            if response.status_code == 429 or (500 <= response.status_code < 600):
+                raise requests.exceptions.HTTPError(f"Server returned status {response.status_code}", response=response)
+
+            if response.status_code != 200:
+                # For other client errors, do not retry
+                raise Exception(f"API request failed with status code {response.status_code}")
+
+            data = response.json()
+            break
+
+        except (requests.exceptions.RequestException, requests.exceptions.HTTPError) as e:
+            if attempt == max_retries:
+                raise Exception(f"Failed to fetch delegations after {max_retries} attempts: {e}")
+            backoff = initial_backoff * (2 ** (attempt - 1))
+            # add jitter
+            backoff = backoff + random.uniform(0, backoff * 0.1)
+            print(f"get_delegations: request failed (attempt {attempt}/{max_retries}): {e}. Retrying in {backoff:.1f}s...")
+            time.sleep(backoff)
+            continue
     
     if data["code"] != 0:
         raise Exception(f"API returned error code {data['code']}")

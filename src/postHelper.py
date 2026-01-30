@@ -95,7 +95,7 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
             time.sleep(retry_delay_seconds)
             retries += 1
 
-def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None):
+def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None, full_delegations=None):
     postingKey=config.get('STEEM', 'POSTING_KEY')
     steemApi=config.get('STEEM', 'STEEM_API')
 
@@ -185,7 +185,9 @@ This will be done by:
 
     # Get all delegations, filter out excluded accounts, and select beneficiaries
     try:
-        full_delegations = delegationInfo.get_delegations(postingAccount)
+        # Use provided delegations when available to avoid duplicate RPC calls
+        if full_delegations is None:
+            full_delegations = delegationInfo.get_delegations(postingAccount)
 
         # Get lists of delegators to exclude from config
         pro_bono_delegators = [d.strip() for d in config.get('BLOG', 'PRO_BONO_DELEGATORS', fallback='').split(',') if d.strip()]
@@ -271,7 +273,8 @@ This will be done by:
                         item_index=idx, # 0-based index
                         thothAccount=postingAccount, # The account that made the main curation post
                         thothPermlink=permlink,       # The permlink of the main curation post
-                        model_manager=model_manager
+                        model_manager=model_manager,
+                        full_delegations=full_delegations
                     )
                     if reply_voting_thread: # If a thread was successfully started by postReply
                         active_voting_threads.append(reply_voting_thread)
