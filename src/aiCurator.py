@@ -80,9 +80,10 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
     if model_manager is None:
         model_manager = ModelManager(arliaiModel)
     
+    output_language = config.get('ARLIAI', 'OUTPUT_LANGUAGE', fallback='English')
     try:
         with open(systemPromptFile, 'r', encoding='utf-8') as f:
-            systemPrompt = f.read()
+            systemPrompt = f.read().format(language=output_language)
     except FileNotFoundError:
         logging.error(f"System prompt file not found: {systemPromptFile}")
         return "System Prompt File Error"
@@ -91,7 +92,7 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
 
     try:
         with open(userPromptFile, 'r', encoding='utf-8') as f:
-            curationPrompt = f.read()
+            curationPrompt = f.read().format(language=output_language)
     except FileNotFoundError:
         logging.error(f"User prompt file not found: {userPromptFile}")
         return "Curation Prompt File Error"

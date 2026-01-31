@@ -11,7 +11,7 @@ Start immediately with your response - no thinking blocks.
 * If not, respond only with `DO NOT CURATE`
 
 ## MANDATORY REQUIREMENTS & TERMS
-* The curation report MUST be written in English.
+* The curation report MUST be written in {language}.
 * Use level 2 heading formats for section titles (e.g., "## HEADING").
 * Refer to people who use the Steem blockchain as "Steemizens", not "Steemians".
 
