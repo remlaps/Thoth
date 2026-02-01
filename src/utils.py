@@ -10,6 +10,7 @@ import numpy as np
 import os
 import time
 from steem import Steem
+from localization import Localization
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -114,6 +115,7 @@ def generate_beneficiary_display_html(beneficiary_list, author_accounts, delegat
     # Create a lookup map for weights for easy access
     beneficiary_weights = {b['account']: b['weight'] for b in beneficiary_list}
     null_account = 'null'
+    loc = Localization()
     
     def _generate_table_html(title, accounts, weights_map, gratitude_message=""):
         """Nested helper to generate a single HTML table."""
@@ -156,32 +158,32 @@ def generate_beneficiary_display_html(beneficiary_list, author_accounts, delegat
         return html
 
     # Start building the main HTML string
-    body = f"\n\n<br><br><h3>Beneficiaries</h3>"
+    body = f"\n\n<br><br><h3>{loc.get('beneficiaries_title')}</h3>"
 
     # 1. Thoth Operator
     if thoth_account in beneficiary_weights and beneficiary_weights[thoth_account] > 0:
         percentage = beneficiary_weights[thoth_account] / 100.0
         formatted_percentage = f"{percentage:g}"
-        body += f'<h4>Thoth Operator</h4>\n<p>{thoth_account} / {formatted_percentage}%</p>\n' # No @ sign
+        body += f'<h4>{loc.get("thoth_operator_title")}</h4>\n<p>{thoth_account} / {formatted_percentage}%</p>\n' # No @ sign
 
     # 2. Curated Authors
     unique_authors = sorted(list(set(author_accounts)))
     if unique_authors:
-        author_title = "Curated Author" if len(unique_authors) == 1 else "Curated Authors"
-        author_gratitude = "Thank you for creating the content that makes Steem a vibrant and interesting place. Your creativity is the foundation of our social ecosystem."
+        author_title = loc.get("curated_author_title_singular") if len(unique_authors) == 1 else loc.get("curated_author_title_plural")
+        author_gratitude = loc.get("curated_author_gratitude")
         body += _generate_table_html(author_title, unique_authors, beneficiary_weights, gratitude_message=author_gratitude)
 
     # 3. Delegators
     if delegator_accounts:
-        delegator_title = "Delegator" if len(delegator_accounts) == 1 else "Delegators"
-        delegator_gratitude = "Delegator support is crucial for the Thoth project's ability to find and reward attractive content. Thank you for investing in the Steem ecosystem and the Thoth project."
+        delegator_title = loc.get("delegator_title_singular") if len(delegator_accounts) == 1 else loc.get("delegator_title_plural")
+        delegator_gratitude = loc.get("delegator_gratitude")
         body += _generate_table_html(delegator_title, delegator_accounts, beneficiary_weights, gratitude_message=delegator_gratitude)
 
     # 4. Burn Account (@null)
     if null_account in beneficiary_weights and beneficiary_weights[null_account] > 0:
         percentage = beneficiary_weights[null_account] / 100.0
         formatted_percentage = f"{percentage:g}"
-        body += f'<h4>Burn Account</h4>\n<p>{null_account} / {formatted_percentage}%</p>\n'
+        body += f'<h4>{loc.get("burn_account_title")}</h4>\n<p>{null_account} / {formatted_percentage}%</p>\n'
 
     body += "<br><br>\n"
     return body

@@ -7,6 +7,7 @@ import delegationInfo
 import threading
 import utils
 import steembase.exceptions # Required for specific exception handling
+from localization import Localization
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -139,21 +140,20 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
     else:
         used_model = config.get('ARLIAI','ARLIAI_MODEL')
 
-    body=f"""
-AI Curation by [Thoth](https://github.com/remlaps/Thoth)
-| <h6>Unlocking #lifetime-rewards for Steem's creators and #passive-rewards for delegators</h6> |
-| --- |
+    loc = Localization()
 
+    body = f"{loc.get('ai_curation_by')}\n"
+    body += f"| <h6>{loc.get('unlocking_rewards')}</h6> |\n"
+    body += "| --- |\n\n\n"
+    body += f"{loc.get('generated_with', model=used_model)}\n"
 
-This post was generated with the assistance of the following AI model(s): <i>{used_model}</i>
-    """
     display_index = item_index + 1 # Convert 0-based index to 1-based for display
 
     body += '<table border="1">\n'
     body += '   <tr>\n'
-    body += f'     <td><b>Original Post Reference #</b></td>\n'
-    body += f'     <td><b>Title</b></td>\n'
-    body += f'     <td><b>Author</b></td>\n'
+    body += f'     <td><b>{loc.get("reply_table_ref")}</b></td>\n'
+    body += f'     <td><b>{loc.get("reply_table_title")}</b></td>\n'
+    body += f'     <td><b>{loc.get("reply_table_author")}</b></td>\n'
     body += f'  </tr><tr>\n'
     body += f'     <td>{display_index}</td>\n'
     body += f'     <td><a href="/thoth/@{comment_item["author"]}/{comment_item["permlink"]}">{repr(comment_item["title"])}</a></td>\n'
@@ -163,8 +163,8 @@ This post was generated with the assistance of the following AI model(s): <i>{us
     body += f'<table><tr><td>\n\n{ai_response_item}\n\n' # Use the single ai_response_item
     body += '</td></tr></table><br><br>\n'
 
-    body += f"<br>This Thoth instance is operated by {config.get('BLOG', 'THOTH_OPERATOR')}<br>\n"
-    body += "<br>\n\nYou can contribute to Thoth or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
+    body += f"<br>{loc.get('operated_by', operator=config.get('BLOG', 'THOTH_OPERATOR'))}<br>\n"
+    body += f"<br>\n\n{loc.get('contribute_link')}"
 
     # --- Beneficiary Calculation ---
     # For a single reply, there's always 1 author.

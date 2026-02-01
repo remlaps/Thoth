@@ -34,7 +34,7 @@ If ANY of the following conditions are true for the article, you MUST respond wi
 
 ## CURATION REPORT STRUCTURE (IF NO EXCLUSION CONDITIONS ARE MET)
 If NONE of the EXCLUSION CONDITIONS are met, and the post qualifies for curation, then create a curation report with ONLY the following three sections, 
-in this exact order.
+in this exact order. Translate section headings to {language}.
 
 ## KEY TAKEAWAYS
 (Provide 3–4 bullet points. Each bullet should summarize a main insight from the article. Aim for clarity and

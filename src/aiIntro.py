@@ -8,6 +8,7 @@ import logging
 from pathlib import Path
 from modelManager import ModelManager
 from promptHelper import construct_messages
+from localization import Localization
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -55,6 +56,7 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
     if model_manager is None:
         model_manager = ModelManager(arliaiModel)
     
+    loc = Localization()
     modelPrefix = model_manager.get_model_prefix()
     
     config = configparser.ConfigParser()
@@ -64,14 +66,14 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
     ensurePromptFileExists('config/introSystemPrompt.txt', f'config/introSystemPromptTemplate_{modelPrefix}.txt', "Intro System")
     ensurePromptFileExists('config/introUserPrompt.txt', f'config/introUserPromptTemplate_{modelPrefix}.txt', "Intro User")
 
-    if ( startTime.strftime('%Y-%m-%d') == endTime.strftime('%Y-%m-%d') ):
-        datePrompt = f"Today is {today.strftime('%Y-%m-%d')}.  These articles were published on {startTime.strftime('%Y-%m-%d')}."
-    else:
-        datePrompt = f"""
-        Today is {today.strftime('%Y-%m-%d')}.
+    today_str = today.strftime('%Y-%m-%d')
+    start_str = startTime.strftime('%Y-%m-%d')
+    end_str = endTime.strftime('%Y-%m-%d')
 
-        These articles were published between {startTime.strftime('%Y-%m-%d')} and {endTime.strftime('%Y-%m-%d')}.
-        """
+    if start_str == end_str:
+        datePrompt = f"{loc.get('today_is', date=today_str)} {loc.get('articles_published_on', date=start_str)}"
+    else:
+        datePrompt = f"{loc.get('today_is', date=today_str)}\n\n{loc.get('articles_published_between', start_date=start_str, end_date=end_str)}"
     
     try:
         with open('config/introSystemPrompt.txt', 'r', encoding='utf-8') as f:
@@ -80,10 +82,10 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
             userPrompt = f.read().format(combinedComment=combinedComment, language=output_language)
     except FileNotFoundError as e:
         logging.error(f"Prompt file not found: {e}")
-        return "Error: Prompt File Missing"
+        return loc.get('error_prompt_missing')
     except Exception as e:
         logging.error(f"Error reading prompt file: {e}")
-        return "Error: Prompt File Error"
+        return loc.get('error_prompt_error')
     
     if arliaiUrl.startswith("https://generativelanguage.googleapis.com"):  ## Google API/models
         stop_param_name = "stop"
@@ -198,4 +200,4 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
         else:
             # If we exhaust retries for this model, log and exit
             logging.error(f"Exhausted all retries for model {current_model}.")
-            return "Thoth was unable to generate an introduction for this post due to an API error after multiple retries."
+            return loc.get('error_intro_generation')
