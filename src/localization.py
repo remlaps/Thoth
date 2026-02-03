@@ -77,6 +77,9 @@ class Localization:
                 'delegator_title_plural': "Delegators",
                 'delegator_gratitude': "Delegator support is crucial for the Thoth project's ability to find and reward attractive content. Thank you for investing in the Steem ecosystem and the Thoth project.",
                 'burn_account_title': "Burn Account",
+                'heading_key_takeaways': "KEY TAKEAWAYS",
+                'heading_target_audience': "TARGET AUDIENCE",
+                'heading_conversation_starters': "CONVERSATION STARTERS",
             },
             'de': {
                 'today_is': "Heute ist {date}.",
@@ -129,6 +132,9 @@ class Localization:
                 'delegator_title_plural': "Delegierende",
                 'delegator_gratitude': "Die Unterstützung durch Delegierende ist entscheidend für die Fähigkeit des Thoth-Projekts, attraktive Inhalte zu finden und zu belohnen. Danke, dass Sie in das Steem-Ökosystem und das Thoth-Projekt investieren.",
                 'burn_account_title': "Burn-Konto",
+                'heading_key_takeaways': "WICHTIGSTE ERKENNTNISSE",
+                'heading_target_audience': "ZIELGRUPPE",
+                'heading_conversation_starters': "DISKUSSIONSANSTÖSSE",
             },
             'es': {
                 'today_is': "Hoy es {date}.",
@@ -181,6 +187,9 @@ class Localization:
                 'delegator_title_plural': "Delegantes",
                 'delegator_gratitude': "El apoyo de las personas delegantes es crucial para la capacidad del proyecto Thoth de encontrar y recompensar contenido atractivo. Gracias por invertir en el ecosistema Steem y en el proyecto Thoth.",
                 'burn_account_title': "Cuenta de quema",
+                'heading_key_takeaways': "PUNTOS CLAVE",
+                'heading_target_audience': "PÚBLICO OBJETIVO",
+                'heading_conversation_starters': "INICIADORES DE CONVERSACIÓN",
             }
         }
         self._initialized = True

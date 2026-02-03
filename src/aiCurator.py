@@ -94,7 +94,13 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
 
     try:
         with open(userPromptFile, 'r', encoding='utf-8') as f:
-            curationPrompt = f.read().format(language=output_language)
+            curationPromptTemplate = f.read()
+        curationPrompt = curationPromptTemplate.format(
+            language=output_language,
+            key_takeaways_header=loc.get('heading_key_takeaways'),
+            target_audience_header=loc.get('heading_target_audience'),
+            conversation_starters_header=loc.get('heading_conversation_starters')
+        )
     except FileNotFoundError:
         logging.error(f"User prompt file not found: {userPromptFile}")
         return "Curation Prompt File Error"
