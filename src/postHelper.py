@@ -118,6 +118,7 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
     else:
         used_model = config.get('ARLIAI','ARLIAI_MODEL')
 
+    introImageUrl = config.get('BLOG', 'IMAGE_FOR_INTRO', fallback="https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png")
     loc = Localization()
 
     body = f"{loc.get('ai_curation_by')}\n"
@@ -126,7 +127,7 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
     body += f"{loc.get('generated_with', model=used_model)}\n"
 
     body += '<div class=pull-right>\n\n'
-    body += '[![](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)'
+    body += '[![](' + introImageUrl + ')](' + introImageUrl + ')'
     body += f'<h6><sup>{loc.get("image_by_ai")}</sup></h6>\n\n</div>\n\n'
 
     body += f'\n\n{aiIntroString}\n\n<hr>'
