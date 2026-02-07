@@ -96,6 +96,8 @@ MIN_REPUTATION = 6
 [BLOG]
 CURATED_AUTHOR_WEIGHT = 900
 DELEGATOR_WEIGHT = 2000
+IMAGE_FOR_INTRO = https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png
+IMAGE_FOR_REPLIES = https://cdn.steemitimages.com/DQmPPZcxrEVGPoWv2FchkaVn4PM6W9muRgSkryzjFmaFzDm/image.png
 # A comma-separated list of delegators who are ineligible for rewards for other reasons
 INELIGIBLE_DELEGATORS = 
 #

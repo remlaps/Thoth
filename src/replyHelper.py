@@ -163,6 +163,11 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
     body += f'<table><tr><td>\n\n{ai_response_item}\n\n' # Use the single ai_response_item
     body += '</td></tr></table><br><br>\n'
 
+    replyImageUrl = config.get('BLOG', 'IMAGE_FOR_REPLIES', fallback="https://cdn.steemitimages.com/DQmPPZcxrEVGPoWv2FchkaVn4PM6W9muRgSkryzjFmaFzDm/image.png")
+    body += '<div class=pull-right>\n\n'
+    body += '[![](' + replyImageUrl + ')](' + replyImageUrl + ')'
+    body += f'<h6><sup>{loc.get("image_by_ai")}</sup></h6>\n\n</div>\n\n'
+
     body += f"<br>{loc.get('operated_by', operator=config.get('BLOG', 'THOTH_OPERATOR'))}<br>\n"
     body += f"<br>\n\n{loc.get('contribute_link')}"
 
