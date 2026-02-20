@@ -2,18 +2,21 @@
 
 Evaluate this article and create a curation report.
 
+Start immediately with your response - no thinking blocks.
+
 ## OUTPUT INSTRUCTIONS
-*   Your response MUST adhere strictly to the structure defined below.
-*   If curating, start your response *directly* with the `## KEY TAKEAWAYS` heading.
-*   If not curating, respond *only* with `DO NOT CURATE`.
+* Follow structure below strictly
+* No preamble (e.g., "Here is the report...")
+* If article qualifies, start with `## {key_takeaways_header}`
+* If not, respond only with `DO NOT CURATE`
 
 ## MANDATORY REQUIREMENTS & TERMS
-* The curation report MUST be written in English.
+* The curation report MUST be written in {language}.
 * Use level 2 heading formats for section titles (e.g., "## HEADING").
 * Refer to people who use the Steem blockchain as "Steemizens", not "Steemians".
 
 ## EXCLUSION CONDITIONS (IMMEDIATE ACTION)
-If ANY of the following conditions are true for the article, you MUST respond with: `DO NOT CURATE` then STOP.
+If ANY of the following conditions are true for the article, you MUST respond with ONLY: `DO NOT CURATE` Then STOP. Do not provide explanations or reasoning.
 * Content appears AI-generated or plagiarized
 * Poor writing quality (confusing, repetitive, disorganized)
 * Focuses on gambling, prize contests, giveaways, or any online competitions involving rewards
@@ -21,18 +24,24 @@ If ANY of the following conditions are true for the article, you MUST respond wi
 * Repetitive phrases, vague generalizations, or a weak or disconnected conclusion
 * Consists mainly of lists, digests, or summaries of other Steem posts
 * Is a curator application or another curation report
-* Cursory or superficial coverage of widely known information
+* Cursory, superficial, or generic coverage
+* Absence of value to readers (who, what, where, when, why are missing or vague)
+* Lacks concrete examples, data, or evidence to support claims
+* Shows minimal research effort or fails to cite credible sources when needed
+* Covers topics already extensively discussed without adding new perspectives
+* Uses clickbait titles or sensationalized language
+* Contains more than 20% quoted material from other sources
 
 ## CURATION REPORT STRUCTURE (IF NO EXCLUSION CONDITIONS ARE MET)
-If NONE of the EXCLUSION CONDITIONS are met, create a curation report with ONLY the following three sections, 
+If NONE of the EXCLUSION CONDITIONS are met, and the post qualifies for curation, then create a curation report with ONLY the following three sections, 
 in this exact order.
 
-## KEY TAKEAWAYS
+## {key_takeaways_header}
 (Provide 3–4 bullet points. Each bullet should summarize a main insight from the article. Aim for clarity and
 use SEO-friendly keywords where natural.)
 
-## TARGET AUDIENCE
+## {target_audience_header}
 (Identify who would find this content most valuable and explain why..)
 
-## CONVERSATION STARTERS
+## {conversation_starters_header}
 (Formulate 3 distinct, thought-provoking questions related to the article's topic that could spark discussion among Steemizens.)

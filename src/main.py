@@ -9,6 +9,7 @@ import aiIntro
 import utils  # From the thoth package
 import aiCurator # From the thoth package
 import postHelper # From the thoth package
+import delegationInfo
 from configValidator import ConfigValidator
 from modelManager import ModelManager
 from steemHelpers import initialize_steem_with_retry
@@ -282,7 +283,15 @@ if earliest_timestamp and latest_timestamp:
         enable_switching=enable_model_switching,
         dry_run=model_switching_dry_run
     )
-    postHelper.postCuration(commentList, aiResponseList, aiIntroString, model_manager=model_manager)
+    # Retrieve delegations once and pass into postHelper to avoid duplicate RPC calls
+    postingAccount_main = config.get('STEEM', 'POSTING_ACCOUNT')
+    try:
+        full_delegations = delegationInfo.get_delegations(postingAccount_main)
+    except Exception as e:
+        print(f"Warning: could not fetch delegations in main: {e}")
+        full_delegations = []
+
+    postHelper.postCuration(commentList, aiResponseList, aiIntroString, model_manager=model_manager, full_delegations=full_delegations)
     print("Posting finished.")
 else:
     print("No posts were found to curate in the specified block range. Exiting.")

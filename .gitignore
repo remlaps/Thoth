@@ -15,3 +15,6 @@ config/config-social.ini
 config/config-thothtest.ini
 config/configBackups
 config/delegationUncounted.txt
+Thoth-social.code-workspace
+config/introSystemPrompt.txt
+config/introUserPrompt.txt

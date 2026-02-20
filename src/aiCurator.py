@@ -9,6 +9,7 @@ import configparser
 from pathlib import Path
 from modelManager import ModelManager
 from promptHelper import construct_messages
+from localization import Localization
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -75,23 +76,31 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
     """
     today = datetime.now()
     arliaiKey = arliaiKey.split()[0]  # Eliminate comments after the key (should be redundant)
+    loc = Localization()
     
     # Use provided model_manager or create one from the model string
     if model_manager is None:
         model_manager = ModelManager(arliaiModel)
     
+    output_language = config.get('ARLIAI', 'OUTPUT_LANGUAGE', fallback='English')
     try:
         with open(systemPromptFile, 'r', encoding='utf-8') as f:
-            systemPrompt = f.read()
+            systemPrompt = f.read().format(language=output_language)
     except FileNotFoundError:
         logging.error(f"System prompt file not found: {systemPromptFile}")
         return "System Prompt File Error"
 
-    systemPrompt += f"\n\nToday is {today.strftime('%Y-%m-%d')}.\n" # Correctly format and append today's date
+    systemPrompt += f"\n\n{loc.get('today_is', date=today.strftime('%Y-%m-%d'))}\n" # Correctly format and append today's date
 
     try:
         with open(userPromptFile, 'r', encoding='utf-8') as f:
-            curationPrompt = f.read()
+            curationPromptTemplate = f.read()
+        curationPrompt = curationPromptTemplate.format(
+            language=output_language,
+            key_takeaways_header=loc.get('heading_key_takeaways'),
+            target_audience_header=loc.get('heading_target_audience'),
+            conversation_starters_header=loc.get('heading_conversation_starters')
+        )
     except FileNotFoundError:
         logging.error(f"User prompt file not found: {userPromptFile}")
         return "Curation Prompt File Error"

@@ -8,6 +8,7 @@ import contentValidation
 import delegationInfo
 import threading
 import utils
+from localization import Localization
 
 import replyHelper # From the thoth package
 
@@ -95,7 +96,7 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
             time.sleep(retry_delay_seconds)
             retries += 1
 
-def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None):
+def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None, full_delegations=None):
     postingKey=config.get('STEEM', 'POSTING_KEY')
     steemApi=config.get('STEEM', 'STEEM_API')
 
@@ -117,22 +118,21 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
     else:
         used_model = config.get('ARLIAI','ARLIAI_MODEL')
 
-    body=f"""
-AI Curation by [Thoth](https://github.com/remlaps/Thoth)
-| <h6>Unlocking #lifetime-rewards for Steem's creators and #passive-rewards for delegators</h6> |
-| --- |
+    introImageUrl = config.get('BLOG', 'IMAGE_FOR_INTRO', fallback="https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png")
+    loc = Localization()
 
+    body = f"{loc.get('ai_curation_by')}\n"
+    body += f"| <h6>{loc.get('unlocking_rewards')}</h6> |\n"
+    body += "| --- |\n\n\n"
+    body += f"{loc.get('generated_with', model=used_model)}\n"
 
-This post was generated with the assistance of the following AI model(s): <i>{used_model}</i>
-    """
-
-    body+='<div class=pull-right>\n\n[![](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)](https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png)<h6><sup>Image by AI</sup></h6>\n\n</div>\n\n'
+    body += '<div class=pull-right>\n\n'
+    body += '[![](' + introImageUrl + ')](' + introImageUrl + ')'
+    body += f'<h6><sup>{loc.get("image_by_ai")}</sup></h6>\n\n</div>\n\n'
 
     body += f'\n\n{aiIntroString}\n\n<hr>'
 
-    body+=f"""
-Here are the articles that are featured in this curation post:<br><br>
-"""
+    body += f"\n{loc.get('featured_articles')}\n"
 
     body+="<hr><table>"
     for lcv, comment in enumerate(commentList):
@@ -148,35 +148,30 @@ Here are the articles that are featured in this curation post:<br><br>
         body += f'   <td><b>{lcv + 1}</b>: </td>\n'
         body += f'   <td><A HREF="/thoth/@{comment["author"]}/{comment["permlink"]}" target="_blank">{repr(comment["title"])}</A>'
         body += f'      <hr>\n'
-        body += f'      <b>Tags</b>: {tagString}</td>\n'
+        body += f'      <b>{loc.get("table_tags")}</b>: {tagString}</td>\n'
         body += f'   <td>@{commentList[lcv]["author"]}'
         body += f'      <hr>\n'
-        body += f'      <b>Created</b>: {steemPost["created"]}</td>\n'
+        body += f'      <b>{loc.get("table_created")}</b>: {steemPost["created"]}</td>\n'
         body += '</tr>\n'
 
     body +="</table><hr>"
     
-    body += "<br>Obviously, inclusion in this list does not imply endorsement of the author's ideas.  The list was built by AI and other automated tools, so the results may contain halucinations, errors, or controversial opinions.  If you see content that should be filtered in the future, please let the operator know.<br>\n"
-    body += "<br>If the highlighted post has already paid out, you can upvote this post in order to send rewards to the included authors.  If it is still eligible for payout, you can also click through and vote on the orginal post.  Either way, you may also wish to click through and engage with the original author!<br><hr>\n"
+    body += f"<br>{loc.get('disclaimer_endorsement')}<br>\n"
+    body += f"<br>{loc.get('disclaimer_voting')}<br><hr>\n"
 
-    body+=f"""
-### About <b><i>Thoth</i></b>:
+    body += f"\n{loc.get('about_thoth_title')}\n\n"
+    body += f"{loc.get('about_thoth_desc')}\n\n"
+    body += f"{loc.get('thoth_goals_intro')}\n"
+    body += f"{loc.get('thoth_goal_1')}\n"
+    body += f"{loc.get('thoth_goal_2')}\n"
+    body += f"{loc.get('thoth_goal_3')}\n"
+    body += f"{loc.get('thoth_goal_4')}\n"
+    body += f"   {loc.get('thoth_note_1')}\n"
+    body += f"   {loc.get('thoth_note_2')}\n"
+    body += f"   {loc.get('thoth_note_3')}\n\n"
 
-Named after the ancient Egyptian god of writing, science, art, wisdom, judgment, and magic, <b><i>Thoth</i></i> is an Open Source curation bot that is intended to align incentives for authors and investors towards the production and support of creativity that attracts human eyeballs to the Steem blockchain.<br><br>
-
-This will be done by:
-1. Identifying attractive posts on the blockchain - past and present;
-2. Highlighting those posts for curators;
-3. Delivering beneficiary rewards to the creators who are producing blockchain content with lasting value; and
-4. Delivering beneficiary rewards to the delegators who support the curation initiative.<br><br>
-   - No rate of return is guaranteed or implied.
-   - Reward amounts are entirely determined by blockchain consensus.
-   - Delegator beneficiaries are randomly selected for inclusion in each post and reply with a weighting based on the amount of Steem Power delegated.
-
-"""
-
-    body += f"<br>This Thoth instance is operated by {config.get('BLOG', 'THOTH_OPERATOR')}<br>\n"
-    body += "<br>\n\nYou can contribute to Thoth or download your own copy of the code, [here](https://github.com/remlaps/Thoth)"
+    body += f"<br>{loc.get('operated_by', operator=config.get('BLOG', 'THOTH_OPERATOR'))}<br>\n"
+    body += f"<br>\n\n{loc.get('contribute_link')}"
 
     beneficiaryList = ['null', postingAccount ]
     # The "a/d account types is a kludge"
@@ -185,7 +180,9 @@ This will be done by:
 
     # Get all delegations, filter out excluded accounts, and select beneficiaries
     try:
-        full_delegations = delegationInfo.get_delegations(postingAccount)
+        # Use provided delegations when available to avoid duplicate RPC calls
+        if full_delegations is None:
+            full_delegations = delegationInfo.get_delegations(postingAccount)
 
         # Get lists of delegators to exclude from config
         pro_bono_delegators = [d.strip() for d in config.get('BLOG', 'PRO_BONO_DELEGATORS', fallback='').split(',') if d.strip()]
@@ -246,7 +243,7 @@ This will be done by:
     while not postDone and retryCount < 3:
         now = datetime.datetime.now(datetime.timezone.utc)
         timeStamp = now.strftime("%Y-%m-%d %H:%M")
-        title = f"Curated by Thoth - {timeStamp}Z"
+        title = f"{loc.get('post_title', timestamp=timeStamp)}Z"
         print(f"Posting: {title}")
         print(body)
         with open('data/fakepost.html', 'w', encoding='utf-8') as f:
@@ -271,7 +268,8 @@ This will be done by:
                         item_index=idx, # 0-based index
                         thothAccount=postingAccount, # The account that made the main curation post
                         thothPermlink=permlink,       # The permlink of the main curation post
-                        model_manager=model_manager
+                        model_manager=model_manager,
+                        full_delegations=full_delegations
                     )
                     if reply_voting_thread: # If a thread was successfully started by postReply
                         active_voting_threads.append(reply_voting_thread)

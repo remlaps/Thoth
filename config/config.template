@@ -22,6 +22,10 @@ ARLIAI_URL = https://generativelanguage.googleapis.com/v1beta/openai/chat/comple
 INITIAL_BACKOFF_SECONDS = 15.0
 JITTER_FACTOR = 0.2
 MAX_RETRIES = 9
+###
+### Language options are English, German, or Spanish.
+###
+OUTPUT_LANGUAGE = English
 SYSTEM_PROMPT_FILE = config\systemPrompt.txt
 SYSTEM_PROMPT_TEMPLATE = config\systemPromptTemplate.txt
 USER_PROMPT_FILE = config\userPrompt.txt
@@ -95,6 +99,8 @@ MIN_REPUTATION = 6
 [BLOG]
 CURATED_AUTHOR_WEIGHT = 900
 DELEGATOR_WEIGHT = 2000
+IMAGE_FOR_INTRO = https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png
+IMAGE_FOR_REPLIES = https://cdn.steemitimages.com/DQmW2gQy8hsvsVAgNicfK9qm6LpUuA6J4bc7J8Lxp35nQan/image.png
 # A comma-separated list of delegators who are ineligible for rewards for other reasons
 INELIGIBLE_DELEGATORS = 
 #
@@ -136,7 +142,9 @@ VOTE_COUNT_WEIGHT = 1
 
 [WALLET]
 DELEGATION_FILE=config\delegationScreen.txt
-MAX_DELEGATION_PCT = 25.0
-MAX_POWERDOWN_YEARLY_PCT = 50.0
-MAX_SCREENED_DELEGATION_PCT=25.0
-MIN_UNDELEGATED_SP = 0.0
+MAX_DELEGATION_PCT = 50.0
+MAX_POWERDOWN_YEARLY_PCT = 130.0
+MAX_SCREENED_DELEGATION_PCT=15.0
+MIN_UNDELEGATED_SP = 6.0
+SCREENED_DELEGATEE_FILE=config\delegationScreen.txt
+UNCOUNTED_DELEGATEE_FILE=config\delegationUncounted.txt
