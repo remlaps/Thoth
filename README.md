@@ -21,7 +21,17 @@ Each post and reply provides the ability to direct beneficiary rewards to the fo
 
 After posting is done, the post and replies receive upvotes from the Thoth account and the blockchain consensus will eventually distribute all rewards as specified in the beneficiary settings.
 
+---
 
+## Thoth’s Flywheel (Incentive Model)
+
+Thoth operates as a self-reinforcing  cycle: curated authors, delegators, and the operator are aligned through beneficiary rewards and blockchain incentives.
+
+<p align="center">
+  <img src="images/ThothFlywheelImage20260215.png" alt="Thoth's Flywheel" width="900">
+</p>
+
+This flywheel illustrates how content creation, curation, posting, and reward distribution reinforce one another over time.
 ## Installation
 
 1. **Set-up a python-steem virtual environment**
