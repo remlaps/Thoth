@@ -42,12 +42,14 @@ def rep_log10(rep):
     out = (out * 9) + 25          # 9 points per magnitude. center at 25
     return round(out, 2)
 
-def isBlacklisted(account, steem_instance=None):
+def isBlacklisted(account, steem_instance=None, registryAccount=None):
     steemApi = config.get('STEEM', 'STEEM_API')
     # Use provided Steem instance or create a new one
     nodes = [n.strip() for n in steemApi.split(',')] if steemApi else None
     s = steem_instance or Steem(node=nodes)
-    registryAccount = config.get('CONTENT', 'REGISTRY_ACCOUNT')
+    
+    if not registryAccount:
+        registryAccount = config.get('CONTENT', 'REGISTRY_ACCOUNT')
     
     max_retries = 3
     for attempt in range(max_retries):
@@ -78,11 +80,11 @@ def isAuthorWhitelisted(account):
     
     return account in whiteList
 
-def isAuthorScreened(comment, included_posts=None):
+def isAuthorScreened(comment, included_posts=None, steem_instance=None):
     steemApi = config.get('STEEM', 'STEEM_API')
     # Create a single Steem instance to be reused by all validation functions
     nodes = [n.strip() for n in steemApi.split(',')] if steemApi else None
-    s = Steem(node=nodes)
+    s = steem_instance or Steem(node=nodes)
 
     if included_posts is not None:
         max_posts = config.getint('AUTHOR', 'MAX_INCLUDED_POSTS_PER_AUTHOR', fallback=1)
@@ -112,7 +114,17 @@ def isAuthorScreened(comment, included_posts=None):
         print(f"DEBUG: isAuthorScreened({comment['author']}) -> isHiveActivityTooRecent: True")
         return True
 
-    if isFollowerCountTooLow(comment['author'], steem_instance=s):
+    # Optimization: Fetch Follower Count ONCE
+    follower_count = 0
+    try:
+        follower_count = s.get_follow_count(comment['author'])['follower_count']
+    except Exception as e:
+        print(f"Error fetching follower count for {comment['author']}: {e}")
+        # If we can't get follower count, we might default to screening or retrying. 
+        # For now, let's assume 0 to be safe/strict.
+        follower_count = 0
+
+    if isFollowerCountTooLow(comment['author'], steem_instance=s, cached_count=follower_count):
         print(f"DEBUG: isAuthorScreened({comment['author']}) -> isFollowerCountTooLow: True")
         return True
 
@@ -137,11 +149,11 @@ def isAuthorScreened(comment, included_posts=None):
         print(f"DEBUG: isAuthorScreened({comment['author']}) -> isRepTooLow: True")
         return True
     
-    if isMonthlyFollowersTooLow(accountInfo, comment, steem_instance=s):
+    if isMonthlyFollowersTooLow(accountInfo, comment, steem_instance=s, cached_count=follower_count):
         print(f"DEBUG: isAuthorScreened({comment['author']}) -> isMonthlyFollowersTooLow: True")
         return True
     
-    if isAdjustedMonthlyFollowersTooLow ( accountInfo, comment, steem_instance=s):
+    if isAdjustedMonthlyFollowersTooLow ( accountInfo, comment, steem_instance=s, cached_count=follower_count):
         print(f"DEBUG: isAuthorScreened({comment['author']}) -> isAdjustedMonthlyFollowersTooLow: True")
         return True
 
@@ -155,34 +167,42 @@ def isAuthorScreened(comment, included_posts=None):
 def isRepTooLow(reputation):
     return rep_log10(reputation) < config.getint('AUTHOR','MIN_REPUTATION')
 
-def isFollowerCountTooLow(commentAuthor, steem_instance=None):
-    s = steem_instance or Steem()
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            followerCount = s.get_follow_count(commentAuthor)['follower_count']
-            return followerCount < config.getint('AUTHOR','MIN_FOLLOWERS')
-        except Exception as e:
-            if attempt < max_retries - 1:
-                time.sleep(2)
-                continue
-            print(f"Error checking follower count for {commentAuthor}: {e}")
-            return False
+def isFollowerCountTooLow(commentAuthor, steem_instance=None, cached_count=None):
+    if cached_count is not None:
+        followerCount = cached_count
+    else:
+        s = steem_instance or Steem()
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                followerCount = s.get_follow_count(commentAuthor)['follower_count']
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                    continue
+                print(f"Error checking follower count for {commentAuthor}: {e}")
+                return False
+                
+    return followerCount < config.getint('AUTHOR','MIN_FOLLOWERS')
 
-def followersPerMonth(accountInfo, comment, steem_instance=None):
-    s = steem_instance or Steem()
-    followerCount = 0
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            followerCount = s.get_follow_count(comment['author'])['follower_count']
-            break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                time.sleep(2)
-                continue
-            print(f"Error getting follower count in followersPerMonth for {comment['author']}: {e}")
-            return float('inf')
+def followersPerMonth(accountInfo, comment, steem_instance=None, cached_count=None):
+    if cached_count is not None:
+        followerCount = cached_count
+    else:
+        s = steem_instance or Steem()
+        followerCount = 0
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                followerCount = s.get_follow_count(comment['author'])['follower_count']
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                    continue
+                print(f"Error getting follower count in followersPerMonth for {comment['author']}: {e}")
+                return float('inf')
 
     accountCreated = datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
     now = datetime.now()
@@ -193,20 +213,23 @@ def followersPerMonth(accountInfo, comment, steem_instance=None):
 
 import math
 
-def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_instance=None):
-    s = steem_instance or Steem()
-    followerCount = 0
-    max_retries = 3
-    for attempt in range(max_retries):
-        try:
-            followerCount = s.get_follow_count(comment['author'])['follower_count']
-            break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                time.sleep(2)
-                continue
-            print(f"Error getting follower count in adjustedFollowersPerMonth for {comment['author']}: {e}")
-            return float('inf')
+def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_instance=None, cached_count=None):
+    if cached_count is not None:
+        followerCount = cached_count
+    else:
+        s = steem_instance or Steem()
+        followerCount = 0
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                followerCount = s.get_follow_count(comment['author'])['follower_count']
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    time.sleep(2)
+                    continue
+                print(f"Error getting follower count in adjustedFollowersPerMonth for {comment['author']}: {e}")
+                return float('inf')
 
     accountCreated = datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
     now = datetime.now()
@@ -232,18 +255,18 @@ def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_i
     print(f"DEBUG: adjustedFollowersPerMonth({comment['author']}) -> followerCount: {followerCount}, age (days): {age.days}, halfLife (days): {halfLife}, adjustedFollowerCount: {adjustedFollowerCount:.2f}, adjustedFollowersPerMonth: {adjustedFollowersPerMonth:.2f}")
     return adjustedFollowersPerMonth
 
-def isMonthlyFollowersTooLow (accountInfo, comment, steem_instance=None):
-    return followersPerMonth(accountInfo, comment, steem_instance=steem_instance) < config.getint('AUTHOR','MIN_FOLLOWERS_PER_MONTH')
+def isMonthlyFollowersTooLow (accountInfo, comment, steem_instance=None, cached_count=None):
+    return followersPerMonth(accountInfo, comment, steem_instance=steem_instance, cached_count=cached_count) < config.getint('AUTHOR','MIN_FOLLOWERS_PER_MONTH')
 
-def isAdjustedMonthlyFollowersTooLow (accountInfo, comment, steem_instance=None):
+def isAdjustedMonthlyFollowersTooLow (accountInfo, comment, steem_instance=None, cached_count=None):
     halfLife = config.getint('AUTHOR','FOLLOWER_HALFLIFE_YEARS')
     if ( halfLife ):
         return \
-            adjustedFollowersPerMonth(accountInfo, comment, halfLife * 365.25, steem_instance=steem_instance) < \
+            adjustedFollowersPerMonth(accountInfo, comment, halfLife * 365.25, steem_instance=steem_instance, cached_count=cached_count) < \
                 config.getint('AUTHOR','MIN_ADJUSTED_FOLLOWERS_PER_MONTH')
     else:
         return \
-            adjustedFollowersPerMonth(accountInfo, comment, steem_instance=steem_instance) < \
+            adjustedFollowersPerMonth(accountInfo, comment, steem_instance=steem_instance, cached_count=cached_count) < \
                 config.getint('AUTHOR','MIN_ADJUSTED_FOLLOWERS_PER_MONTH')
 
 def isActiveFollowerCountTooLow(accountName, steem_instance=None):
@@ -265,23 +288,39 @@ def isActiveFollowerCountTooLow(accountName, steem_instance=None):
         
         s = steem_instance or Steem()
         followers_data = getAllFollowers(accountName, steem_instance=s)
+        
+        # Extract follower names for batch processing
+        follower_names = [entry['follower'] for entry in followers_data]
         active_followers_found = 0
+        batch_size = 50
 
-        for follower_entry in followers_data:
-            # print(f"Checking activity time for {accountName} -> {follower_entry}: {active_followers_found}/{min_followers_needed}")
-            follower_account_name = follower_entry['follower']
+        # Process in batches to reduce API calls
+        for i in range(0, len(follower_names), batch_size):
+            batch = follower_names[i:i + batch_size]
             try:
-                days_inactive = inactiveDays(follower_account_name, steem_instance=s)
-                if days_inactive is not None and days_inactive <= max_inactivity_days:
-                    active_followers_found += 1
-                    if active_followers_found >= min_followers_needed:
-                        # Success: enough active followers found. Count is NOT too low.
-                        print(f"DEBUG: isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: True. Result (is_too_low): False")
-                        return False
+                # Fetch account data for the whole batch in one RPC call
+                accounts_data = s.get_accounts(batch)
+                
+                for account_data in accounts_data:
+                    # Calculate inactivity using the fetched data
+                    lastPost = account_data.get('last_post', '1970-01-01T00:00:00')
+                    lastVote = account_data.get('last_vote_time', '1970-01-01T00:00:00')
+
+                    lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
+                    lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+                    mostRecentActivity = max(lastPostTime, lastVoteTime)
+                    today = datetime.now()
+                    days_inactive = (today - mostRecentActivity).days
+
+                    if days_inactive <= max_inactivity_days:
+                        active_followers_found += 1
+                        if active_followers_found >= min_followers_needed:
+                            # Success: enough active followers found. Count is NOT too low.
+                            print(f"DEBUG: isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: True. Result (is_too_low): False")
+                            return False
             except Exception as e:
-                # This handles errors for a single follower (e.g., account deleted)
-                # We just log it and continue checking other followers.
-                print(f"Warning: Could not determine inactivity for follower {follower_account_name}: {e}")
+                print(f"Warning: Error checking batch of followers for {accountName}: {e}")
+                continue
         
         # If the loop completes without reaching the threshold, the count is too low.
         has_enough = active_followers_found >= min_followers_needed
