@@ -13,12 +13,15 @@ import delegationInfo
 from configValidator import ConfigValidator
 from modelManager import ModelManager
 from steemHelpers import initialize_steem_with_retry
+import version
 
 from steem.blockchain import Blockchain
 from steem import Steem
 
 # Create ONE high-quality RNG instance at module level with explicit entropy
 _rng = utils.get_rng()
+
+print(f"Starting Thoth v{version.__version__} ({version.__status__})")
 
 # Check if the UNLOCK environment variable exists
 if "UNLOCK" in os.environ:
