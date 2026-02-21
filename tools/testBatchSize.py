@@ -59,6 +59,12 @@ def main():
         print("Account has no followers. Cannot perform test.")
         sys.exit(1)
 
+    # If we don't have enough followers to test the requested batch size, duplicate them
+    if len(follower_names) < batch_size:
+        print(f"Warning: Account only has {len(follower_names)} followers. Duplicating list to reach batch size of {batch_size}...")
+        multiplier = (batch_size // len(follower_names)) + 1
+        follower_names = follower_names * multiplier
+
     # Process all followers in batches
     print(f"Testing get_accounts() with batch size {batch_size} across {len(follower_names)} followers...")
 
@@ -76,6 +82,7 @@ def main():
             
             if len(accounts) != len(batch):
                 print(f"  Warning: Requested {len(batch)} accounts, but received {len(accounts)}.")
+                print("  (This may be due to duplicate accounts in the batch if the source list was small.)")
         except Exception as e:
             print(f"  Failed to fetch batch starting at index {i}.")
             print(f"  Error: {e}")

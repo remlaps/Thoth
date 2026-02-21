@@ -380,14 +380,14 @@ def getAllFollowers(account, account_type='blog', steem_instance=None):
    """
    s = steem_instance or Steem()
    all_followers = []
-   batch_size = 5000
+   batch_size = 1000
    last_account = ''
    
    while True:
        # Get the next batch of followers
        followers_batch = []
        batch_success = False
-       max_retries = 3
+       max_retries = 5
        for attempt in range(max_retries):
            try:
                followers_batch = s.get_followers(account, last_account, account_type, batch_size)
@@ -395,7 +395,9 @@ def getAllFollowers(account, account_type='blog', steem_instance=None):
                break
            except Exception as e:
                if attempt < max_retries - 1:
-                   time.sleep(2)
+                   sleep_time = 2 * (attempt + 1)
+                   print(f"Warning: Error fetching followers batch (Attempt {attempt+1}/{max_retries}): {e}. Retrying in {sleep_time}s...")
+                   time.sleep(sleep_time)
                    continue
                print(f"Error fetching followers batch for {account}: {e}")
        
