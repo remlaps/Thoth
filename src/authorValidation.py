@@ -292,7 +292,7 @@ def isActiveFollowerCountTooLow(accountName, steem_instance=None):
         # Extract follower names for batch processing
         follower_names = [entry['follower'] for entry in followers_data]
         active_followers_found = 0
-        batch_size = 50
+        batch_size = 1000
 
         # Process in batches to reduce API calls
         for i in range(0, len(follower_names), batch_size):
@@ -380,7 +380,7 @@ def getAllFollowers(account, account_type='blog', steem_instance=None):
    """
    s = steem_instance or Steem()
    all_followers = []
-   batch_size = 1000
+   batch_size = 5000
    last_account = ''
    
    while True:
@@ -403,7 +403,7 @@ def getAllFollowers(account, account_type='blog', steem_instance=None):
            break
        
        # If we got no results or just the last one repeated, we're done
-       if not followers_batch or (len(followers_batch) < 1001 and followers_batch[0]['follower'] == last_account):
+       if not followers_batch or (len(followers_batch) == 1 and followers_batch[0]['follower'] == last_account):
            break
            
        # Add the followers to our result list (skip the first one if it's the last from previous batch)
