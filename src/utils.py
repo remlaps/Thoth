@@ -34,6 +34,10 @@ def screenPost(comment, included_posts=None, steem_instance=None):
     s = steem_instance or Steem()
 
     # Optimization: Fetch content ONCE and pass it to checks
+    ###
+    ### comment = comment from the streamed blockchain operation
+    ### latestComment = the full post content (get_content)
+    ### 
     latestComment = s.get_content(comment['author'], comment['permlink'])
 
     if ( contentValidation.isEdit(comment, latest_content=latestComment) ):
@@ -64,6 +68,7 @@ def screenPost(comment, included_posts=None, steem_instance=None):
         return "Author screened"
       
     if ( authorValidation.isAuthorWhitelisted(comment['author'])):
+        ### This includes the fast follower counts (total & adjusted followers and follwers per month.)
         return "Accept"
     
     whiteListRequired = config.get('CONTENT', 'WHITELIST_REQUIRED')
@@ -86,7 +91,7 @@ def screenPost(comment, included_posts=None, steem_instance=None):
     
     ### Do this separately and last because it is VERY slow.
     if ( authorValidation.isActiveFollowerCountTooLow(comment['author'], steem_instance=s)):
-        return "Follower count too low"
+        return "Active follower count is too low"
            
     return "Accept"
 
