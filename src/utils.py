@@ -30,14 +30,21 @@ def detect_language(text):
     except langdetect.lang_detect_exception.LangDetectException:
         return "Unable to detect language"
 
-def screenPost(comment, included_posts=None):
-    if ( contentValidation.isEdit (comment)):
+def screenPost(comment, included_posts=None, steem_instance=None):
+    s = steem_instance or Steem()
+
+    # Optimization: Fetch content ONCE and pass it to checks
+    ###
+    ### comment = comment from the streamed blockchain operation
+    ### latestComment = the full post content (get_content)
+    ### 
+    latestComment = s.get_content(comment['author'], comment['permlink'])
+
+    if ( contentValidation.isEdit(comment, latest_content=latestComment) ):
         return "Post edit"
     
     if ( contentValidation.hasBlacklistedTag(comment)):
         return "Blacklisted tag in original version"
-    
-    latestComment=Steem().get_content(comment['author'],comment['permlink'])
 
     if ( contentValidation.hasBlacklistedTag(latestComment)):
         return "Blacklisted tag in latest revision."
@@ -47,15 +54,21 @@ def screenPost(comment, included_posts=None):
     
     targetLanguage = [lang.strip() for lang in config.get('CONTENT', 'LANGUAGE').split(',') if lang]
     tmpBody=remove_formatting(latestComment['body'])
+
+    wordCount = contentValidation.word_count(tmpBody)
+    if contentValidation.isTooShortHard(wordCount):
+        return "Too short (hard limit)"
+
     bodyLanguage = detect_language(tmpBody)
     titleLanguage = detect_language(latestComment['title'])
     if not ( bodyLanguage in targetLanguage and titleLanguage in targetLanguage ):
         return f"Not a target language - body: {bodyLanguage}, title: {titleLanguage}"
 
-    if ( authorValidation.isAuthorScreened(comment, included_posts=included_posts)):
+    if ( authorValidation.isAuthorScreened(comment, included_posts=included_posts, steem_instance=s)):
         return "Author screened"
       
     if ( authorValidation.isAuthorWhitelisted(comment['author'])):
+        ### This includes the fast follower counts (total & adjusted followers and follwers per month.)
         return "Accept"
     
     whiteListRequired = config.get('CONTENT', 'WHITELIST_REQUIRED')
@@ -63,7 +76,7 @@ def screenPost(comment, included_posts=None):
         return ("Non-whitelisted author")
         
     ### Additional checks for non-whitelisted authors
-    if ( contentValidation.isTooShort (tmpBody)):
+    if ( contentValidation.isTooShort (wordCount)):
         return "Too short"
     
     if ( contentValidation.hasTooManyTags (latestComment)):
@@ -73,12 +86,12 @@ def screenPost(comment, included_posts=None):
         return "Low engagement"
     
     ### This is slow.  Screen everything else first.
-    if ( walletValidation.walletScreened(comment['author'])):
+    if ( walletValidation.walletScreened(comment['author'], steem_instance=s)):
         return "Wallet screened"
     
     ### Do this separately and last because it is VERY slow.
-    if ( authorValidation.isActiveFollowerCountTooLow(comment['author'])):
-        return "Follower count too low"
+    if ( authorValidation.isActiveFollowerCountTooLow(comment['author'], steem_instance=s)):
+        return "Active follower count is too low"
            
     return "Accept"
 

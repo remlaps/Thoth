@@ -16,7 +16,7 @@ s = Steem(node=steemApi) if steemApi else Steem()
 screenedDelegateeFile = config.get('WALLET', 'SCREENED_DELEGATEE_FILE')
 uncountedDelegateeFile = config.get('WALLET', 'UNCOUNTED_DELEGATEE_FILE')
 
-def _get_thoth_incoming_delegations(author: str) -> list:
+def _get_thoth_incoming_delegations(author: str, steem_instance=None) -> list:
     """
     Fetches incoming delegations to a Thoth author.
 
@@ -28,7 +28,7 @@ def _get_thoth_incoming_delegations(author: str) -> list:
     If the author makes no delegations, returns 0.
     """
     steemApi = config.get('STEEM', 'STEEM_API')
-    s = Steem(node=steemApi) if steemApi else Steem()
+    s = steem_instance or (Steem(node=steemApi) if steemApi else Steem())
     thothAccount = config.get('STEEM', 'POSTING_ACCOUNT')
                               
     last_delegatee = None
@@ -59,7 +59,7 @@ def _get_thoth_incoming_delegations(author: str) -> list:
     print (f"Total incoming VESTS to Thoth from {author}: {incomingVests}")
     return incomingVests
 
-def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, float | None]:
+def _get_account_vesting_info(author: str, steem_instance=None) -> tuple[float | None, float | None, float | None]:
     """
     Fetches and parses an account's total, delegated, and received vesting shares.
 
@@ -71,7 +71,7 @@ def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, 
         or (None, None, None) if the account is not found or data is missing.
     """
     steemApi = config.get('STEEM', 'STEEM_API')
-    s = Steem(node=steemApi) if steemApi else Steem()
+    s = steem_instance or (Steem(node=steemApi) if steemApi else Steem())
 
     try:
         account = s.get_account(author)
@@ -83,7 +83,7 @@ def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, 
         delegated_vesting_shares = float(account.get('delegated_vesting_shares', '0.0 ').split()[0])
         received_vesting_shares = float(account.get('received_vesting_shares', '0.0 ').split()[0])
 
-        thothDelegation = _get_thoth_incoming_delegations(author)
+        thothDelegation = _get_thoth_incoming_delegations(author, steem_instance=s)
         delegated_vesting_shares -= float(thothDelegation)
 
         return vesting_shares, delegated_vesting_shares, received_vesting_shares
@@ -93,21 +93,21 @@ def _get_account_vesting_info(author: str) -> tuple[float | None, float | None, 
         return None, None, None
 
 def walletScreened(account, steem_instance=None):
-    if not check_author_wallet(account):
+    if not check_author_wallet(account, steem_instance=steem_instance):
         return True
     
-    if _isPowerDownTooHigh(account):
+    if _isPowerDownTooHigh(account, steemInstance=steem_instance):
         return True
     
     maxScreenedDelegationPct = config.getfloat('WALLET', 'MAX_SCREENED_DELEGATION_PCT')
-    vesting_shares, _, _ = _get_account_vesting_info(account)
+    vesting_shares, _, _ = _get_account_vesting_info(account, steem_instance=steem_instance)
     if vesting_shares is None:
         # Account not found, cannot be screened.
         return True
 
     # The config value is a percentage (e.g., 15.0 for 15%).
     # The logic is to check if the percentage of screened delegations to total SP exceeds the threshold.
-    screenedVests = totalScreenedOrIgnoredDelegations(account, delegateeFile=screenedDelegateeFile)
+    screenedVests = totalScreenedOrIgnoredDelegations(account, delegateeFile=screenedDelegateeFile, steem_instance=steem_instance)
     
     # Avoid ZeroDivisionError if account has 0 SP.
     if vesting_shares == 0.0:  # Minimum vesting_shares was already checked by check_author_wallet.  At this point, 0 is ok.
@@ -120,14 +120,14 @@ def walletScreened(account, steem_instance=None):
     print (f"Percentage screened: {screened_percentage:.2f}%")
     return screened_percentage > maxScreenedDelegationPct
 
-def totalScreenedOrIgnoredDelegations (delegator, delegateeFile=screenedDelegateeFile) -> float:
+def totalScreenedOrIgnoredDelegations (delegator, delegateeFile=screenedDelegateeFile, steem_instance=None) -> float:
     # Optimization: If the user has no delegated shares at all, we can exit early.
-    _, delegated_vests_total, _ = _get_account_vesting_info(delegator)
+    _, delegated_vests_total, _ = _get_account_vesting_info(delegator, steem_instance=steem_instance)
     if delegated_vests_total is None or delegated_vests_total == 0.0:
         return 0.0
     
     steemApi = config.get('STEEM', 'STEEM_API')
-    s = Steem(node=steemApi) if steemApi else Steem()
+    s = steem_instance or (Steem(node=steemApi) if steemApi else Steem())
 
     try:
         with open(delegateeFile, 'r') as f:
@@ -205,7 +205,7 @@ def _isPowerDownTooHigh(author: str, steemInstance=None) -> bool:
 
     return False
 
-def check_author_wallet(author: str) -> bool:
+def check_author_wallet(author: str, steem_instance=None) -> bool:
     """
     Checks an author's holdings against delegation and undelegated SP thresholds.
 
@@ -220,12 +220,12 @@ def check_author_wallet(author: str) -> bool:
         min_undelegated_sp = config.getfloat('WALLET', 'MIN_UNDELEGATED_SP')
                 
         # 1. Get account details using the new helper function
-        vesting_shares, delegated_vesting_shares, _ = _get_account_vesting_info(author)
+        vesting_shares, delegated_vesting_shares, _ = _get_account_vesting_info(author, steem_instance=steem_instance)
         if vesting_shares is None:
             # Error already printed in helper function
             return False
 
-        unCountedVests = totalScreenedOrIgnoredDelegations(delegator=author, delegateeFile=uncountedDelegateeFile)
+        unCountedVests = totalScreenedOrIgnoredDelegations(delegator=author, delegateeFile=uncountedDelegateeFile, steem_instance=steem_instance)
         delegationPenalty = delegated_vesting_shares - unCountedVests
 
         print(f"\n--- Checking author: @{author} ---")
@@ -243,7 +243,7 @@ def check_author_wallet(author: str) -> bool:
         print(f"Delegation Percentage: {delegation_percentage:.2f}%")
 
         # 3. Calculate undelegated Steem Power (SP)
-        steem_per_mvest = utils.get_steem_per_mvest(s)
+        steem_per_mvest = utils.get_steem_per_mvest(steem_instance)
         if steem_per_mvest == 0.0:
             return False # Stop if we can't get the conversion rate
             

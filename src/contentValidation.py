@@ -12,16 +12,29 @@ config.read('config/config.ini')
 def word_count(text):
     return len(text.split())
 
-def isTooShort(text):
+def isTooShort(text_or_count):
     minWords=config.getint('CONTENT', 'MIN_WORDS')
-    return word_count(text) < minWords
+    count = text_or_count if isinstance(text_or_count, int) else word_count(text_or_count)
+    return count < minWords
 
-def isEdit(comment):
+def isTooShortHard(text_or_count):
+    minWords=config.getint('CONTENT', 'MIN_WORDS_HARD', fallback=0)
+    if minWords == 0:
+        return False
+    count = text_or_count if isinstance(text_or_count, int) else word_count(text_or_count)
+    return count < minWords
+
+def isEdit(comment, steem_instance=None, latest_content=None):
     if (comment['body'][:2] == '@@'):  ## Edited post (better check needed)
         return True
     
-    s=Steem()
-    postCreated=datetime.strptime(s.get_content(comment['author'],comment['permlink'])['created'], '%Y-%m-%dT%H:%M:%S')
+    if latest_content:
+        content = latest_content
+    else:
+        s = steem_instance or Steem()
+        content = s.get_content(comment['author'], comment['permlink'])
+        
+    postCreated = datetime.strptime(content['created'], '%Y-%m-%dT%H:%M:%S')
     if ( postCreated != comment['timestamp'] ):
         return True
     
@@ -119,4 +132,3 @@ def getTags(comment):
         tags.add(comment['category'])  # Add category to the set
 
     return sorted(list(tags))  # Convert the set to a sorted list for the return value
-
