@@ -72,6 +72,7 @@ MIN_FEED_REACH = 200 # NOT IMPLEMENTED - Parameter loaded but not used in valida
 MIN_RESTEEMS = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
 MIN_REPLIES = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
 MIN_WORDS = 400
+MIN_WORDS_HARD = 100
 REGISTRY_ACCOUNT = penny4thoughts
 WHITELIST_REQUIRED = False
 ### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS, EXCLUDE_TAGS, INCLUDE_TAGS, LANGUAGE, AUTHOR_WHITELIST_FILE
