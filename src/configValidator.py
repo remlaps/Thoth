@@ -46,6 +46,24 @@ class ConfigValidator:
         """
         return self.errors
     
+    def get(self, section: str, key: str, fallback: str = '') -> str:
+        """Get a configuration value with fallback."""
+        return self.config.get(section, key, fallback=fallback).strip()
+    
+    def get_int(self, section: str, key: str, fallback: int = 0) -> int:
+        """Get an integer configuration value with fallback."""
+        try:
+            return self.config.getint(section, key, fallback=fallback)
+        except (ValueError, configparser.NoOptionError):
+            return fallback
+    
+    def get_float(self, section: str, key: str, fallback: float = 0.0) -> float:
+        """Get a float configuration value with fallback."""
+        try:
+            return self.config.getfloat(section, key, fallback=fallback)
+        except (ValueError, configparser.NoOptionError):
+            return fallback
+    
     def _validate_steem_section(self) -> None:
         """Validate STEEM section requirements."""
         # Requirement 1: POSTING_ACCOUNT must be set
@@ -118,6 +136,13 @@ class ConfigValidator:
                     f"({num_delegators} * {delegator_weight} + "
                     f"{num_reviewed_posts} * {curated_author_weight} + "
                     f"{posting_account_weight}) = {total_weight}"
+                )
+                
+            # Validate MIN_CURATION_TIER if present
+            min_curation_tier = self.config.get('BLOG', 'MIN_CURATION_TIER', fallback='').strip().lower()
+            if min_curation_tier and min_curation_tier not in ['excellent', 'good', 'fair', 'poor', 'reject']:
+                self.errors.append(
+                    f"[BLOG] MIN_CURATION_TIER must be one of: excellent, good, fair, poor, reject. Got: {min_curation_tier}"
                 )
                 
         except ValueError as e:

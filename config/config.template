@@ -118,6 +118,8 @@ POST_TAGS = test, thoth-test, lifetime-rewards
 PRO_BONO_DELEGATORS = 
 # [Name, alias, or Acccount info here (will be published in the post)]
 THOTH_OPERATOR = 
+# Minimum quality tier required for curation: excellent, good, fair, poor, reject
+MIN_CURATION_TIER = fair
 ### Implemented: CURATED_AUTHOR_WEIGHT, NUMBER_OF_REVIEWED_POSTS, POSTING_ACCOUNT, POSTING_ACCOUNT_WEIGHT
 ### [ POSTING_ACCOUNT_WEIGHT + ( NUMBER_OF_REVIEWED_POSTS * CURATED_AUTHOR_WEIGHT ) ] must be less than 10000 (i.e. 500 == 5%)
 VOTE_DELAY_SECONDS = 300

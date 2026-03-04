@@ -11,6 +11,7 @@ import aiCurator # From the thoth package
 import postHelper # From the thoth package
 import delegationInfo
 from configValidator import ConfigValidator
+from contentScoring import ContentScorer
 from modelManager import ModelManager
 from steemHelpers import initialize_steem_with_retry
 import version
@@ -86,6 +87,10 @@ else:
         print(f"  - {error}")
     exit(1)
 
+# Initialize the Content Scorer for quality-based curation
+content_scorer = ContentScorer(steemdInstance, validator)
+print("Content scoring system initialized.")
+
 steemApi=config.get('STEEM', 'STEEM_API')
 streamType = config.get('STEEM', 'STREAM_TYPE')
 
@@ -99,6 +104,7 @@ maxSize=config.getint('BLOG', 'NUMBER_OF_REVIEWED_POSTS')
 
 commentList = []
 aiResponseList = []
+scoreList = []  # Track scores for each curated post
 
 earliest_timestamp = None
 latest_timestamp = None
@@ -211,14 +217,26 @@ while retry_count <= max_retries:
                     if latest_timestamp is None or current_timestamp > latest_timestamp:
                         latest_timestamp = current_timestamp
 
-                    screenResult = utils.screenPost(comment, included_posts=commentList, steem_instance=steemdInstance)
-                    if screenResult == "Accept": 
+                    # Use content scoring system instead of binary screening
+                    score_result = content_scorer.score_content(comment)
+                    total_score = score_result['total_score']
+                    quality_tier = score_result['quality_tier']
+                    
+                    print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}")
+                    print(f"Score: {total_score} ({quality_tier})")
+                    print(f"Components: Author={score_result['components']['author']}, Content={score_result['components']['content']}, Engagement={score_result['components']['engagement']}")
+                    
+                    # Determine if content should be curated based on score
+                    should_curate = content_scorer.should_curate(score_result)
+                    ai_intensity = content_scorer.get_ai_analysis_intensity(score_result)
+                    
+                    if should_curate and ai_intensity != 'none':
                         ### Retrieve the latest version of the post
                         latestPostVersion=steemdInstance.get_content(comment['author'],comment['permlink'])
                         tmpBody = utils.remove_formatting(latestPostVersion['body'])
-                        print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}\n{tmpBody[:100]}...")
+                        print(f"Content accepted for curation with {ai_intensity} AI analysis.")
 
-                        ### Get the AI Evaluation
+                        ### Get the AI Evaluation with score context
                         aiResponse = aiCurator.aicurate(
                             arliaiKey, arliaiModel, arliaiUrl, tmpBody,
                             model_manager=model_manager,
@@ -228,6 +246,7 @@ while retry_count <= max_retries:
                         with open('data/output.html', 'a', encoding='utf-8') as f:
                             print(f"URL: https://steemit.com/@{comment['author']}/{comment['permlink']}")
                             print(f"Title: {latestPostVersion['title']}")
+                            print(f"Score: {total_score} ({quality_tier})")
                             print(f"Body (first 200 chars): {tmpBody[:200]}...\n\nAI Response: {aiResponse}\n", file=f)
                         print (f"\n\nAI Response: {aiResponse}\n")
 
@@ -246,9 +265,12 @@ while retry_count <= max_retries:
                         else:
                             commentList.append(comment)
                             aiResponseList.append(aiResponse)
+                            scoreList.append(score_result)  # Track scores for each curated post
                             postCount = postCount + 1
+                            print(f"Content curated successfully! ({postCount}/{maxSize})")
                     else:
-                        print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: excluded by screening: {screenResult}.")
+                        reason = "below quality threshold" if not should_curate else "no AI analysis needed"
+                        print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: excluded by scoring system ({reason}). Score: {total_score} ({quality_tier})")
                 # else:
                     # print(f"{postCount}: {operation['type']}")
         
@@ -284,7 +306,8 @@ if earliest_timestamp and latest_timestamp:
         "\n\n".join(aiResponseList), 16384,
         model_manager=model_manager,
         enable_switching=enable_model_switching,
-        dry_run=model_switching_dry_run
+        dry_run=model_switching_dry_run,
+        score_data=scoreList
     )
     # Retrieve delegations once and pass into postHelper to avoid duplicate RPC calls
     postingAccount_main = config.get('STEEM', 'POSTING_ACCOUNT')

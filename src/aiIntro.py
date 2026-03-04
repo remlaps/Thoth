@@ -33,7 +33,7 @@ def ensurePromptFileExists(promptFilePath, templateFilePath, promptTypeName):
             logging.warning(f"No template file specified for {promptTypeName} prompt. Cannot create default prompt file.")
 
 
-def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComment, maxTokens=8192, model_manager=None, enable_switching=False, dry_run=False):
+def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComment, maxTokens=8192, model_manager=None, enable_switching=False, dry_run=False, score_data=None):
     """
     Generate an introduction for a blog post using the AI API.
     
@@ -46,6 +46,7 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
         combinedComment: Combined summaries of articles
         maxTokens: Maximum tokens for the response
         model_manager: Optional ModelManager instance for handling multiple models
+        score_data: Optional list of score results for curated posts
         
     Returns:
         str: The AI-generated introduction or error message
@@ -74,6 +75,12 @@ def aiIntro(arliaiKey, arliaiModel, arliaiUrl, startTime, endTime, combinedComme
         datePrompt = f"{loc.get('today_is', date=today_str)} {loc.get('articles_published_on', date=start_str)}"
     else:
         datePrompt = f"{loc.get('today_is', date=today_str)}\n\n{loc.get('articles_published_between', start_date=start_str, end_date=end_str)}"
+    
+    # Add score summary to the date prompt if available
+    if score_data and len(score_data) > 0:
+        avg_score = sum(score['total_score'] for score in score_data) / len(score_data)
+        score_summary = f"\n\n{loc.get('curated_posts_average_score', avg_score=round(avg_score, 1))}"
+        datePrompt += score_summary
     
     try:
         with open('config/introSystemPrompt.txt', 'r', encoding='utf-8') as f:
