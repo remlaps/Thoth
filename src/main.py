@@ -87,10 +87,6 @@ else:
         print(f"  - {error}")
     exit(1)
 
-# Initialize the Content Scorer for quality-based curation
-content_scorer = ContentScorer(steemdInstance, validator)
-print("Content scoring system initialized.")
-
 steemApi=config.get('STEEM', 'STEEM_API')
 streamType = config.get('STEEM', 'STREAM_TYPE')
 
@@ -125,6 +121,10 @@ else:
 steemdInstance = initialize_steem_with_retry(node_api=steemApi)
 if not steemdInstance:
     exit(1) # Exit if Steem connection failed
+
+# Initialize the Content Scorer for quality-based curation
+content_scorer = ContentScorer(steemdInstance, validator)
+print("Content scoring system initialized.")
 
 blockchain = Blockchain(steemd_instance=steemdInstance)
 print(f"Using blockchain with nodes: {steemdInstance.steemd.nodes}")
