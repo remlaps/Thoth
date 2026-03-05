@@ -10,7 +10,7 @@
 # Gemini info here - https://ai.google.dev/gemini-api/docs/quickstart
 ##### ArliAI switched again.  This time to Gemma3-27B models for free tier.  These are mostly untested.
 
-# ARLIAI_KEY = # This can be pulled from an environment variable.
+### ARLIAI_KEY = # This can be pulled from an environment variable.   ***DO NOT USE THIS / PROTECT YOUR KEY***
 #ARLIAI example
 ### ARLIAI_MODEL = Gemma-3-27B-it
 ### ARLIAI_URL = https://api.arliai.com/v1/chat/completions
@@ -35,48 +35,6 @@ USER_PROMPT_TEMPLATE = config\userPromptTemplate.txt
 ARLIAI_ENABLE_MODEL_SWITCHING = False
 # When True (and ARLIAI_ENABLE_MODEL_SWITCHING is True), log rate-limit events but do not actually switch models
 ARLIAI_MODEL_SWITCHING_DRY_RUN = False
-
-[STEEM]
-DEFAULT_START_BLOCK = 3250000
-# Default to @social for testing
-POSTING_ACCOUNT = social
-# It is recommended to set these in your wallet, using "steempy"
-POSTING_KEY = 
-STEEM_API = 
-SDS_API = https://sds.steemworld.org
-
-# ACTIVE, HISTORY, RANDOM, OR TIME_WEIGHTED_RANDOM
-STREAM_TYPE = TIME_WEIGHTED_RANDOM
-# When using the TIME_WEIGHTED_RANDOM stream type, this controls how strongly
-# recent blocks are favored. 0 = uniform random, larger values favor recent
-# blocks more strongly. Typical values: 0.0 (no bias), 0.5, 1.0, 2.0
-STREAM_TIME_WEIGHT = 0.4
-
-####
-#### From here down copy content from config.ini to config.template
-####
-
-[CONTENT]
-AUTHOR_WHITELIST_FILE = config\authorWhiteList.txt
-EXCLUDE_TAGS = actifit, appics, bible, booming, blurt, christianity, contest, cross-post, curation, curatorapplication,
-   dtube, erotic, heartchurch, hive, hive-108451, hive-119463, islam, jesuschrist, hive, hbd, minnowsupport, nobots, norobots, 
-   nsfw, partiko, pizzagate, porn, pornography, promo-steem, realrobinhood, religion, splinterlands, steemhostiletakeover,
-   steemmonsters, steemzzang, test, weeklyreport, whaleshares, yehey, zzan
-INCLUDE_TAGS =
-LANGUAGE = de, en, es, fr, it, ukr
-MAX_DOWNVOTES = 5 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
-MAX_MENTION_COUNT = 10 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
-MAX_TAG_COUNT = 10
-MAX_VOTING_SERVICE_PCT = 25 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
-MIN_FEED_REACH = 200 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
-MIN_RESTEEMS = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
-MIN_REPLIES = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
-MIN_WORDS = 400
-MIN_WORDS_HARD = 100
-REGISTRY_ACCOUNT = penny4thoughts
-WHITELIST_REQUIRED = False
-### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS, EXCLUDE_TAGS, INCLUDE_TAGS, LANGUAGE, AUTHOR_WHITELIST_FILE
-###              WHITELIST_REQUIRED, MAX_TAG_COUNT
 
 [AUTHOR]
 FOLLOWER_HALFLIFE_YEARS = 2
@@ -125,6 +83,28 @@ MIN_CURATION_TIER = fair
 VOTE_DELAY_SECONDS = 300
 VOTE_PERCENT = 100
 
+[CONTENT]
+AUTHOR_WHITELIST_FILE = config\authorWhiteList.txt
+EXCLUDE_TAGS = actifit, appics, bible, booming, blurt, christianity, contest, cross-post, curation, curatorapplication,
+   dtube, erotic, heartchurch, hive, hive-108451, hive-119463, islam, jesuschrist, hive, hbd, minnowsupport, nobots, norobots, 
+   nsfw, partiko, pizzagate, porn, pornography, promo-steem, realrobinhood, religion, splinterlands, steemhostiletakeover,
+   steemmonsters, steemzzang, test, weeklyreport, whaleshares, yehey, zzan
+INCLUDE_TAGS =
+LANGUAGE = de, en, es, fr, it, ukr
+MAX_DOWNVOTES = 5 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+MAX_MENTION_COUNT = 10 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+MAX_TAG_COUNT = 10
+MAX_VOTING_SERVICE_PCT = 25 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+MIN_FEED_REACH = 200 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+MIN_RESTEEMS = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+MIN_REPLIES = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+MIN_WORDS = 400
+MIN_WORDS_HARD = 100
+REGISTRY_ACCOUNT = penny4thoughts
+WHITELIST_REQUIRED = False
+### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS, EXCLUDE_TAGS, INCLUDE_TAGS, LANGUAGE, AUTHOR_WHITELIST_FILE
+###              WHITELIST_REQUIRED, MAX_TAG_COUNT
+
 ### Enable screening based on a post's engagement score.
 ### Resteem scoring is not working yet.  Not sure how to get the resteem count back from the Steem API 
 ###    without weeding through the account history.
@@ -142,6 +122,36 @@ VALUE_WEIGHT = 1
 VOTE_COUNT_MAX = 200
 VOTE_COUNT_MIN = 10 
 VOTE_COUNT_WEIGHT = 1
+
+[SCORING]
+# Quality Tiers (0-100)
+# These thresholds determine the label assigned to a post based on its total score.
+TIER_EXCELLENT_MIN = 85.0
+TIER_GOOD_MIN = 70.0
+TIER_FAIR_MIN = 55.0
+TIER_POOR_MIN = 40.0
+
+# Component Weights (Should sum to 1.0)
+# These determine how much each factor contributes to the total score.
+COMPONENT_AUTHOR_WEIGHT = 0.40
+COMPONENT_CONTENT_WEIGHT = 0.35
+COMPONENT_ENGAGEMENT_WEIGHT = 0.25
+
+[STEEM]
+DEFAULT_START_BLOCK = 3250000
+# Default to @social for testing
+POSTING_ACCOUNT = social
+# It is recommended to set these in your wallet, using "steempy"
+### POSTING_KEY =  ***DO NOT USE THIS / PROTECT YOUR KEY***
+STEEM_API = 
+SDS_API = https://sds.steemworld.org
+
+# ACTIVE, HISTORY, RANDOM, OR TIME_WEIGHTED_RANDOM
+STREAM_TYPE = TIME_WEIGHTED_RANDOM
+# When using the TIME_WEIGHTED_RANDOM stream type, this controls how strongly
+# recent blocks are favored. 0 = uniform random, larger values favor recent
+# blocks more strongly. Typical values: 0.0 (no bias), 0.5, 1.0, 2.0
+STREAM_TIME_WEIGHT = 0.4
 
 [WALLET]
 DELEGATION_FILE=config\delegationScreen.txt

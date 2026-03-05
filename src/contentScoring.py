@@ -13,10 +13,11 @@ import logging
 from steem import Steem
 from steem.account import Account
 from steem.post import Post
-from steem.exceptions import AccountDoesNotExistsException
+from steem.account import AccountDoesNotExistsException
 
 from configValidator import ConfigValidator
 from utils import get_rng
+from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +65,11 @@ class ContentScorer:
         weights['engagement_feed_reach'] = 0.1  # Placeholder for future implementation
         weights['engagement_downvotes'] = 0.5   # Penalty weight for downvotes
         
+        # Component weights (Total Score calculation)
+        weights['component_author'] = self.config.get_float('SCORING', 'COMPONENT_AUTHOR_WEIGHT', 0.4)
+        weights['component_content'] = self.config.get_float('SCORING', 'COMPONENT_CONTENT_WEIGHT', 0.35)
+        weights['component_engagement'] = self.config.get_float('SCORING', 'COMPONENT_ENGAGEMENT_WEIGHT', 0.25)
+        
         return weights
     
     def _load_scoring_thresholds(self):
@@ -71,10 +77,10 @@ class ContentScorer:
         thresholds = {}
         
         # Quality tiers
-        thresholds['excellent_min'] = 85.0
-        thresholds['good_min'] = 70.0
-        thresholds['fair_min'] = 55.0
-        thresholds['poor_min'] = 40.0
+        thresholds['excellent_min'] = self.config.get_float('SCORING', 'TIER_EXCELLENT_MIN', 85.0)
+        thresholds['good_min'] = self.config.get_float('SCORING', 'TIER_GOOD_MIN', 70.0)
+        thresholds['fair_min'] = self.config.get_float('SCORING', 'TIER_FAIR_MIN', 55.0)
+        thresholds['poor_min'] = self.config.get_float('SCORING', 'TIER_POOR_MIN', 40.0)
         
         # Engagement thresholds
         thresholds['min_vote_count'] = self.config.get_int('ENGAGEMENT', 'VOTE_COUNT_MIN', 10)
@@ -105,9 +111,9 @@ class ContentScorer:
             
             # Calculate weighted total score
             total_score = (
-                author_score * 0.4 +    # 40% author quality
-                content_score * 0.35 +  # 35% content quality  
-                engagement_score * 0.25 # 25% engagement
+                author_score * self.weights['component_author'] +
+                content_score * self.weights['component_content'] +
+                engagement_score * self.weights['component_engagement']
             )
             
             # Determine quality tier
@@ -128,7 +134,7 @@ class ContentScorer:
                     'total_payout_value': post['total_payout_value'],
                     'children': post['children'],
                     'created': post['created'],
-                    'tags': post['json_metadata'].get('tags', []) if post['json_metadata'] else []
+                    'tags': post['json_metadata'].get('tags', []) if post['json_metadata'] and isinstance(post['json_metadata'], dict) else []
                 }
             }
             
@@ -156,6 +162,21 @@ class ContentScorer:
             
             # Check account age
             created_date = account['created']
+            # created_date may be returned as a string from the Steem API
+            if isinstance(created_date, str):
+                try:
+                    # Accept ISO formats with or without trailing Z
+                    if created_date.endswith('Z'):
+                        created_date = datetime.fromisoformat(created_date.replace('Z', '+00:00'))
+                    else:
+                        created_date = datetime.fromisoformat(created_date)
+                except (ValueError, TypeError):
+                    # Fallback to older strptime pattern
+                    try:
+                        created_date = datetime.strptime(created_date, '%Y-%m-%dT%H:%M:%S')
+                    except Exception:
+                        # If parsing fails entirely, treat as very old account
+                        created_date = datetime.now() - timedelta(days=3650)
             account_age_days = (datetime.now() - created_date).days
             
             # Check last activity
@@ -164,22 +185,71 @@ class ContentScorer:
                 account['last_post'], 
                 account['last_root_post']
             )
-            last_activity_days = (datetime.now() - last_activity).days
+            
+            # Ensure last_activity is a datetime object
+            if isinstance(last_activity, str):
+                try:
+                    # Handle different timestamp formats from Steem API
+                    # Format: "2026-03-04T12:25:13" or "2026-03-04T12:25:13Z"
+                    if last_activity.endswith('Z'):
+                        last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+                    else:
+                        last_activity = datetime.fromisoformat(last_activity)
+                except (ValueError, TypeError):
+                    # If parsing fails, use a default old date to indicate inactivity
+                    last_activity = datetime.now() - timedelta(days=3650)  # 10 years ago
+            elif hasattr(last_activity, 'replace'):  # Already a datetime object
+                pass
+            else:
+                # Fallback for unexpected types
+                last_activity = datetime.now() - timedelta(days=3650)
+            
+            # Handle timezone-aware vs timezone-naive datetime comparison
+            now = datetime.now()
+            if hasattr(last_activity, 'tzinfo') and last_activity.tzinfo is not None:
+                # If last_activity is timezone-aware, make now timezone-aware too
+                from datetime import timezone
+                now = datetime.now(timezone.utc)
+            
+            last_activity_days = (now - last_activity).days
             
             # Author score components
-            reputation_score = min(reputation / 10.0, 25.0)  # Cap at 25 points
+            # Reputation is typically 25-80. 
+            # Normalize: (Rep - 25) / 2. Example: Rep 75 -> 25 pts. Rep 25 -> 0 pts.
+            # Ensure we don't go below 0 or above 25.
+            reputation_score = min(max(0, (reputation - 25) / 2.0), 25.0)
             
-            # Followers score with diminishing returns
-            followers_score = min(math.log10(max(adjusted_followers, 1)) * 5, 25.0)
+            # Advanced follower metrics from authorValidation.py
+            # 1. Followers per month (normalized)
+            followers_per_month = followersPerMonth(account, {'author': author}, steem_instance=self.steem)
+            followers_per_month_score = min(followers_per_month * 2.0, 20.0)  # Max 20 points
             
-            # Account age score (older accounts get more trust)
-            age_score = min(account_age_days / 100.0, 20.0)
+            # 2. Adjusted followers per month (with half-life decay)
+            adjusted_followers_per_month = adjustedFollowersPerMonth(account, {'author': author}, steem_instance=self.steem)
+            adjusted_followers_score = min(adjusted_followers_per_month * 2.5, 25.0)  # Max 25 points
             
-            # Activity score (penalty for inactivity)
-            activity_score = max(0, 20.0 - (last_activity_days / 50.0))
+            # 3. Median follower reputation
+            median_follower_rep = getMedianFollowerRep(author, steem_instance=self.steem)
+            median_rep_score = 0.0
+            if median_follower_rep is not None:
+                # Normalize median rep (typically 0-80 range)
+                median_rep_score = min(max(0, median_follower_rep / 4.0), 15.0)  # Max 15 points
+            
+            # 4. Account age score (older accounts get more trust)
+            age_score = min(account_age_days / 100.0, 15.0)  # Reduced from 20 to 15 to make room for new metrics
+            
+            # 5. Activity score (penalty for inactivity)
+            activity_score = max(0, 15.0 - (last_activity_days / 50.0))  # Reduced from 20 to 15
             
             # Combined author score (max 100)
-            author_score = reputation_score + followers_score + age_score + activity_score
+            author_score = (
+                reputation_score + 
+                followers_per_month_score + 
+                adjusted_followers_score + 
+                median_rep_score + 
+                age_score + 
+                activity_score
+            )
             
             return min(author_score, 100.0)
             
@@ -194,21 +264,23 @@ class ContentScorer:
         """Score content quality based on length, tags, language, and other factors."""
         try:
             # Content length score
-            body_length = len(post['body'])
+            # Use word count instead of character count
+            words = post['body'].split()
+            word_count = len(words)
             title_length = len(post['title'])
             
             # Length scoring with optimal ranges
             length_score = 0.0
-            if body_length >= 400:
-                length_score = min(body_length / 40.0, 30.0)  # Max 30 points for length
-            elif body_length >= 100:
-                length_score = body_length / 80.0  # Partial credit for shorter posts
+            if word_count >= 400:
+                length_score = min(word_count / 20.0, 30.0)  # Max 30 points (approx 600 words)
+            elif word_count >= 100:
+                length_score = word_count / 40.0  # Partial credit for shorter posts
             
             # Title quality score
             title_score = min(title_length / 5.0, 10.0)
             
             # Tag quality score
-            tags = post['json_metadata'].get('tags', []) if post['json_metadata'] else []
+            tags = post['json_metadata'].get('tags', []) if post['json_metadata'] and isinstance(post['json_metadata'], dict) else []
             tag_count = len(tags)
             tag_score = max(0, 15.0 - abs(tag_count - 3) * 2.0)  # Optimal around 3 tags
             
@@ -230,25 +302,43 @@ class ContentScorer:
         if not text:
             return 0.0
             
-        # Check for basic readability (avoid pure spam/emoji posts)
-        text_clean = re.sub(r'[^\w\s]', '', text.lower())
-        words = text_clean.split()
-        
-        if len(words) < 50:
-            return 0.0  # Too short
-        
-        # Check for excessive repetition (potential spam indicator)
-        unique_words = set(words)
-        repetition_ratio = len(unique_words) / len(words) if words else 0
-        
-        if repetition_ratio < 0.3:
-            return 0.0  # Likely spam
-        
-        # Basic readability score
-        avg_word_length = sum(len(word) for word in words) / len(words) if words else 0
-        readability_score = min(avg_word_length * 2, 20.0)
-        
-        return readability_score
+        try:
+            # Ensure text is properly encoded and handle potential encoding issues
+            if isinstance(text, bytes):
+                # If text is bytes, decode it with error handling
+                text = text.decode('utf-8', errors='ignore')
+            elif isinstance(text, str):
+                # If text is string, ensure it's clean UTF-8
+                text = text.encode('utf-8', errors='ignore').decode('utf-8', errors='ignore')
+            else:
+                # Convert other types to string
+                text = str(text)
+            
+            # Check for basic readability (avoid pure spam/emoji posts)
+            text_clean = re.sub(r'[^\w\s]', '', text.lower())
+            words = text_clean.split()
+            
+            if len(words) < 50:
+                return 0.0  # Too short
+            
+            # Check for excessive repetition (potential spam indicator)
+            unique_words = set(words)
+            repetition_ratio = len(unique_words) / len(words) if words else 0
+            
+            if repetition_ratio < 0.3:
+                return 0.0  # Likely spam
+            
+            # Basic readability score
+            avg_word_length = sum(len(word) for word in words) / len(words) if words else 0
+            readability_score = min(avg_word_length * 2, 20.0)
+            
+            return readability_score
+        except UnicodeEncodeError as e:
+            logger.error(f"Unicode encoding error in language scoring: {e}")
+            return 0.0
+        except Exception as e:
+            logger.error(f"Error in language scoring: {e}")
+            return 0.0
     
     def _score_engagement(self, post):
         """Score post engagement based on votes, comments, and value."""

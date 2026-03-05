@@ -7,6 +7,7 @@ This document explains the purpose of the sections and parameters in the `config
 ## [ARLIAI]
 This section configures the AI model and related parameters.
 
+- **ARLIAI_KEY**: The API key for the AI model.  ***DO NOT USE THIS / PROTECT YOUR KEY***
 - **ARLIAI_MODEL**: Specifies the AI model to use. Options include `Qwen3-14B`, `gemini-2.0-flash`, etc.
 - **ARLIAI_URL**: The API endpoint for the AI model.
 - **INITIAL_BACKOFF_SECONDS**: Initial delay before retrying a failed request.
@@ -28,25 +29,6 @@ This section configures the Steem blockchain interaction.
 - **STEEM_API**: The API endpoint for Steem blockchain.
 - **SDS_API**: The API endpoint for Steem Data Services.
 - **STREAM_TYPE**: Determines the type of stream (`ACTIVE`, `HISTORY`, or `RANDOM`).
-
----
-
-## [CONTENT]
-This section defines content filtering and validation rules.
-
-- **AUTHOR_WHITELIST_FILE**: Path to the author whitelist file.
-- **EXCLUDE_TAGS**: Tags to exclude from processing.
-- **INCLUDE_TAGS**: Tags to include for processing.
-- **LANGUAGE**: Supported languages (e.g., `en`, `de`, `es`).
-- **MAX_DOWNVOTES**: Maximum allowed downvotes.
-- **MAX_MENTION_COUNT**: Maximum allowed mentions in a post.
-- **MAX_TAG_COUNT**: Maximum allowed tags in a post.
-- **MIN_FEED_REACH**: Minimum feed reach for a post.
-- **MIN_RESTEEMS**: Minimum required resteems.
-- **MIN_REPLIES**: Minimum required replies.
-- **MIN_WORDS**: Minimum word count for a post.
-- **REGISTRY_ACCOUNT**: Account used for registry purposes.
-- **WHITELIST_REQUIRED**: Whether a whitelist is required.
 
 ---
 
@@ -83,6 +65,25 @@ This section configures blog post parameters.
 
 ---
 
+## [CONTENT]
+This section defines content filtering and validation rules.
+
+- **AUTHOR_WHITELIST_FILE**: Path to the author whitelist file.
+- **EXCLUDE_TAGS**: Tags to exclude from processing.
+- **INCLUDE_TAGS**: Tags to include for processing.
+- **LANGUAGE**: Supported languages (e.g., `en`, `de`, `es`).
+- **MAX_DOWNVOTES**: Maximum allowed downvotes.
+- **MAX_MENTION_COUNT**: Maximum allowed mentions in a post.
+- **MAX_TAG_COUNT**: Maximum allowed tags in a post.
+- **MIN_FEED_REACH**: Minimum feed reach for a post.
+- **MIN_RESTEEMS**: Minimum required resteems.
+- **MIN_REPLIES**: Minimum required replies.
+- **MIN_WORDS**: Minimum word count for a post.
+- **REGISTRY_ACCOUNT**: Account used for registry purposes.
+- **WHITELIST_REQUIRED**: Whether a whitelist is required.
+
+---
+
 ## [ENGAGEMENT]
 This section defines engagement metrics.
 
@@ -99,6 +100,31 @@ This section defines engagement metrics.
 - **VOTE_COUNT_MAX**: Maximum vote count.
 - **VOTE_COUNT_MIN**: Minimum vote count.
 - **VOTE_COUNT_WEIGHT**: Weight assigned to vote count.
+
+---
+
+## [SCORING]
+This section configures the quality scoring system.
+
+- **TIER_EXCELLENT_MIN**: Minimum score (0-100) for a post to be rated 'excellent'.
+- **TIER_GOOD_MIN**: Minimum score for a post to be rated 'good'.
+- **TIER_FAIR_MIN**: Minimum score for a post to be rated 'fair'.
+- **TIER_POOR_MIN**: Minimum score for a post to be rated 'poor'.
+- **COMPONENT_AUTHOR_WEIGHT**: The weight of the author score component in the total score calculation.
+- **COMPONENT_CONTENT_WEIGHT**: The weight of the content score component in the total score calculation.
+- **COMPONENT_ENGAGEMENT_WEIGHT**: The weight of the engagement score component in the total score calculation.
+
+---
+
+## [STEEM]
+This section configures the Steem blockchain interaction.
+
+- **DEFAULT_START_BLOCK**: The starting block number for processing.
+- **POSTING_ACCOUNT**: The account used for posting.
+- **POSTING_KEY**: The private key for the posting account.  ***DO NOT USE THIS / PROTECT YOUR KEY***
+- **STEEM_API**: The API endpoint for Steem blockchain.
+- **SDS_API**: The API endpoint for Steem Data Services.
+- **STREAM_TYPE**: Determines the type of stream (`ACTIVE`, `HISTORY`, or `RANDOM`).
 
 ---
 

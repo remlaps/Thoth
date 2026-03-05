@@ -12,6 +12,7 @@ import postHelper # From the thoth package
 import delegationInfo
 from configValidator import ConfigValidator
 from contentScoring import ContentScorer
+from hybridScreening import HybridScreening
 from modelManager import ModelManager
 from steemHelpers import initialize_steem_with_retry
 import version
@@ -122,9 +123,9 @@ steemdInstance = initialize_steem_with_retry(node_api=steemApi)
 if not steemdInstance:
     exit(1) # Exit if Steem connection failed
 
-# Initialize the Content Scorer for quality-based curation
-content_scorer = ContentScorer(steemdInstance, validator)
-print("Content scoring system initialized.")
+# Initialize the Hybrid Screening system for quality-based curation
+hybrid_screening = HybridScreening(steemdInstance, validator)
+print("Hybrid screening system initialized.")
 
 blockchain = Blockchain(steemd_instance=steemdInstance)
 print(f"Using blockchain with nodes: {steemdInstance.steemd.nodes}")
@@ -217,18 +218,30 @@ while retry_count <= max_retries:
                     if latest_timestamp is None or current_timestamp > latest_timestamp:
                         latest_timestamp = current_timestamp
 
-                    # Use content scoring system instead of binary screening
-                    score_result = content_scorer.score_content(comment)
-                    total_score = score_result['total_score']
-                    quality_tier = score_result['quality_tier']
+                    # Use hybrid screening system (rule-based first, then score-based)
+                    try:
+                        screening_result = hybrid_screening.screen_content(comment)
+                        status = screening_result['status']
+                        reason = screening_result['reason']
+                        
+                        print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}")
+                        print(f"Screening Status: {status} ({reason})")
+                        
+                        if screening_result['score_result']:
+                            total_score = screening_result['total_score']
+                            quality_tier = screening_result['quality_tier']
+                            ai_intensity = screening_result['ai_intensity']
+                            print(f"Score: {total_score} ({quality_tier}) - AI Intensity: {ai_intensity}")
+                            print(f"Components: Author={screening_result['score_result']['components']['author']}, Content={screening_result['score_result']['components']['content']}, Engagement={screening_result['score_result']['components']['engagement']}")
+                        else:
+                            print("No score available (rejected by rule-based screening)")
+                    except Exception as e:
+                        print(f"Error in hybrid screening for {comment['author']}/{comment['permlink']}: {e}")
+                        continue
                     
-                    print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}")
-                    print(f"Score: {total_score} ({quality_tier})")
-                    print(f"Components: Author={score_result['components']['author']}, Content={score_result['components']['content']}, Engagement={score_result['components']['engagement']}")
-                    
-                    # Determine if content should be curated based on score
-                    should_curate = content_scorer.should_curate(score_result)
-                    ai_intensity = content_scorer.get_ai_analysis_intensity(score_result)
+                    # Determine if content should be curated based on hybrid screening
+                    should_curate = hybrid_screening.should_curate(screening_result)
+                    ai_intensity = hybrid_screening.get_ai_analysis_intensity(screening_result)
                     
                     if should_curate and ai_intensity != 'none':
                         ### Retrieve the latest version of the post
@@ -246,7 +259,8 @@ while retry_count <= max_retries:
                         with open('data/output.html', 'a', encoding='utf-8') as f:
                             print(f"URL: https://steemit.com/@{comment['author']}/{comment['permlink']}")
                             print(f"Title: {latestPostVersion['title']}")
-                            print(f"Score: {total_score} ({quality_tier})")
+                            if screening_result['score_result']:
+                                print(f"Score: {screening_result['total_score']} ({screening_result['quality_tier']})")
                             print(f"Body (first 200 chars): {tmpBody[:200]}...\n\nAI Response: {aiResponse}\n", file=f)
                         print (f"\n\nAI Response: {aiResponse}\n")
 
@@ -265,12 +279,21 @@ while retry_count <= max_retries:
                         else:
                             commentList.append(comment)
                             aiResponseList.append(aiResponse)
-                            scoreList.append(score_result)  # Track scores for each curated post
+                            # Track scores for each curated post (only if scoring was performed)
+                            if screening_result['score_result']:
+                                scoreList.append(screening_result['score_result'])
+                            else:
+                                # Create a minimal score entry for rejected posts
+                                scoreList.append({
+                                    'total_score': 0.0,
+                                    'quality_tier': 'rejected',
+                                    'components': {'author': 0.0, 'content': 0.0, 'engagement': 0.0}
+                                })
                             postCount = postCount + 1
                             print(f"Content curated successfully! ({postCount}/{maxSize})")
                     else:
-                        reason = "below quality threshold" if not should_curate else "no AI analysis needed"
-                        print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: excluded by scoring system ({reason}). Score: {total_score} ({quality_tier})")
+                        reason = screening_result['reason']
+                        print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: excluded by hybrid screening ({reason})")
                 # else:
                     # print(f"{postCount}: {operation['type']}")
         

@@ -338,8 +338,17 @@ def isInactive(accountInfo, steem_instance=None):
     lastPost = accountInfo['last_post']
     lastVote = accountInfo['last_vote_time']
 
-    lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
-    lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+    # Handle datetime objects vs strings - Steem API returns datetime objects
+    if isinstance(lastPost, str):
+        lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
+    else:
+        lastPostTime = lastPost
+        
+    if isinstance(lastVote, str):
+        lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+    else:
+        lastVoteTime = lastVote
+        
     mostRecentActivity = max(lastPostTime, lastVoteTime)
     today = datetime.now()
     days = (today - mostRecentActivity).days
@@ -355,8 +364,17 @@ def inactiveDays(accountName, steem_instance=None):
             lastPost = account_data['last_post']
             lastVote = account_data['last_vote_time']
 
-            lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
-            lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+            # Handle datetime objects vs strings - Steem API returns datetime objects
+            if isinstance(lastPost, str):
+                lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
+            else:
+                lastPostTime = lastPost
+                
+            if isinstance(lastVote, str):
+                lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+            else:
+                lastVoteTime = lastVote
+                
             mostRecentActivity = max(lastPostTime, lastVoteTime)
             today = datetime.now()
             return (today - mostRecentActivity).days
