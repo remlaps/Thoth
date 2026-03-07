@@ -8,7 +8,7 @@ over content scores for specific hard constraints.
 
 import logging
 from contentScoring import ContentScorer
-from authorValidation import isBlacklisted, isAuthorWhitelisted, isHiveActivityTooRecent
+from authorValidation import isBlacklisted, isAuthorWhitelisted, isHiveActivityTooRecent, isAuthorPostLimitReached
 from contentValidation import isTooShortHard, isEdit, hasBlacklistedTag, hasRequiredTag
 from walletValidation import walletScreened
 from utils import detect_language
@@ -19,30 +19,36 @@ logger = logging.getLogger(__name__)
 class HybridScreening:
     """Hybrid screening system that applies rule-based constraints before content scoring."""
     
-    def __init__(self, steem_instance, config):
+    def __init__(self, steem_instance, config, stats_tracker=None):
         """
         Initialize the hybrid screening system.
         
         Args:
             steem_instance: Steem blockchain instance
             config: Configuration validator with loaded settings
+            stats_tracker: Optional StatsTracker instance
         """
         self.steem = steem_instance
         self.config = config
+        self.stats_tracker = stats_tracker
         self.content_scorer = ContentScorer(steem_instance, config)
         
-    def screen_content(self, post_data, latest_content=None):
+    def screen_content(self, post_data, latest_content=None, included_posts=None):
         """
         Screen content using hybrid approach: rule-based first, then score-based.
         
         Args:
             post_data: Dictionary containing post information from blockchain
             latest_content: Optional latest content data to avoid re-fetching
+            included_posts: Optional list of already included posts for post limit checking
             
         Returns:
             Dictionary containing screening result with status and details
         """
         try:
+            if self.stats_tracker:
+                self.stats_tracker.track_evaluation()
+
             # Get detailed post information if not provided
             if latest_content is None:
                 post = self.steem.get_content(post_data['author'], post_data['permlink'])
@@ -50,9 +56,12 @@ class HybridScreening:
                 post = latest_content
             
             # Apply rule-based screening (hard constraints)
-            rule_result = self._apply_rule_based_screening(post_data, post)
+            rule_result = self._apply_rule_based_screening(post_data, post, included_posts)
             
             if not rule_result['passed']:
+                if self.stats_tracker:
+                    self.stats_tracker.track_rejection(rule_result['rule_type'])
+
                 return {
                     'status': 'rejected',
                     'reason': rule_result['reason'],
@@ -62,12 +71,34 @@ class HybridScreening:
                     'ai_intensity': None
                 }
             
+            # If a rule forces acceptance (e.g., whitelist), bypass scoring.
+            if rule_result['rule_type'] == 'whitelist':
+                if self.stats_tracker:
+                    # Track as accepted, with a placeholder tier
+                    self.stats_tracker.track_acceptance(100.0, 'whitelisted')
+                return {
+                    'status': 'accepted',
+                    'reason': rule_result['reason'],
+                    'rule_type': rule_result['rule_type'],
+                    'score_result': None, # No scoring performed
+                    'quality_tier': 'whitelisted',
+                    'ai_intensity': 'detailed', # Give whitelisted authors detailed analysis
+                    'total_score': None
+                }
+
             # If passed rule-based screening, apply content scoring
-            score_result = self.content_scorer.score_content(post_data)
+            score_result = self.content_scorer.score_content(post_data, content_data=post)
             quality_tier = score_result['quality_tier']
             ai_intensity = self.content_scorer.get_ai_analysis_intensity(score_result)
             should_curate = self.content_scorer.should_curate(score_result)
             
+            if self.stats_tracker:
+                if should_curate:
+                    self.stats_tracker.track_acceptance(score_result['total_score'], quality_tier)
+                else:
+                    # This is a score-based rejection
+                    self.stats_tracker.track_rejection('score_rejected', score=score_result['total_score'])
+
             return {
                 'status': 'accepted' if should_curate else 'score_rejected',
                 'reason': 'passed_rule_screening' if should_curate else 'below_score_threshold',
@@ -89,13 +120,14 @@ class HybridScreening:
                 'ai_intensity': None
             }
     
-    def _apply_rule_based_screening(self, post_data, post):
+    def _apply_rule_based_screening(self, post_data, post, included_posts=None):
         """
         Apply rule-based screening with hard constraints that override scores.
         
         Args:
             post_data: Dictionary containing post information from blockchain
             post: Detailed post information from Steem API
+            included_posts: Optional list of already included posts for post limit checking
             
         Returns:
             Dictionary with screening result
@@ -105,7 +137,19 @@ class HybridScreening:
         body = post['body']
         title = post['title']
         
-        # Rule 1: Blacklisted authors must be excluded (absolute rule)
+        # Rule 1: Word count must exceed the hard minimum (fastest check, do it first)
+        if isTooShortHard(body):
+            min_words_hard = self.config.get_int('CONTENT', 'MIN_WORDS_HARD', 0)
+            # The body is likely to contain HTML, but for this hard check, a simple split is fast and sufficient.
+            word_count = len(body.split())
+            logger.info(f"Rule-based rejection: {author}/{permlink} below hard minimum word count ({word_count} < {min_words_hard})")
+            return {
+                'passed': False,
+                'reason': f'below_minimum_words: {word_count} < {min_words_hard}',
+                'rule_type': 'word_count'
+            }
+        
+        # Rule 2: Blacklisted authors must be excluded (absolute rule)
         if isBlacklisted(author, steem_instance=self.steem):
             logger.info(f"Rule-based rejection: {author}/{permlink} is blacklisted")
             return {
@@ -114,27 +158,16 @@ class HybridScreening:
                 'rule_type': 'blacklist'
             }
         
-        # Rule 2: Whitelisted authors should be included unless below hard minimum word count
+        # Rule 3: Whitelisted authors bypass all other checks (word count already checked)
         if isAuthorWhitelisted(author):
-            word_count = len(body.split())
-            min_words_hard = self.config.get_int('CONTENT', 'MIN_WORDS_HARD', 0)
-            
-            if min_words_hard > 0 and word_count < min_words_hard:
-                logger.info(f"Rule-based rejection: {author}/{permlink} is whitelisted but below hard minimum word count ({word_count} < {min_words_hard})")
-                return {
-                    'passed': False,
-                    'reason': f'whitelisted_below_minimum_words: {word_count} < {min_words_hard}',
-                    'rule_type': 'whitelist_minimum'
-                }
-            else:
-                logger.info(f"Rule-based acceptance: {author}/{permlink} is whitelisted and meets word count requirements")
-                return {
-                    'passed': True,
-                    'reason': f'whitelisted_author: {author}',
-                    'rule_type': 'whitelist'
-                }
+            logger.info(f"Rule-based acceptance: {author}/{permlink} is whitelisted and passed minimum word count")
+            return {
+                'passed': True,
+                'reason': f'whitelisted_author: {author}',
+                'rule_type': 'whitelist'
+            }
         
-        # Rule 3: Hive inactivity must be higher than specified days
+        # Rule 4: Hive inactivity must be higher than specified days
         if isHiveActivityTooRecent(author):
             hive_inactivity_days = self.config.get_int('AUTHOR', 'LAST_HIVE_ACTIVITY_AGE', 60)
             logger.info(f"Rule-based rejection: {author}/{permlink} has recent Hive activity (below {hive_inactivity_days} days)")
@@ -143,17 +176,7 @@ class HybridScreening:
                 'reason': f'recent_hive_activity: author has been active on Hive recently',
                 'rule_type': 'hive_inactivity'
             }
-        
-        # Rule 4: Author must not delegate too much to screened accounts
-        if walletScreened(author, steem_instance=self.steem):
-            max_screened_delegation_pct = self.config.get_float('WALLET', 'MAX_SCREENED_DELEGATION_PCT', 15.0)
-            logger.info(f"Rule-based rejection: {author}/{permlink} delegates too much to screened accounts (exceeds {max_screened_delegation_pct}%)")
-            return {
-                'passed': False,
-                'reason': f'excessive_screened_delegations: author delegates too much to screened accounts',
-                'rule_type': 'delegation_screening'
-            }
-        
+            
         # Rule 5: Language must be in the allowed list
         try:
             target_languages = [lang.strip() for lang in self.config.get('CONTENT', 'LANGUAGE').split(',') if lang.strip()]
@@ -182,19 +205,7 @@ class HybridScreening:
                 'rule_type': 'tag_filter'
             }
         
-        # Rule 7: Word count must exceed the hard minimum
-        if isTooShortHard(body):
-            min_words_hard = self.config.get_int('CONTENT', 'MIN_WORDS_HARD', 0)
-            word_count = len(body.split())
-            logger.info(f"Rule-based rejection: {author}/{permlink} below hard minimum word count ({word_count} < {min_words_hard})")
-            return {
-                'passed': False,
-                'reason': f'below_minimum_words: {word_count} < {min_words_hard}',
-                'rule_type': 'word_count'
-            }
-        
-        # Additional rule-based checks that should also take precedence
-        # Check for edits (edited posts are typically not curated)
+        # Rule 7: Check for edits (edited posts are typically not curated)
         if isEdit(post_data, steem_instance=self.steem, latest_content=post):
             logger.info(f"Rule-based rejection: {author}/{permlink} appears to be an edited post")
             return {
@@ -203,13 +214,30 @@ class HybridScreening:
                 'rule_type': 'edit_check'
             }
         
-        # Check for required tags (if configured)
+        # Rule 8: Check for required tags (if configured)
         if not hasRequiredTag(post_data):
             logger.info(f"Rule-based rejection: {author}/{permlink} missing required tags")
             return {
                 'passed': False,
                 'reason': 'missing_required_tags: post does not contain required tags',
                 'rule_type': 'tag_filter'
+            }
+        
+        # Rule 9: Check if author has reached the maximum number of included posts
+        if isAuthorPostLimitReached(post_data, included_posts):
+            logger.info(f"Rule-based rejection: {author}/{permlink} author has reached maximum included posts limit")
+            return {
+                'passed': False,
+                'reason': 'max_posts_per_author_reached: author has reached the maximum number of included posts',
+                'rule_type': 'author_post_limit'
+            }
+        
+        # Rule 10: Wallet screening (slow, do last)
+        if ( walletScreened(author, steem_instance=self.steem)):
+            return {
+                'passed': False,
+                'reason': 'wallet_screened: author wallet flagged by screening',
+                'rule_type': 'wallet_screened'
             }
         
         # If all rule-based checks pass, content can proceed to scoring

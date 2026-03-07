@@ -10,13 +10,13 @@ This implementation adds a hybrid screening system to Thoth that combines rule-b
 
 The following 7 rules take precedence over content scores:
 
-1. **Blacklisted Authors**: Must be excluded regardless of content quality
-2. **Whitelisted Authors**: Should be included unless below hard minimum word count
-3. **Hive Inactivity**: Must be higher than the specified days (`LAST_HIVE_ACTIVITY_AGE`)
-4. **Delegation Screening**: Author must not delegate too much to screened accounts (`MAX_SCREENED_DELEGATION_PCT`)
-5. **Language Validation**: Post language must be in the allowed list (`LANGUAGE`)
-6. **Blacklisted Tags**: Posts containing blacklisted tags are rejected (`EXCLUDE_TAGS`)
-7. **Word Count**: Must exceed the hard minimum (`MIN_WORDS_HARD`)
+1. **Word Count**: Must exceed the hard minimum (`MIN_WORDS_HARD`) - *Optimized to run first.*
+2. **Blacklisted Authors**: Must be excluded regardless of content quality
+3. **Whitelisted Authors**: Should be included unless below hard minimum word count
+4. **Hive Inactivity**: Must be higher than the specified days (`LAST_HIVE_ACTIVITY_AGE`)
+5. **Delegation Screening**: Author must not delegate too much to screened accounts (`MAX_SCREENED_DELEGATION_PCT`)
+6. **Language Validation**: Post language must be in the allowed list (`LANGUAGE`)
+7. **Blacklisted Tags**: Posts containing blacklisted tags are rejected (`EXCLUDE_TAGS`)
 
 ### 2. Additional Rule-Based Checks
 
@@ -31,10 +31,10 @@ Content scoring is only applied to posts that pass all rule-based checks:
   - Reputation scoring (normalized 0-25 points)
   - **Followers per month** (normalized growth rate, 0-20 points)
   - **Adjusted followers per month** (with half-life decay, 0-25 points)
-  - **Median follower reputation** (quality of audience, 0-15 points)
+  - **Median follower reputation** (Disabled for performance optimization)
   - Account age and activity scoring
 - Content quality scoring (length, tags, language)
-- Engagement scoring (votes, comments, value)
+- Engagement scoring (votes, comments, value, **resteems**)
 - Quality tier determination (excellent, good, fair, poor, reject)
 - AI analysis intensity based on quality
 
@@ -47,7 +47,11 @@ Content scoring is only applied to posts that pass all rule-based checks:
    - `_apply_rule_based_screening()` method implements the 5 hard constraints
    - Early return logic ensures rules take precedence over scores
 
-2. **`tools/verify_hybrid_implementation.py`**: Verification script
+2. **`src/statsTracker.py`**: Statistics tracking system
+   - Tracks evaluation counts, rejection reasons, and acceptance rates
+   - Generates detailed reports at the end of each run
+
+3. **`tools/verify_hybrid_implementation.py`**: Verification script
    - Confirms all components are properly integrated
    - Validates rule precedence logic
    - Checks configuration usage
@@ -59,6 +63,7 @@ Content scoring is only applied to posts that pass all rule-based checks:
    - Updated main curation loop to use `screen_content()` method
    - Enhanced logging to show screening status and reasons
    - Maintained backward compatibility for score tracking
+   - Integrated `StatsTracker` for run-time statistics
 
 ## Configuration Settings Used
 
@@ -80,13 +85,13 @@ LAST_HIVE_ACTIVITY_AGE = 60  # Minimum days since Hive activity
 ### Screening Flow
 
 1. **Rule-Based Screening First**:
+   - Check word count → REJECT if below minimum
    - Check if author is blacklisted → REJECT (no scoring)
    - Check if author is whitelisted → ACCEPT (unless below word count)
    - Check Hive inactivity → REJECT if too recent
    - Check delegation screening → REJECT if exceeds threshold
    - Check language validation → REJECT if not in allowed list
    - Check blacklisted tags → REJECT if contains excluded tags
-   - Check word count → REJECT if below minimum
    - Check other rule-based constraints
 
 2. **Score-Based Evaluation (Conditional)**:
@@ -126,7 +131,7 @@ The `screen_content()` method returns a comprehensive result:
 ## Testing
 
 The implementation includes comprehensive verification:
-- All 7 required rules are implemented and tested
+- All 8 required rules are implemented and tested
 - Rule precedence logic verified
 - Configuration integration confirmed
 - Main integration validated

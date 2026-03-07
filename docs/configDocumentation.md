@@ -40,6 +40,7 @@ This section defines author validation rules.
 - **LAST_HIVE_ACTIVITY_AGE**: Required days since last activity on Hive.
 - **MAX_FOLLOWER_INACTIVITY_DAYS**: Maximum allowed inactivity days for followers.
 - **MAX_INACTIVITY_DAYS**: Maximum allowed inactivity days for the author.
+- **MAX_INCLUDED_POSTS_PER_AUTHOR**: Maximum number of posts allowed per author in the included posts list. When an author reaches this limit, additional posts from that author will be rejected by the screening system.
 - **MIN_ACCOUNT_AGE**: Minimum account age in days.
 - **MIN_ACTIVE_FOLLOWERS**: Minimum number of active followers.
 - **MIN_ADJUSTED_FOLLOWERS_PER_MONTH**: Minimum adjusted followers per month.
@@ -91,7 +92,7 @@ This section defines engagement metrics.
 - **COMMENT_MIN**: Minimum comment score.
 - **COMMENT_WEIGHT**: Weight assigned to comments.
 - **ENGAGEMENT_THRESHOLD**: Threshold for engagement.
-- **RESETEEM_MAX**: Maximum resteem score.
+- **RESTEEM_MAX**: Maximum resteem score.
 - **RESTEEM_MIN**: Minimum resteem score.
 - **RESTEEM_WEIGHT**: Weight assigned to resteems.
 - **VALUE_MAX**: Maximum value score.

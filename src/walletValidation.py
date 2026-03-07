@@ -16,27 +16,25 @@ s = Steem(node=steemApi) if steemApi else Steem()
 screenedDelegateeFile = config.get('WALLET', 'SCREENED_DELEGATEE_FILE')
 uncountedDelegateeFile = config.get('WALLET', 'UNCOUNTED_DELEGATEE_FILE')
 
-def _get_thoth_incoming_delegations(author: str, steem_instance=None) -> list:
+def _get_authors_delegation_to_thoth(author: str, steem_instance=None) -> Decimal:
     """
-    Fetches incoming delegations to a Thoth author.
+    Fetches the amount of an author's outgoing delegation to the Thoth account.
 
-    Args: the Steem account name of the author
+    Args:
+        author: The Steem account name of the author.
 
-    TechDebt: At some point, this should be changed to happen only once per program execution.
-
-    Returns the total amount of vesting shares delegated to Thoth by the author.
-    If the author makes no delegations, returns 0.
+    Returns:
+        The amount of vesting shares delegated to Thoth by the author as a Decimal.
+        If the author makes no delegations to Thoth, returns Decimal('0').
     """
     steemApi = config.get('STEEM', 'STEEM_API')
     s = steem_instance or (Steem(node=steemApi) if steemApi else Steem())
     thothAccount = config.get('STEEM', 'POSTING_ACCOUNT')
                               
-    last_delegatee = None
+    last_delegatee = ''
     batch_size = 100
     is_first_batch = True
                               
-    incomingVests = Decimal('0')
-
     while True:
         data = s.get_vesting_delegations(author, last_delegatee, batch_size)
         if not data:
@@ -47,17 +45,15 @@ def _get_thoth_incoming_delegations(author: str, steem_instance=None) -> list:
 
         for delegation in data[start_idx:]:
             delegatee = delegation['delegatee']
-            vests_str = delegation['vesting_shares'].split(' ')[0]
             if delegatee == thothAccount:
-                incomingVests = Decimal(vests_str) 
-                break
+                vests_str = delegation['vesting_shares'].split(' ')[0]
+                return Decimal(vests_str)
             last_delegatee = delegatee
 
         if len(data) < batch_size:
             break
 
-    print (f"Total incoming VESTS to Thoth from {author}: {incomingVests}")
-    return incomingVests
+    return Decimal('0')
 
 def _get_account_vesting_info(author: str, steem_instance=None) -> tuple[float | None, float | None, float | None]:
     """
@@ -82,9 +78,6 @@ def _get_account_vesting_info(author: str, steem_instance=None) -> tuple[float |
         vesting_shares = float(account.get('vesting_shares', '0.0 ').split()[0])
         delegated_vesting_shares = float(account.get('delegated_vesting_shares', '0.0 ').split()[0])
         received_vesting_shares = float(account.get('received_vesting_shares', '0.0 ').split()[0])
-
-        thothDelegation = _get_thoth_incoming_delegations(author, steem_instance=s)
-        delegated_vesting_shares -= float(thothDelegation)
 
         return vesting_shares, delegated_vesting_shares, received_vesting_shares
 
@@ -137,7 +130,7 @@ def totalScreenedOrIgnoredDelegations (delegator, delegateeFile=screenedDelegate
         return 0.0
 
     total_vests = Decimal('0')
-    last_delegatee = None
+    last_delegatee = ''
     batch_size = 100
     is_first_batch = True
 
@@ -225,8 +218,11 @@ def check_author_wallet(author: str, steem_instance=None) -> bool:
             # Error already printed in helper function
             return False
 
+        # Calculate penalty only for this check, using raw delegated vests
+        thoth_delegation = _get_authors_delegation_to_thoth(author, steem_instance=steem_instance)
         unCountedVests = totalScreenedOrIgnoredDelegations(delegator=author, delegateeFile=uncountedDelegateeFile, steem_instance=steem_instance)
-        delegationPenalty = delegated_vesting_shares - unCountedVests
+        # The penalty is the total outgoing delegations, minus any "free passes"
+        delegationPenalty = delegated_vesting_shares - float(thoth_delegation) - unCountedVests
 
         print(f"\n--- Checking author: @{author} ---")
         print(f"Vesting Shares: {vesting_shares:,.6f} VESTS")

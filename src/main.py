@@ -4,6 +4,8 @@ import os
 import time
 from datetime import datetime
 import math
+import io
+import sys
 
 import aiIntro
 import utils  # From the thoth package
@@ -14,6 +16,7 @@ from configValidator import ConfigValidator
 from contentScoring import ContentScorer
 from hybridScreening import HybridScreening
 from modelManager import ModelManager
+from statsTracker import StatsTracker
 from steemHelpers import initialize_steem_with_retry
 import version
 
@@ -22,6 +25,15 @@ from steem import Steem
 
 # Create ONE high-quality RNG instance at module level with explicit entropy
 _rng = utils.get_rng()
+
+# Reconfigure stdout and stderr to use UTF-8 encoding, especially for Windows,
+# to prevent 'charmap' codec errors when printing non-ASCII characters.
+if sys.stdout.encoding.lower().replace('-', '') != 'utf8':
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    except Exception as e:
+        print(f"Warning: Could not reconfigure stdout/stderr to UTF-8: {e}")
 
 print(f"Starting Thoth v{version.__version__} ({version.__status__})")
 
@@ -123,8 +135,11 @@ steemdInstance = initialize_steem_with_retry(node_api=steemApi)
 if not steemdInstance:
     exit(1) # Exit if Steem connection failed
 
+# Initialize the statistics tracker
+stats_tracker = StatsTracker()
+
 # Initialize the Hybrid Screening system for quality-based curation
-hybrid_screening = HybridScreening(steemdInstance, validator)
+hybrid_screening = HybridScreening(steemdInstance, validator, stats_tracker=stats_tracker)
 print("Hybrid screening system initialized.")
 
 blockchain = Blockchain(steemd_instance=steemdInstance)
@@ -342,5 +357,17 @@ if earliest_timestamp and latest_timestamp:
 
     postHelper.postCuration(commentList, aiResponseList, aiIntroString, model_manager=model_manager, full_delegations=full_delegations)
     print("Posting finished.")
+
+    # Generate and print statistics report
+    stats_report = stats_tracker.generate_report()
+    print(stats_report)
+    with open('data/output.html', 'a', encoding='utf-8') as f:
+        # Use <pre> for preformatted text in HTML
+        print(f"\n<hr>\n<h2>Run Statistics</h2>\n<pre>{stats_report}</pre>", file=f)
 else:
     print("No posts were found to curate in the specified block range. Exiting.")
+    # Also print stats here, in case some posts were evaluated but none were accepted.
+    stats_report = stats_tracker.generate_report()
+    print(stats_report)
+    with open('data/output.html', 'a', encoding='utf-8') as f:
+        print(f"\n<hr>\n<h2>Run Statistics</h2>\n<pre>{stats_report}</pre>", file=f)

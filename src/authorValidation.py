@@ -164,6 +164,33 @@ def isAuthorScreened(comment, included_posts=None, steem_instance=None):
         
     return False
 
+def isAuthorPostLimitReached(comment, included_posts=None):
+    """
+    Check if an author has reached the maximum number of included posts.
+    This is a standalone function that only checks the post limit constraint,
+    separate from other author screening rules.
+    
+    Args:
+        comment: Dictionary containing post information with 'author' key
+        included_posts: List of already included posts to check against
+        
+    Returns:
+        bool: True if the author has reached the post limit, False otherwise
+    """
+    if included_posts is None:
+        return False
+        
+    max_posts = config.getint('AUTHOR', 'MAX_INCLUDED_POSTS_PER_AUTHOR', fallback=1)
+    
+    # Count how many posts this author already has in the included list
+    current_count = sum(1 for p in included_posts if p['author'] == comment['author'])
+    
+    if current_count >= max_posts:
+        print(f"DEBUG: isAuthorPostLimitReached({comment['author']}) -> max posts reached ({current_count} >= {max_posts}): True")
+        return True
+    
+    return False
+
 def isRepTooLow(reputation):
     return rep_log10(reputation) < config.getint('AUTHOR','MIN_REPUTATION')
 

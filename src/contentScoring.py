@@ -16,8 +16,9 @@ from steem.post import Post
 from steem.account import AccountDoesNotExistsException
 
 from configValidator import ConfigValidator
-from utils import get_rng
+from utils import get_rng, remove_formatting
 from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep
+from steemHelpers import get_resteem_count
 
 logger = logging.getLogger(__name__)
 
@@ -90,19 +91,23 @@ class ContentScorer:
         
         return thresholds
     
-    def score_content(self, post_data):
+    def score_content(self, post_data, content_data=None):
         """
         Score a piece of content across multiple dimensions.
         
         Args:
             post_data: Dictionary containing post information from blockchain
+            content_data: Optional dictionary containing detailed post data (to avoid re-fetching)
             
         Returns:
             Dictionary containing total score, component scores, and quality tier
         """
         try:
             # Get detailed post information
-            post = self.steem.get_content(post_data['author'], post_data['permlink'])
+            if content_data:
+                post = content_data
+            else:
+                post = self.steem.get_content(post_data['author'], post_data['permlink'])
             
             # Calculate component scores
             author_score = self._score_author(post['author'])
@@ -154,8 +159,10 @@ class ContentScorer:
             
             # Basic author metrics
             reputation = account.rep
-            followers = len(account.get_followers())
-            following = len(account.get_following())
+            # Optimization: Use get_follow_count instead of fetching the list (which is very slow for large accounts)
+            follow_counts = self.steem.get_follow_count(author)
+            followers = follow_counts['follower_count']
+            following = follow_counts['following_count']
             
             # Calculate adjusted followers (followers - following to account for spam follows)
             adjusted_followers = max(0, followers - following)
@@ -221,19 +228,20 @@ class ContentScorer:
             
             # Advanced follower metrics from authorValidation.py
             # 1. Followers per month (normalized)
-            followers_per_month = followersPerMonth(account, {'author': author}, steem_instance=self.steem)
+            followers_per_month = followersPerMonth(account, {'author': author}, steem_instance=self.steem, cached_count=followers)
             followers_per_month_score = min(followers_per_month * 2.0, 20.0)  # Max 20 points
             
             # 2. Adjusted followers per month (with half-life decay)
-            adjusted_followers_per_month = adjustedFollowersPerMonth(account, {'author': author}, steem_instance=self.steem)
+            adjusted_followers_per_month = adjustedFollowersPerMonth(account, {'author': author}, steem_instance=self.steem, cached_count=followers)
             adjusted_followers_score = min(adjusted_followers_per_month * 2.5, 25.0)  # Max 25 points
             
             # 3. Median follower reputation
-            median_follower_rep = getMedianFollowerRep(author, steem_instance=self.steem)
+            # Optimization: Disabled because fetching all followers is too expensive for large accounts (O(N))
+            # median_follower_rep = getMedianFollowerRep(author, steem_instance=self.steem)
             median_rep_score = 0.0
-            if median_follower_rep is not None:
-                # Normalize median rep (typically 0-80 range)
-                median_rep_score = min(max(0, median_follower_rep / 4.0), 15.0)  # Max 15 points
+            # if median_follower_rep is not None:
+            #     # Normalize median rep (typically 0-80 range)
+            #     median_rep_score = min(max(0, median_follower_rep / 4.0), 15.0)  # Max 15 points
             
             # 4. Account age score (older accounts get more trust)
             age_score = min(account_age_days / 100.0, 15.0)  # Reduced from 20 to 15 to make room for new metrics
@@ -265,7 +273,8 @@ class ContentScorer:
         try:
             # Content length score
             # Use word count instead of character count
-            words = post['body'].split()
+            clean_body = remove_formatting(post['body'])
+            words = clean_body.split()
             word_count = len(words)
             title_length = len(post['title'])
             
@@ -285,7 +294,7 @@ class ContentScorer:
             tag_score = max(0, 15.0 - abs(tag_count - 3) * 2.0)  # Optimal around 3 tags
             
             # Language detection (simplified - just check for common language patterns)
-            language_score = self._score_language(post['body'])
+            language_score = self._score_language(clean_body)
             
             # Combined content score
             content_score = length_score + title_score + tag_score + language_score
@@ -318,8 +327,9 @@ class ContentScorer:
             text_clean = re.sub(r'[^\w\s]', '', text.lower())
             words = text_clean.split()
             
-            if len(words) < 50:
-                return 0.0  # Too short
+            min_words = self.config.get_int('CONTENT', 'MIN_WORDS', 400)
+            if len(words) < min_words:
+                return 0.0  # Too short to evaluate language quality effectively
             
             # Check for excessive repetition (potential spam indicator)
             unique_words = set(words)
@@ -339,29 +349,73 @@ class ContentScorer:
         except Exception as e:
             logger.error(f"Error in language scoring: {e}")
             return 0.0
-    
+
+    def _scale(self, value, min_val, max_val):
+        """Scale a value to a 0-100 range based on provided min and max."""
+        if value <= min_val:
+            return 0.0
+        elif value >= max_val:
+            return 100.0
+        else:
+            # Avoid division by zero if min_val and max_val are the same
+            if max_val - min_val == 0:
+                return 100.0
+            score = 100.0 * (value - min_val) / (max_val - min_val)
+            return score
+
     def _score_engagement(self, post):
         """Score post engagement based on votes, comments, and value."""
         try:
             # Basic engagement metrics
+            author = post['author']
+            permlink = post['permlink']
             net_votes = post['net_votes']
             children = post['children']
             pending_payout = float(post['pending_payout_value'].split()[0])
             total_payout = float(post['total_payout_value'].split()[0])
-            
-            # Engagement score components
-            vote_score = min(net_votes * 0.5, 30.0)  # Max 30 points from votes
-            
-            comment_score = min(children * 2.0, 20.0)  # Max 20 points from comments
-            
-            # Value score (combined pending + total payout)
-            value_score = min((pending_payout + total_payout) * 2.0, 30.0)
-            
-            # Combined engagement score
-            engagement_score = vote_score + comment_score + value_score
-            
+            total_value = pending_payout + total_payout
+
+            # Load scaling params and weights from config
+            vote_min = self.config.get_int('ENGAGEMENT', 'VOTE_COUNT_MIN', 10)
+            vote_max = self.config.get_int('ENGAGEMENT', 'VOTE_COUNT_MAX', 200)
+            vote_weight = self.config.get_float('ENGAGEMENT', 'VOTE_COUNT_WEIGHT', 1.0)
+
+            comment_min = self.config.get_int('ENGAGEMENT', 'COMMENT_MIN', -10)
+            comment_max = self.config.get_int('ENGAGEMENT', 'COMMENT_MAX', 20)
+            comment_weight = self.config.get_float('ENGAGEMENT', 'COMMENT_WEIGHT', 2.0)
+
+            value_min = self.config.get_float('ENGAGEMENT', 'VALUE_MIN', 0.25)
+            value_max = self.config.get_float('ENGAGEMENT', 'VALUE_MAX', 100.0)
+            value_weight = self.config.get_float('ENGAGEMENT', 'VALUE_WEIGHT', 1.0)
+
+            resteem_min = self.config.get_int('ENGAGEMENT', 'RESTEEM_MIN', 2)
+            resteem_max = self.config.get_int('ENGAGEMENT', 'RESTEEM_MAX', 20)
+            resteem_weight = self.config.get_float('ENGAGEMENT', 'RESTEEM_WEIGHT', 0.0)
+
+            # Calculate scaled scores (0-100 for each component)
+            vote_score_scaled = self._scale(net_votes, vote_min, vote_max)
+            comment_score_scaled = self._scale(children, comment_min, comment_max)
+            value_scaled = self._scale(total_value, value_min, value_max)
+            resteem_count = get_resteem_count(author, permlink)
+            resteem_score_scaled = self._scale(resteem_count, resteem_min, resteem_max)
+
+            # Calculate weighted average
+            total_weighted_score = (
+                vote_score_scaled * vote_weight +
+                comment_score_scaled * comment_weight +
+                value_scaled * value_weight +
+                resteem_score_scaled * resteem_weight
+            )
+
+            total_weight = vote_weight + comment_weight + value_weight + resteem_weight
+
+            if total_weight == 0:
+                return 0.0
+
+            engagement_score = total_weighted_score / total_weight
+
             return min(engagement_score, 100.0)
-            
+
         except Exception as e:
             logger.error(f"Error scoring engagement: {e}")
             return 0.0
