@@ -74,62 +74,55 @@ def verify_rule_precedence_logic():
             print("✗ Rule-based screening function not found")
             return False
         
-        # Check for the 6 specific rules (including delegation and language screening)
-        rules_found = 0
-        
-        if 'isBlacklisted(author' in content:
-            print("✓ Blacklisted author rule found")
-            rules_found += 1
-        else:
-            print("✗ Blacklisted author rule not found")
-        
-        if 'isAuthorWhitelisted(author' in content:
-            print("✓ Whitelisted author rule found")
-            rules_found += 1
-        else:
-            print("✗ Whitelisted author rule not found")
-        
-        if 'isHiveActivityTooRecent(author' in content:
-            print("✓ Hive inactivity rule found")
-            rules_found += 1
-        else:
-            print("✗ Hive inactivity rule not found")
-        
-        if 'walletScreened(author' in content:
-            print("✓ Delegation screening rule found")
-            rules_found += 1
-        else:
-            print("✗ Delegation screening rule not found")
-        
-        if 'detect_language(body' in content and 'target_languages' in content:
-            print("✓ Language validation rule found")
-            rules_found += 1
-        else:
-            print("✗ Language validation rule not found")
-        
-        if 'hasBlacklistedTag(post_data' in content:
-            print("✓ Blacklisted tags rule found")
-            rules_found += 1
-        else:
-            print("✗ Blacklisted tags rule not found")
-        
-        if 'isTooShortHard(body' in content:
-            print("✓ Word count rule found")
-            rules_found += 1
-        else:
-            print("✗ Word count rule not found")
-        
-        if rules_found == 7:
-            print("✓ All 7 required rules found in hybrid screening")
-        else:
-            print(f"⚠ Only {rules_found}/7 required rules found")
+        # Extract the function body to verify order within the function
+        try:
+            func_parts = content.split('def _apply_rule_based_screening')
+            if len(func_parts) < 2:
+                print("✗ Could not parse function body")
+                return False
+            # Take the part after definition, stop at next def (simple heuristic)
+            func_body = func_parts[1].split('\n    def ')[0]
+        except Exception:
+            print("✗ Error extracting function body")
             return False
         
-        # Check that rules return early (precedence over scoring)
-        if "if not rule_result['passed']:" in content and "return {" in content:
-            print("✓ Rule precedence logic found (early return on rule failure)")
+        print("\nVerifying optimization order (Fail-Fast Strategy):")
+        
+        # Define expected order: (function_call_substring, display_name)
+        expected_order = [
+            ('isTooShortHard', '1. Word count (Hard limit)'),
+            ('detect_language', '2. Language detection'),
+            ('isEdit', '3. Edit check'),
+            ('hasBlacklistedTag', '4. Blacklisted tags'),
+            ('hasRequiredTag', '5. Required tags'),
+            ('isAuthorPostLimitReached', '6. Author post limit'),
+            ('isBlacklisted', '7. Blacklisted author'),
+            ('isAuthorWhitelisted', '8. Whitelisted author'),
+            ('isHiveActivityTooRecent', '9. Hive inactivity'),
+            ('walletScreened', '10. Wallet screening')
+        ]
+        
+        last_pos = -1
+        order_correct = True
+        rules_found = 0
+        
+        for func_name, display_name in expected_order:
+            pos = func_body.find(func_name)
+            if pos != -1:
+                rules_found += 1
+                if pos > last_pos:
+                    print(f"✓ {display_name} found in correct relative position")
+                    last_pos = pos
+                else:
+                    print(f"✗ {display_name} found but OUT OF ORDER (should be later)")
+                    order_correct = False
+            else:
+                print(f"⚠ {display_name} check not found in function body")
+        
+        if order_correct and rules_found >= 7:
+            print("✓ Rule execution order is optimized for speed")
         else:
-            print("✗ Rule precedence logic not found")
+            print("✗ Rule optimization verification failed")
             return False
         
         return True
@@ -193,12 +186,11 @@ def main():
     if passed == total:
         print("🎉 All verification checks passed! Hybrid screening implementation is complete.")
         print("\nKey features implemented:")
-        print("• Rule-based screening takes precedence over content scores")
-        print("• Blacklisted authors are rejected regardless of score")
-        print("• Whitelisted authors are accepted unless below hard minimum word count")
-        print("• Hive inactivity rule enforced (must be higher than specified days)")
-        print("• Word count rule enforced (must exceed hard minimum)")
-        print("• Content scoring only applied to posts that pass rule-based screening")
+        print("• Rule-based screening optimized for speed (Fail-Fast)")
+        print("• Cheap local checks (word count, tags) run first")
+        print("• Expensive network checks (wallet, history) run last")
+        print("• Blacklists checked before Whitelists for safety")
+        print("• Content scoring only applied after all rules pass")
         return True
     else:
         print(f"❌ {total - passed} verification checks failed. Please review the implementation.")

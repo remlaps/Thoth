@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Author scoring rebalanced to incorporate growth and quality metrics
 - Configuration values dynamically loaded (no hard-coded thresholds)
 - Enhanced logging with detailed screening reasons and rule types
+- Optimized rule-based screening order in `hybridScreening.py` to implement a "Fail-Fast" strategy: cheap local checks (word count, language, tags) now run before expensive network checks (blacklist, wallet, history).
+- Updated `verify_hybrid_implementation.py` to verify the exact execution order of screening rules.
+- Refactored `test_hybrid_screening.py` to use extensive Mocking, ensuring unit tests verify specific logic in isolation regardless of the new optimization order.
 
 ### Fixed
 - **Major Performance Issue**: Disabled the `getMedianFollowerRep` calculation, which was causing extreme slowdowns and API spam by fetching all followers of an author.

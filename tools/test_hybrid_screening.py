@@ -109,6 +109,12 @@ def test_blacklisted_author():
     original_isEdit = hybridScreening.isEdit
     hybridScreening.isEdit = Mock(return_value=False)
     
+    # Mock tag checks to prevent them from triggering before blacklist (as they are now faster/earlier)
+    original_hasBlacklistedTag = hybridScreening.hasBlacklistedTag
+    original_hasRequiredTag = hybridScreening.hasRequiredTag
+    hybridScreening.hasBlacklistedTag = Mock(return_value=False)
+    hybridScreening.hasRequiredTag = Mock(return_value=True)
+    
     try:
         mock_steem = create_mock_steem_instance()
         mock_config = create_mock_config()
@@ -152,6 +158,8 @@ def test_blacklisted_author():
         hybridScreening.isBlacklisted = original_isBlacklisted
         hybridScreening.detect_language = original_detect_language
         hybridScreening.isEdit = original_isEdit
+        hybridScreening.hasBlacklistedTag = original_hasBlacklistedTag
+        hybridScreening.hasRequiredTag = original_hasRequiredTag
 
 def test_whitelisted_author():
     """Test that whitelisted authors are accepted unless below hard minimum word count."""
@@ -163,6 +171,18 @@ def test_whitelisted_author():
     original_isAuthorWhitelisted_author = authorValidation.isAuthorWhitelisted
     hybridScreening.isAuthorWhitelisted = Mock(return_value=True)
     authorValidation.isAuthorWhitelisted = Mock(return_value=True)
+
+    # Mock fast checks to ensure we reach the whitelist check
+    original_detect_language = hybridScreening.detect_language
+    hybridScreening.detect_language = Mock(return_value='en')
+    
+    original_isEdit = hybridScreening.isEdit
+    hybridScreening.isEdit = Mock(return_value=False)
+    
+    original_hasBlacklistedTag = hybridScreening.hasBlacklistedTag
+    original_hasRequiredTag = hybridScreening.hasRequiredTag
+    hybridScreening.hasBlacklistedTag = Mock(return_value=False)
+    hybridScreening.hasRequiredTag = Mock(return_value=True)
 
     # Mock ContentScorer.score_content to prevent crashes if scoring is accidentally triggered
     original_score_content = contentScoring.ContentScorer.score_content
@@ -196,6 +216,10 @@ def test_whitelisted_author():
         hybridScreening.isAuthorWhitelisted = original_isAuthorWhitelisted_hybrid
         authorValidation.isAuthorWhitelisted = original_isAuthorWhitelisted_author
         contentScoring.ContentScorer.score_content = original_score_content
+        hybridScreening.detect_language = original_detect_language
+        hybridScreening.isEdit = original_isEdit
+        hybridScreening.hasBlacklistedTag = original_hasBlacklistedTag
+        hybridScreening.hasRequiredTag = original_hasRequiredTag
 
 def test_whitelisted_author_below_minimum():
     """Test that whitelisted authors are rejected if below hard minimum word count."""
@@ -249,6 +273,24 @@ def test_hive_inactivity_rule():
     original_isHiveActivityTooRecent = hybridScreening.isHiveActivityTooRecent
     hybridScreening.isHiveActivityTooRecent = Mock(return_value=True)
     
+    # --- Mock preceding checks to ensure this rule is reached ---
+    original_detect_language = hybridScreening.detect_language
+    hybridScreening.detect_language = Mock(return_value='en')
+    
+    original_isEdit = hybridScreening.isEdit
+    hybridScreening.isEdit = Mock(return_value=False)
+    
+    original_hasBlacklistedTag = hybridScreening.hasBlacklistedTag
+    original_hasRequiredTag = hybridScreening.hasRequiredTag
+    hybridScreening.hasBlacklistedTag = Mock(return_value=False)
+    hybridScreening.hasRequiredTag = Mock(return_value=True)
+    
+    original_isBlacklisted = hybridScreening.isBlacklisted
+    hybridScreening.isBlacklisted = Mock(return_value=False)
+    
+    original_isAuthorWhitelisted = hybridScreening.isAuthorWhitelisted
+    hybridScreening.isAuthorWhitelisted = Mock(return_value=False)
+    
     try:
         mock_steem = create_mock_steem_instance()
         mock_config = create_mock_config()
@@ -272,6 +314,12 @@ def test_hive_inactivity_rule():
     finally:
         # Restore original function
         hybridScreening.isHiveActivityTooRecent = original_isHiveActivityTooRecent
+        hybridScreening.detect_language = original_detect_language
+        hybridScreening.isEdit = original_isEdit
+        hybridScreening.hasBlacklistedTag = original_hasBlacklistedTag
+        hybridScreening.hasRequiredTag = original_hasRequiredTag
+        hybridScreening.isBlacklisted = original_isBlacklisted
+        hybridScreening.isAuthorWhitelisted = original_isAuthorWhitelisted
 
 def test_word_count_rule():
     """Test that posts below hard minimum word count are rejected."""

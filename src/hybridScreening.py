@@ -123,12 +123,14 @@ class HybridScreening:
     def _apply_rule_based_screening(self, post_data, post, included_posts=None):
         """
         Apply rule-based screening with hard constraints that override scores.
+        The order of checks is optimized to fail fast on cheap checks first, based on
+        observed rejection statistics.
         
         Args:
             post_data: Dictionary containing post information from blockchain
             post: Detailed post information from Steem API
             included_posts: Optional list of already included posts for post limit checking
-            
+
         Returns:
             Dictionary with screening result
         """
@@ -136,8 +138,10 @@ class HybridScreening:
         permlink = post_data['permlink']
         body = post['body']
         title = post['title']
-        
-        # Rule 1: Word count must exceed the hard minimum (fastest check, do it first)
+
+        # --- FAST, LOCAL CHECKS (ordered by rejection rate) ---
+
+        # Rule 1: Word count must exceed the hard minimum (fastest check, highest rejection rate)
         if isTooShortHard(body):
             min_words_hard = self.config.get_int('CONTENT', 'MIN_WORDS_HARD', 0)
             # The body is likely to contain HTML, but for this hard check, a simple split is fast and sufficient.
@@ -148,8 +152,66 @@ class HybridScreening:
                 'reason': f'below_minimum_words: {word_count} < {min_words_hard}',
                 'rule_type': 'word_count'
             }
-        
-        # Rule 2: Blacklisted authors must be excluded (absolute rule)
+
+        # Rule 2: Language must be in the allowed list (local check, high rejection rate)
+        try:
+            target_languages = [lang.strip() for lang in self.config.get('CONTENT', 'LANGUAGE').split(',') if lang.strip()]
+            if target_languages:  # Only perform check if languages are configured
+                body_language = detect_language(body)
+                title_language = detect_language(title)
+
+                if body_language not in target_languages or title_language not in target_languages:
+                    logger.info(f"Rule-based rejection: {author}/{permlink} language not in target list (body: {body_language}, title: {title_language}, allowed: {target_languages})")
+                    return {
+                        'passed': False,
+                        'reason': f'invalid_language: body={body_language}, title={title_language}, allowed={target_languages}',
+                        'rule_type': 'language_filter'
+                    }
+        except Exception as e:
+            logger.warning(f"Language detection failed for {author}/{permlink}: {e}")
+            # If language detection fails, we could either reject or allow
+            # For now, we'll allow it to proceed to scoring
+            pass
+
+        # Rule 3: Check for edits (fast check, moderate rejection rate)
+        if isEdit(post_data, steem_instance=self.steem, latest_content=post):
+            logger.info(f"Rule-based rejection: {author}/{permlink} appears to be an edited post")
+            return {
+                'passed': False,
+                'reason': 'edited_post: post appears to have been edited',
+                'rule_type': 'edit_check'
+            }
+
+        # Rule 4: Blacklisted tags must be rejected (fast check)
+        if hasBlacklistedTag(post_data):
+            logger.info(f"Rule-based rejection: {author}/{permlink} contains blacklisted tags")
+            return {
+                'passed': False,
+                'reason': 'blacklisted_tags: post contains excluded tags',
+                'rule_type': 'tag_filter'
+            }
+
+        # Rule 5: Check for required tags (fast check)
+        if not hasRequiredTag(post_data):
+            logger.info(f"Rule-based rejection: {author}/{permlink} missing required tags")
+            return {
+                'passed': False,
+                'reason': 'missing_required_tags: post does not contain required tags',
+                'rule_type': 'tag_filter'
+            }
+
+        # Rule 6: Check if author has reached the maximum number of included posts (very fast in-memory check)
+        if isAuthorPostLimitReached(post_data, included_posts):
+            logger.info(f"Rule-based rejection: {author}/{permlink} author has reached maximum included posts limit")
+            return {
+                'passed': False,
+                'reason': 'max_posts_per_author_reached: author has reached the maximum number of included posts',
+                'rule_type': 'author_post_limit'
+            }
+
+        # --- FUNDAMENTAL AUTHOR STATUS CHECKS (Whitelist is a "pass", so check blacklist first) ---
+
+        # Rule 7: Blacklisted authors must be excluded (absolute rule, first network call)
         if isBlacklisted(author, steem_instance=self.steem):
             logger.info(f"Rule-based rejection: {author}/{permlink} is blacklisted")
             return {
@@ -157,17 +219,19 @@ class HybridScreening:
                 'reason': f'blacklisted_author: {author}',
                 'rule_type': 'blacklist'
             }
-        
-        # Rule 3: Whitelisted authors bypass all other checks (word count already checked)
+
+        # Rule 8: Whitelisted authors bypass all other checks (word count already checked)
         if isAuthorWhitelisted(author):
-            logger.info(f"Rule-based acceptance: {author}/{permlink} is whitelisted and passed minimum word count")
+            logger.info(f"Rule-based acceptance: {author}/{permlink} is whitelisted and passed all prior hard checks")
             return {
                 'passed': True,
                 'reason': f'whitelisted_author: {author}',
                 'rule_type': 'whitelist'
             }
-        
-        # Rule 4: Hive inactivity must be higher than specified days
+
+        # --- SLOW, NETWORK-INTENSIVE CHECKS (for non-whitelisted authors) ---
+
+        # Rule 9: Hive inactivity must be higher than specified days (network call)
         if isHiveActivityTooRecent(author):
             hive_inactivity_days = self.config.get_int('AUTHOR', 'LAST_HIVE_ACTIVITY_AGE', 60)
             logger.info(f"Rule-based rejection: {author}/{permlink} has recent Hive activity (below {hive_inactivity_days} days)")
@@ -176,70 +240,16 @@ class HybridScreening:
                 'reason': f'recent_hive_activity: author has been active on Hive recently',
                 'rule_type': 'hive_inactivity'
             }
-            
-        # Rule 5: Language must be in the allowed list
-        try:
-            target_languages = [lang.strip() for lang in self.config.get('CONTENT', 'LANGUAGE').split(',') if lang.strip()]
-            body_language = detect_language(body)
-            title_language = detect_language(title)
-            
-            if body_language not in target_languages or title_language not in target_languages:
-                logger.info(f"Rule-based rejection: {author}/{permlink} language not in target list (body: {body_language}, title: {title_language}, allowed: {target_languages})")
-                return {
-                    'passed': False,
-                    'reason': f'invalid_language: body={body_language}, title={title_language}, allowed={target_languages}',
-                    'rule_type': 'language_filter'
-                }
-        except Exception as e:
-            logger.warning(f"Language detection failed for {author}/{permlink}: {e}")
-            # If language detection fails, we could either reject or allow
-            # For now, we'll allow it to proceed to scoring
-            pass
-        
-        # Rule 6: Blacklisted tags must be rejected
-        if hasBlacklistedTag(post_data):
-            logger.info(f"Rule-based rejection: {author}/{permlink} contains blacklisted tags")
-            return {
-                'passed': False,
-                'reason': 'blacklisted_tags: post contains excluded tags',
-                'rule_type': 'tag_filter'
-            }
-        
-        # Rule 7: Check for edits (edited posts are typically not curated)
-        if isEdit(post_data, steem_instance=self.steem, latest_content=post):
-            logger.info(f"Rule-based rejection: {author}/{permlink} appears to be an edited post")
-            return {
-                'passed': False,
-                'reason': 'edited_post: post appears to have been edited',
-                'rule_type': 'edit_check'
-            }
-        
-        # Rule 8: Check for required tags (if configured)
-        if not hasRequiredTag(post_data):
-            logger.info(f"Rule-based rejection: {author}/{permlink} missing required tags")
-            return {
-                'passed': False,
-                'reason': 'missing_required_tags: post does not contain required tags',
-                'rule_type': 'tag_filter'
-            }
-        
-        # Rule 9: Check if author has reached the maximum number of included posts
-        if isAuthorPostLimitReached(post_data, included_posts):
-            logger.info(f"Rule-based rejection: {author}/{permlink} author has reached maximum included posts limit")
-            return {
-                'passed': False,
-                'reason': 'max_posts_per_author_reached: author has reached the maximum number of included posts',
-                'rule_type': 'author_post_limit'
-            }
-        
-        # Rule 10: Wallet screening (slow, do last)
-        if ( walletScreened(author, steem_instance=self.steem)):
+
+        # Rule 10: Wallet screening (slowest check, do last)
+        if walletScreened(author, steem_instance=self.steem):
+            logger.info(f"Rule-based rejection: {author}/{permlink} wallet flagged by screening")
             return {
                 'passed': False,
                 'reason': 'wallet_screened: author wallet flagged by screening',
                 'rule_type': 'wallet_screened'
             }
-        
+
         # If all rule-based checks pass, content can proceed to scoring
         return {
             'passed': True,
