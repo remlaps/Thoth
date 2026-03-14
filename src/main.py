@@ -364,8 +364,8 @@ if earliest_timestamp and latest_timestamp:
     try:
         full_delegations = delegationInfo.get_delegations(postingAccount_main)
     except Exception as e:
-        print(f"Warning: could not fetch delegations in main: {e}")
-        full_delegations = []
+        print(f"FATAL: Could not fetch delegations in main: {e}")
+        exit(1)
 
     postHelper.postCuration(commentList, aiResponseList, aiIntroString, model_manager=model_manager, full_delegations=full_delegations)
     print("Posting finished.")

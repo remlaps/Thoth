@@ -204,9 +204,8 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
             delegatorList = []
 
     except Exception as e:
-        print(f"Could not process delegator beneficiaries due to an error: {e}")
-        selected_delegators = []
-        delegatorList = []
+        print(f"FATAL: Could not process delegator beneficiaries due to an error: {e}")
+        exit(1)
 
     beneficiaryList = create_beneficiary_list(beneficiaryList)
     author_accounts = [c['author'] for c in commentList]
