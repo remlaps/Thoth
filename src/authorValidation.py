@@ -164,6 +164,33 @@ def isAuthorScreened(comment, included_posts=None, steem_instance=None):
         
     return False
 
+def isAuthorPostLimitReached(comment, included_posts=None):
+    """
+    Check if an author has reached the maximum number of included posts.
+    This is a standalone function that only checks the post limit constraint,
+    separate from other author screening rules.
+    
+    Args:
+        comment: Dictionary containing post information with 'author' key
+        included_posts: List of already included posts to check against
+        
+    Returns:
+        bool: True if the author has reached the post limit, False otherwise
+    """
+    if included_posts is None:
+        return False
+        
+    max_posts = config.getint('AUTHOR', 'MAX_INCLUDED_POSTS_PER_AUTHOR', fallback=1)
+    
+    # Count how many posts this author already has in the included list
+    current_count = sum(1 for p in included_posts if p['author'] == comment['author'])
+    
+    if current_count >= max_posts:
+        print(f"DEBUG: isAuthorPostLimitReached({comment['author']}) -> max posts reached ({current_count} >= {max_posts}): True")
+        return True
+    
+    return False
+
 def isRepTooLow(reputation):
     return rep_log10(reputation) < config.getint('AUTHOR','MIN_REPUTATION')
 
@@ -338,8 +365,17 @@ def isInactive(accountInfo, steem_instance=None):
     lastPost = accountInfo['last_post']
     lastVote = accountInfo['last_vote_time']
 
-    lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
-    lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+    # Handle datetime objects vs strings - Steem API returns datetime objects
+    if isinstance(lastPost, str):
+        lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
+    else:
+        lastPostTime = lastPost
+        
+    if isinstance(lastVote, str):
+        lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+    else:
+        lastVoteTime = lastVote
+        
     mostRecentActivity = max(lastPostTime, lastVoteTime)
     today = datetime.now()
     days = (today - mostRecentActivity).days
@@ -355,8 +391,17 @@ def inactiveDays(accountName, steem_instance=None):
             lastPost = account_data['last_post']
             lastVote = account_data['last_vote_time']
 
-            lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
-            lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+            # Handle datetime objects vs strings - Steem API returns datetime objects
+            if isinstance(lastPost, str):
+                lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
+            else:
+                lastPostTime = lastPost
+                
+            if isinstance(lastVote, str):
+                lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+            else:
+                lastVoteTime = lastVote
+                
             mostRecentActivity = max(lastPostTime, lastVoteTime)
             today = datetime.now()
             return (today - mostRecentActivity).days
@@ -435,8 +480,8 @@ def getMedianFollowerRep(author, steem_instance=None):
    """
    followersData = getAllFollowers(author, steem_instance=steem_instance)
    
-   # Extract reputation values from the data
-   reputations = [follower['reputation'] for follower in followersData]
+   # Extract reputation values from the data (already normalized by the Steem API)
+   reputations = [float(follower['reputation']) for follower in followersData]
    
    # Sort the reputations
    reputations.sort()

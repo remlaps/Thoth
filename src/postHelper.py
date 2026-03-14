@@ -28,6 +28,7 @@ parsed_tags = [tag.strip() for tag in post_tags_config_string.split(',') if tag.
 taglist = parsed_tags # taglist is the list of all parsed tags
 initialWaitSeconds = config.getint('BLOG', 'VOTE_DELAY_SECONDS', fallback=600) # Default to 5 minutes if not set
 votePercent = config.getint('BLOG', 'VOTE_PERCENT', fallback=100) # Default to 100% if not set
+dry_run = config.getboolean('STEEM', 'DRY_RUN', fallback=False)
 
 def create_beneficiary_list(beneficiary_list):
     # Initialize empty dictionary to track accounts and their weights
@@ -116,7 +117,7 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
         models_used = model_manager.get_models_used()
         used_model = ", ".join(models_used) if len(models_used) > 1 else models_used[0] if models_used else "unknown"
     else:
-        used_model = config.get('ARLIAI','ARLIAI_MODEL')
+        used_model = config.get('LLM','LLM_MODEL')
 
     introImageUrl = config.get('BLOG', 'IMAGE_FOR_INTRO', fallback="https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png")
     loc = Localization()
@@ -248,13 +249,17 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
         with open('data/fakepost.html', 'w', encoding='utf-8') as f:
             print(f"{body}", file=f)
         try:
-            s.commit.post(title, body, postingAccount, permlink=permlink, tags=taglist,
-               comment_options=comment_options, json_metadata=metadata, 
-               beneficiaries=beneficiaryList)
-            postDone = True
+            if not dry_run:
+                s.commit.post(title, body, postingAccount, permlink=permlink, tags=taglist,
+                   comment_options=comment_options, json_metadata=metadata, 
+                   beneficiaries=beneficiaryList)
+                postDone = True
+                print(f"Main curation post '{title}' successful. Now posting individual AI summary replies...")
+            else:
+                postDone = True
+                print(f"DRY RUN ENABLED: Skipped main curation post '{title}'. Now processing individual AI summary replies...")
 
             # After the main curation post is successful, post individual AI summary replies
-            print(f"Main curation post '{title}' successful. Now posting individual AI summary replies...")
             for idx, (cmt_item, ai_resp_item) in enumerate(zip(commentList, aiResponseList)):
                 print(f"Preparing to post AI summary reply for item {idx + 1} (Original author: @{cmt_item['author']})...")
                 try:
@@ -289,11 +294,14 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
         print (f"Post {title} failed.  Exiting.")
         return False
     
-    voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, votePercent))
-    voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
-    voting_thread.start()
-    active_voting_threads.append(voting_thread) # Add the main post's voting thread
-    print (f"All content posted. Main post vote for '{title}' scheduled in background.")
+    if not dry_run:
+        voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, votePercent))
+        voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
+        voting_thread.start()
+        active_voting_threads.append(voting_thread) # Add the main post's voting thread
+        print (f"All content posted. Main post vote for '{title}' scheduled in background.")
+    else:
+        print (f"All content processed. DRY RUN: Main post vote for '{title}' skipped.")
 
     if active_voting_threads:
         print(f"\nWaiting for all {len(active_voting_threads)} background votes to be cast (this may take several minutes)...")

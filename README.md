@@ -66,7 +66,7 @@ Thoth can be configured by editing `config/config.ini` and by using environment 
 The LLM API key is required. It is recommended to provide it via an environment variable for better security, but it can also be set in the config file.
 
 *   **(Recommended) Environment Variable:** Set an environment variable named `LLMAPIKEY`. The script will prioritize this method.
-*   **(Alternative) Config File:** If the `LLMAPIKEY` environment variable is not found, the script will use the `ARLIAI_KEY` value from `config/config.ini`.
+*   **(Alternative) Config File:** If the `LLMAPIKEY` environment variable is not found, the script will use the `LLM_API_KEY` value from `config/config.ini`.
 
 ### 2. Config.ini
 
@@ -74,11 +74,11 @@ Customize the `config/config.ini` file to your preferences.
 
 | Section | Key                             | Description                                                                                             |
 |---------|---------------------------------|---------------------------------------------------------------------------------------------------------|
-| `ARLIAI`  | `ARLIAI_KEY`                    | Your LLM API Key (used as a fallback if `LLMAPIKEY` env var is not set).                                  |
-| `ARLIAI`  | `ARLIAI_MODEL`                  | The specific model(s) for the LLM API. Use a single model (e.g., `gemini-2.5-pro`) or comma-separated list for fallback (e.g., `gemini-2.5-pro,gemini-2.5-flash`). If the primary model is rate-limited, the system automatically switches to the next available model.                                                 |
-| `ARLIAI`  | `ARLIAI_URL`                    | The base URL for the LLM API endpoint (tested with Google Gemini and ArliAI endpoints).                   |
-| `ARLIAI`  | `ARLIAI_ENABLE_MODEL_SWITCHING` | Enable automatic model switching when the current model is rate-limited (HTTP 429 or 503 overloaded). Default: `False`. Set to `True` to enable fallback to the next model in the `ARLIAI_MODEL` list. Requires a comma-separated model list to be effective.                   |
-| `ARLIAI`  | `ARLIAI_MODEL_SWITCHING_DRY_RUN` | When enabled (`True`) along with `ARLIAI_ENABLE_MODEL_SWITCHING`, logs rate-limit events and marks models as rate-limited, but does **not** actually switch to the next model. Useful for observation and testing before enabling live switching. Default: `False`.                   |
+| `LLM`     | `LLM_API_KEY`                   | Your LLM API Key (used as a fallback if `LLMAPIKEY` env var is not set).                                  |
+| `LLM`     | `LLM_MODEL`                     | The specific model(s) for the LLM API. Use a single model (e.g., `gemini-2.5-pro`) or comma-separated list for fallback (e.g., `gemini-2.5-pro,gemini-2.5-flash`). If the primary model is rate-limited, the system automatically switches to the next available model.                                                 |
+| `LLM`     | `LLM_URL`                       | The base URL for the LLM API endpoint (tested with Google Gemini and ArliAI endpoints).                   |
+| `LLM`     | `LLM_ENABLE_MODEL_SWITCHING`    | Enable automatic model switching when the current model is rate-limited (HTTP 429 or 503 overloaded). Default: `False`. Set to `True` to enable fallback to the next model in the `LLM_MODEL` list. Requires a comma-separated model list to be effective.                   |
+| `LLM`     | `LLM_MODEL_SWITCHING_DRY_RUN`   | When enabled (`True`) along with `LLM_ENABLE_MODEL_SWITCHING`, logs rate-limit events and marks models as rate-limited, but does **not** actually switch to the next model. Useful for observation and testing before enabling live switching. Default: `False`.                   |
 | `STEEM`   | `STEEM_API`                     | The Steem node to connect to (e.g., `https://api.steemit.com`). Leave blank for default.                  |
 | `STEEM`   | `STREAM_TYPE`                   | `ACTIVE` (recent posts), `HISTORY` (from last run), or `RANDOM`.                          |
 | `STEEM`   | `DEFAULT_START_BLOCK`         | The block number to start from if no history is found.                                                  |
@@ -99,14 +99,14 @@ The distribution of post rewards to beneficiaries is highly configurable but mus
 
 #### Model Switching for Rate-Limit Resilience
 
-If you provide a comma-separated list of models in `ARLIAI_MODEL`, Thoth can automatically switch to the next model if the current one becomes rate-limited. This provides built-in resilience against LLM API rate-limiting.
+If you provide a comma-separated list of models in `LLM_MODEL`, Thoth can automatically switch to the next model if the current one becomes rate-limited. This provides built-in resilience against LLM API rate-limiting.
 
 **Configuration Example:**
 ```ini
-[ARLIAI]
-ARLIAI_MODEL = gemini-2.5-pro,gemini-2.5-flash,gemini-2.0-flash
-ARLIAI_ENABLE_MODEL_SWITCHING = True
-ARLIAI_MODEL_SWITCHING_DRY_RUN = False
+[LLM]
+LLM_MODEL = gemini-2.5-pro,gemini-2.5-flash,gemini-2.0-flash
+LLM_ENABLE_MODEL_SWITCHING = True
+LLM_MODEL_SWITCHING_DRY_RUN = False
 ```
 
 **Recommended Rollout Strategy:**

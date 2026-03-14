@@ -15,7 +15,7 @@ commentMin = config.getint('ENGAGEMENT', 'COMMENT_MIN')
 commentMax = config.getint('ENGAGEMENT', 'COMMENT_MAX')
 commentWeight = config.getint('ENGAGEMENT', 'COMMENT_WEIGHT')
 resteemMin = config.getint('ENGAGEMENT', 'RESTEEM_MIN')
-resteemMax = config.getint('ENGAGEMENT', 'RESETEEM_MAX')
+resteemMax = config.getint('ENGAGEMENT', 'RESTEEM_MAX')
 resteemWeight = config.getint('ENGAGEMENT', 'RESTEEM_WEIGHT')
 valueMin = config.getfloat('ENGAGEMENT', 'VALUE_MIN')
 valueMax = config.getfloat('ENGAGEMENT', 'VALUE_MAX')
@@ -39,36 +39,39 @@ def scale(value, min_val, max_val):
     
 def hasLowEngagement(comment):
     """Determine if a comment has low engagement based on configured thresholds."""
+    try:
+        fullComment = steem.get_content(comment['author'], comment['permlink'])
 
-    fullComment = steem.get_content(comment['author'], comment['permlink'])
+        voteCountScore = scale(fullComment['net_votes'], voteCountMin, voteCountMax) * voteCountWeight
+        commentScore = scale(fullComment['children'], commentMin, commentMax) * commentWeight
+        # Fetch resteem count using the SDS API
+        resteemCount = get_resteem_count(comment['author'], comment['permlink'])
+        if resteemCount >= 0:  # Only use valid counts
+            resteemScore = scale(resteemCount, resteemMin, resteemMax) * resteemWeight
+        else:
+            resteemScore = 0  # Default to 0 if resteem count cannot be fetched
+        postValue = float(fullComment["pending_payout_value"].split()[0])
+        if ( postValue == 0.0 ):
+            postValue = 2 * float(fullComment['curator_payout_value'].split()[0])
 
-    voteCountScore = scale(fullComment['net_votes'], voteCountMin, voteCountMax) * voteCountWeight
-    commentScore = scale(fullComment['children'], commentMin, commentMax) * commentWeight
-    # Fetch resteem count using the SDS API
-    resteemCount = get_resteem_count(comment['author'], comment['permlink'])
-    if resteemCount >= 0:  # Only use valid counts
-        resteemScore = scale(resteemCount, resteemMin, resteemMax) * resteemWeight
-    else:
-        resteemScore = 0  # Default to 0 if resteem count cannot be fetched
-    postValue = float(fullComment["pending_payout_value"].split()[0])
-    if ( postValue == 0.0 ):
-        postValue = 2 * float(fullComment['curator_payout_value'].split()[0])
+        valueScore = scale(postValue, valueMin, valueMax) * valueWeight
+        valueScore = max(valueScore, 0 )
 
-    valueScore = scale(postValue, valueMin, valueMax) * valueWeight
-    valueScore = max(valueScore, 0 )
+        print (f"Engagement for post {comment['author']}/{comment['permlink']}: "
+               f"Votes: {fullComment['net_votes']} (Score: {voteCountScore}), "
+               f"Comments: {fullComment['children']} (Score: {commentScore}), "
+                  f"Resteems: {resteemCount} (Score: {resteemScore}), "
+                    f"Value: {postValue} (Score: {valueScore})")
+        totalWeight = voteCountWeight + commentWeight + resteemWeight + valueWeight
 
-    print (f"Engagement for post {comment['author']}/{comment['permlink']}: "
-           f"Votes: {fullComment['net_votes']} (Score: {voteCountScore}), "
-           f"Comments: {fullComment['children']} (Score: {commentScore}), "
-              f"Resteems: {resteemCount} (Score: {resteemScore}), "
-                f"Value: {postValue} (Score: {valueScore})")
-    totalWeight = voteCountWeight + commentWeight + resteemWeight + valueWeight
+        print (f"  Total Engagement Score: {(voteCountScore + commentScore + resteemScore + valueScore) / totalWeight:.2f} (Threshold: {engagementThreshold})") 
 
-    print (f"  Total Engagement Score: {(voteCountScore + commentScore + resteemScore + valueScore) / totalWeight:.2f} (Threshold: {engagementThreshold})") 
+        if totalWeight == 0:
+            return False # Avoid division by zero; consider no engagement if no weights are set
+        else:
+            engagementScore = int(0.5 + (voteCountScore + commentScore + resteemScore + valueScore) / totalWeight)
 
-    if totalWeight == 0:
-        return False # Avoid division by zero; consider no engagement if no weights are set
-    else:
-        engagementScore = int(0.5 + (voteCountScore + commentScore + resteemScore + valueScore) / totalWeight)
-
-    return engagementScore < engagementThreshold
+        return engagementScore < engagementThreshold
+    except Exception as e:
+        print(f"Error scoring engagement for {comment['author']}/{comment['permlink']}: {e}")
+        return True  # Default to low engagement on error

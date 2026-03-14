@@ -32,7 +32,7 @@ class ConfigValidator:
         
         # Validate all requirements
         self._validate_steem_section()
-        self._validate_arliai_section()  # Now includes API key validation
+        self._validate_llm_section()  # Now includes API key validation
         self._validate_blog_section()
         
         return len(self.errors) == 0
@@ -46,6 +46,31 @@ class ConfigValidator:
         """
         return self.errors
     
+    def get(self, section: str, key: str, fallback: str = '') -> str:
+        """Get a configuration value with fallback."""
+        return self.config.get(section, key, fallback=fallback).strip()
+    
+    def get_int(self, section: str, key: str, fallback: int = 0) -> int:
+        """Get an integer configuration value with fallback."""
+        try:
+            return self.config.getint(section, key, fallback=fallback)
+        except (ValueError, configparser.NoOptionError):
+            return fallback
+    
+    def get_float(self, section: str, key: str, fallback: float = 0.0) -> float:
+        """Get a float configuration value with fallback."""
+        try:
+            return self.config.getfloat(section, key, fallback=fallback)
+        except (ValueError, configparser.NoOptionError):
+            return fallback
+    
+    def get_boolean(self, section: str, key: str, fallback: bool = False) -> bool:
+        """Get a boolean configuration value with fallback."""
+        try:
+            return self.config.getboolean(section, key, fallback=fallback)
+        except (ValueError, configparser.NoOptionError):
+            return fallback
+
     def _validate_steem_section(self) -> None:
         """Validate STEEM section requirements."""
         # Requirement 1: POSTING_ACCOUNT must be set
@@ -60,24 +85,24 @@ class ConfigValidator:
         if not unlock_env and not posting_key:
             self.errors.append("Either UNLOCK environment variable or [STEEM] POSTING_KEY must be set")
     
-    def _validate_arliai_section(self) -> None:
-        """Validate ARLIAI section requirements."""
-        # Requirement 2: ARLIAI_MODEL must be set
-        arliai_model = self.config.get('ARLIAI', 'ARLIAI_MODEL', fallback='').strip()
-        if not arliai_model:
-            self.errors.append("[ARLIAI] ARLIAI_MODEL must be set")
+    def _validate_llm_section(self) -> None:
+        """Validate LLM section requirements."""
+        # Requirement 2: LLM_MODEL must be set
+        llm_model = self.config.get('LLM', 'LLM_MODEL', fallback='').strip()
+        if not llm_model:
+            self.errors.append("[LLM] LLM_MODEL must be set")
         
-        # Requirement 3: ARLIAI_URL must be set
-        arliai_url = self.config.get('ARLIAI', 'ARLIAI_URL', fallback='').strip()
-        if not arliai_url:
-            self.errors.append("[ARLIAI] ARLIAI_URL must be set")
+        # Requirement 3: LLM_URL must be set
+        llm_url = self.config.get('LLM', 'LLM_URL', fallback='').strip()
+        if not llm_url:
+            self.errors.append("[LLM] LLM_URL must be set")
         
-        # Requirement 7: LLMAPIKEY environment variable OR ARLIAI_KEY must be set
+        # Requirement 7: LLMAPIKEY environment variable OR LLM_API_KEY must be set
         llm_api_key_env = os.environ.get('LLMAPIKEY', '').strip()
-        arliai_key = self.config.get('ARLIAI', 'ARLIAI_KEY', fallback='').strip()
+        llm_api_key = self.config.get('LLM', 'LLM_API_KEY', fallback='').strip()
         
-        if not llm_api_key_env and not arliai_key:
-            self.errors.append("Either LLMAPIKEY environment variable or [ARLIAI] ARLIAI_KEY must be set")
+        if not llm_api_key_env and not llm_api_key:
+            self.errors.append("Either LLMAPIKEY environment variable or [LLM] LLM_API_KEY must be set")
     
     def _validate_blog_section(self) -> None:
         """Validate BLOG section requirements."""
@@ -118,6 +143,13 @@ class ConfigValidator:
                     f"({num_delegators} * {delegator_weight} + "
                     f"{num_reviewed_posts} * {curated_author_weight} + "
                     f"{posting_account_weight}) = {total_weight}"
+                )
+                
+            # Validate MIN_CURATION_TIER if present
+            min_curation_tier = self.config.get('BLOG', 'MIN_CURATION_TIER', fallback='').strip().lower()
+            if min_curation_tier and min_curation_tier not in ['excellent', 'good', 'fair', 'poor', 'reject']:
+                self.errors.append(
+                    f"[BLOG] MIN_CURATION_TIER must be one of: excellent, good, fair, poor, reject. Got: {min_curation_tier}"
                 )
                 
         except ValueError as e:
