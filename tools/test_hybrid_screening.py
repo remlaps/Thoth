@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Test script for the hybrid screening system.
 This script tests the rule-based constraints to ensure they take precedence over content scores.

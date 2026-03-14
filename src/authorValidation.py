@@ -480,8 +480,8 @@ def getMedianFollowerRep(author, steem_instance=None):
    """
    followersData = getAllFollowers(author, steem_instance=steem_instance)
    
-   # Extract reputation values from the data
-   reputations = [follower['reputation'] for follower in followersData]
+   # Extract reputation values from the data (already normalized by the Steem API)
+   reputations = [float(follower['reputation']) for follower in followersData]
    
    # Sort the reputations
    reputations.sort()

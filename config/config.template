@@ -2,22 +2,22 @@
 
 ###
 ### DO NOT COPY KEYS into config.template
-###    - Make sure ARLIAI/ARLIAI_KEY and STEEM/POSTING_KEY are both empty before saving!!!
+###    - Make sure LLM/LLM_API_KEY and STEEM/POSTING_KEY are both empty before saving in github!!!
 ###
 
-[ARLIAI]
+[LLM]
 # ArliAI info here - https://www.arliai.com/quick-start
 # Gemini info here - https://ai.google.dev/gemini-api/docs/quickstart
 ##### ArliAI switched again.  This time to Gemma3-27B models for free tier.  These are mostly untested.
 
-### ARLIAI_KEY = # This can be pulled from an environment variable.   ***DO NOT USE THIS / PROTECT YOUR KEY***
+### LLM_API_KEY = # This can be pulled from an environment variable.   ***DO NOT USE THIS / PROTECT YOUR KEY***
 #ARLIAI example
-### ARLIAI_MODEL = Gemma-3-27B-it
-### ARLIAI_URL = https://api.arliai.com/v1/chat/completions
+### LLM_MODEL = Gemma-3-27B-it
+### LLM_URL = https://api.arliai.com/v1/chat/completions
 
 #Gemini example
-ARLIAI_MODEL = gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash-lite, gemini-2.0-flash
-ARLIAI_URL = https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+LLM_MODEL = gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash-lite, gemini-2.0-flash
+LLM_URL = https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
 
 INITIAL_BACKOFF_SECONDS = 15.0
 JITTER_FACTOR = 0.2
@@ -32,11 +32,15 @@ USER_PROMPT_FILE = config\userPrompt.txt
 USER_PROMPT_TEMPLATE = config\userPromptTemplate.txt
 # Feature flags for model switching behavior
 # When True, enable automatic switching to the next model in the list if rate-limited
-ARLIAI_ENABLE_MODEL_SWITCHING = False
-# When True (and ARLIAI_ENABLE_MODEL_SWITCHING is True), log rate-limit events but do not actually switch models
-ARLIAI_MODEL_SWITCHING_DRY_RUN = False
+LLM_ENABLE_MODEL_SWITCHING = False
+# When True (and LLM_ENABLE_MODEL_SWITCHING is True), log rate-limit events but do not actually switch models
+LLM_MODEL_SWITCHING_DRY_RUN = False
+
+# When True, skips making actual API calls to the LLM for curation and intro generation, inserting dummy text instead.
+SKIP_AI_CURATION = False
 
 [AUTHOR]
+ENABLE_MEDIAN_REP_SCORING = False
 FOLLOWER_HALFLIFE_YEARS = 2
 # required days since the account was active on Blurt (not yet implemented)
 LAST_BLURT_ACTIVITY_AGE = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
@@ -124,12 +128,14 @@ VOTE_COUNT_MIN = 10
 VOTE_COUNT_WEIGHT = 1
 
 [SCORING]
-# Quality Tiers (0-100)
-# These thresholds determine the label assigned to a post based on its total score.
-TIER_EXCELLENT_MIN = 85.0
-TIER_GOOD_MIN = 70.0
-TIER_FAIR_MIN = 55.0
-TIER_POOR_MIN = 40.0
+# Author Component Max Scores
+MAX_REPUTATION_SCORE = 25.0
+MAX_FOLLOWERS_PER_MONTH_SCORE = 20.0
+MAX_ADJUSTED_FOLLOWERS_SCORE = 25.0
+MAX_MEDIAN_REP_SCORE = 15.0
+MAX_AGE_SCORE = 15.0
+MAX_ACTIVITY_SCORE = 15.0
+MAX_INFLUENCE_SCORE = 10.0
 
 # Component Weights (Should sum to 1.0)
 # These determine how much each factor contributes to the total score.
@@ -137,8 +143,22 @@ COMPONENT_AUTHOR_WEIGHT = 0.40
 COMPONENT_CONTENT_WEIGHT = 0.35
 COMPONENT_ENGAGEMENT_WEIGHT = 0.25
 
+# Content Component Max Scores
+MAX_LENGTH_SCORE = 30.0
+MAX_TITLE_SCORE = 10.0
+MAX_TAG_SCORE = 15.0
+MAX_LANGUAGE_SCORE = 20.0
+
+# Quality Tiers (0-100)
+# These thresholds determine the label assigned to a post based on its total score.
+TIER_EXCELLENT_MIN = 90.0
+TIER_GOOD_MIN = 80.0
+TIER_FAIR_MIN = 70.0
+TIER_POOR_MIN = 60.0
+
 [STEEM]
 DEFAULT_START_BLOCK = 3250000
+DRY_RUN = False
 # Default to @social for testing
 POSTING_ACCOUNT = social
 # It is recommended to set these in your wallet, using "steempy"

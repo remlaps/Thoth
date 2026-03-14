@@ -4,12 +4,14 @@ This document explains the purpose of the sections and parameters in the `config
 
 ---
 
-## [ARLIAI]
+## [LLM]
 This section configures the AI model and related parameters.
 
-- **ARLIAI_KEY**: The API key for the AI model.  ***DO NOT USE THIS / PROTECT YOUR KEY***
-- **ARLIAI_MODEL**: Specifies the AI model to use. Options include `Qwen3-14B`, `gemini-2.0-flash`, etc.
-- **ARLIAI_URL**: The API endpoint for the AI model.
+- **LLM_API_KEY**: The API key for the AI model.  ***DO NOT USE THIS / PROTECT YOUR KEY***
+- **LLM_MODEL**: Specifies the AI model to use. Options include `Qwen3-14B`, `gemini-2.0-flash`, etc.
+- **LLM_URL**: The API endpoint for the AI model.
+- **LLM_ENABLE_MODEL_SWITCHING**: Enable automatic model switching when the current model is rate-limited.
+- **LLM_MODEL_SWITCHING_DRY_RUN**: When enabled, logs rate-limit events but does not actually switch to the next model.
 - **INITIAL_BACKOFF_SECONDS**: Initial delay before retrying a failed request.
 - **JITTER_FACTOR**: Adds randomness to retry delays to avoid collisions.
 - **MAX_RETRIES**: Maximum number of retry attempts for failed requests.
@@ -17,6 +19,7 @@ This section configures the AI model and related parameters.
 - **SYSTEM_PROMPT_TEMPLATE**: Path to the system prompt template.
 - **USER_PROMPT_FILE**: Path to the user prompt file.
 - **USER_PROMPT_TEMPLATE**: Path to the user prompt template.
+- **SKIP_AI_CURATION**: Set to `True` to skip AI curation and intro generation, inserting dummy text instead.
 
 ---
 
@@ -35,6 +38,7 @@ This section configures the Steem blockchain interaction.
 ## [AUTHOR]
 This section defines author validation rules.
 
+- **ENABLE_MEDIAN_REP_SCORING**: Set to `True` to enable median follower reputation scoring (can be slow for large accounts).
 - **FOLLOWER_HALFLIFE_YEARS**: Half-life of followers for activity calculation.
 - **LAST_BLURT_ACTIVITY_AGE**: Required days since last activity on Blurt.
 - **LAST_HIVE_ACTIVITY_AGE**: Required days since last activity on Hive.
@@ -107,6 +111,17 @@ This section defines engagement metrics.
 ## [SCORING]
 This section configures the quality scoring system.
 
+- **MAX_ACTIVITY_SCORE**: Maximum points awarded for author activity.
+- **MAX_ADJUSTED_FOLLOWERS_SCORE**: Maximum points awarded for adjusted followers per month.
+- **MAX_AGE_SCORE**: Maximum points awarded for author account age.
+- **MAX_FOLLOWERS_PER_MONTH_SCORE**: Maximum points awarded for followers per month.
+- **MAX_LANGUAGE_SCORE**: Maximum points awarded for language readability.
+- **MAX_LENGTH_SCORE**: Maximum points awarded for content length.
+- **MAX_MEDIAN_REP_SCORE**: Maximum points awarded for median follower reputation.
+- **MAX_INFLUENCE_SCORE**: Maximum points awarded (or penalized) for the author's influence ratio (followers/following).
+- **MAX_REPUTATION_SCORE**: Maximum points awarded for author reputation.
+- **MAX_TAG_SCORE**: Maximum points awarded for optimal tag usage.
+- **MAX_TITLE_SCORE**: Maximum points awarded for title length/quality.
 - **TIER_EXCELLENT_MIN**: Minimum score (0-100) for a post to be rated 'excellent'.
 - **TIER_GOOD_MIN**: Minimum score for a post to be rated 'good'.
 - **TIER_FAIR_MIN**: Minimum score for a post to be rated 'fair'.
@@ -121,6 +136,7 @@ This section configures the quality scoring system.
 This section configures the Steem blockchain interaction.
 
 - **DEFAULT_START_BLOCK**: The starting block number for processing.
+- **DRY_RUN**: Set to `True` to skip posting, replying, and voting on the blockchain.
 - **POSTING_ACCOUNT**: The account used for posting.
 - **POSTING_KEY**: The private key for the posting account.  ***DO NOT USE THIS / PROTECT YOUR KEY***
 - **STEEM_API**: The API endpoint for Steem blockchain.

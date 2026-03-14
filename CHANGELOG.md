@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - 
 ### Added
+- `DRY_RUN` configuration parameter in the `[STEEM]` section to skip blockchain posting, replying, and voting.
+- `SKIP_AI_CURATION` configuration parameter in the `[LLM]` section to bypass LLM API calls and generate placeholder text instead.
 - `StatsTracker` system (`src/statsTracker.py`) to collect and report detailed run statistics, including rejection reasons and score distributions.
 - Resteems are now included in the engagement score calculation.
 - End-of-run statistical report is now printed to the console and appended to `output.html`.
@@ -27,8 +29,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive verification script `tools/verify_hybrid_implementation.py`
 - Enhanced testing script `tools/test_enhanced_content_scoring.py`
 - Rule-based early rejection for performance optimization
+- Configurable maximum scores for all author and content evaluation components added to the `[SCORING]` section.
+- `ENABLE_MEDIAN_REP_SCORING` configuration parameter added to optionally toggle the computationally expensive median follower reputation check.
+- In-memory caching for `getMedianFollowerRep` across posts by the same author to minimize redundant API calls.
+- Integrated `influence_ratio` metric (followers/following) into author scoring, complete with Laplace smoothing to provide a grace period for brand new authors.
 
 ### Changed
+- Renamed all `ARLIAI` configuration parameters to use a generic `LLM` prefix (e.g., `LLM_API_KEY`, `LLM_MODEL`) to better reflect support for multiple AI providers.
 - The hard minimum word count check is now the first rule executed in the screening process for significant performance improvement.
 - The engagement scoring logic in `contentScoring.py` was refactored to use a configurable weighted-average model based on settings in `config.ini`.
 - The `_score_language` check now correctly references the soft minimum word count (`MIN_WORDS`) from the configuration.
@@ -41,12 +48,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Optimized rule-based screening order in `hybridScreening.py` to implement a "Fail-Fast" strategy: cheap local checks (word count, language, tags) now run before expensive network checks (blacklist, wallet, history).
 - Updated `verify_hybrid_implementation.py` to verify the exact execution order of screening rules.
 - Refactored `test_hybrid_screening.py` to use extensive Mocking, ensuring unit tests verify specific logic in isolation regardless of the new optimization order.
+- Replaced hard-coded scoring discontinuities (e.g., word count length cliffs) with continuous formulas for smoother, fairer evaluations.
+- Rescaled the Median Follower Reputation scoring to map dynamically between a reputation range of 30 and 60 (previously assumed 0-80).
 
 ### Fixed
-- **Major Performance Issue**: Disabled the `getMedianFollowerRep` calculation, which was causing extreme slowdowns and API spam by fetching all followers of an author.
+- **Major Performance Issue**: Made the `getMedianFollowerRep` calculation conditionally optional (default: False) to prevent extreme slowdowns and API spam.
 - **Performance Issue**: Replaced inefficient `len(account.get_followers())` with the fast `get_follow_count` API call to get follower counts.
 - **Performance Issue**: Eliminated a redundant `get_content` API call by passing the post object from the screening stage to the scoring stage.
 - **Accuracy Issue**: Word count for scoring now correctly strips HTML and Markdown, leading to more accurate content length scores.
+- **Accuracy Issue**: Tag extraction logic safely parses `json_metadata` when the Steem API returns it as a serialized JSON string rather than a dictionary.
+- **Accuracy Issue**: Corrected median follower reputation calculation to utilize the API's pre-normalized values instead of inadvertently re-applying `log10` math.
+- **Redundancy**: Streamlined date parsing in `contentScoring.py` into a robust `_parse_steem_date` helper method.
 - Performance issues by avoiding scoring calculations for rule-violating content
 - Inconsistent author quality assessment with basic follower counts
 - Rule precedence logic to ensure hard constraints override scores

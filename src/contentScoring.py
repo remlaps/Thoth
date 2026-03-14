@@ -6,16 +6,14 @@ the binary accept/reject screening with a multi-dimensional scoring approach.
 """
 
 import re
-import math
+import json
 from datetime import datetime, timedelta
 import logging
 
 from steem import Steem
 from steem.account import Account
-from steem.post import Post
 from steem.account import AccountDoesNotExistsException
 
-from configValidator import ConfigValidator
 from utils import get_rng, remove_formatting
 from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep
 from steemHelpers import get_resteem_count
@@ -41,6 +39,9 @@ class ContentScorer:
         self.weights = self._load_scoring_weights()
         self.thresholds = self._load_scoring_thresholds()
         
+        # Cache for expensive calculations
+        self.median_rep_cache = {}
+        
     def _load_scoring_weights(self):
         """Load scoring weights from configuration."""
         weights = {}
@@ -51,6 +52,21 @@ class ContentScorer:
         weights['author_activity'] = self.config.get_int('AUTHOR', 'MAX_INACTIVITY_DAYS', 4000) * 0.001
         weights['author_median_rep'] = self.config.get_int('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP', 40) * 0.1
         
+        # Author max component scores
+        weights['max_reputation_score'] = self.config.get_float('SCORING', 'MAX_REPUTATION_SCORE', 25.0)
+        weights['max_followers_per_month_score'] = self.config.get_float('SCORING', 'MAX_FOLLOWERS_PER_MONTH_SCORE', 20.0)
+        weights['max_adjusted_followers_score'] = self.config.get_float('SCORING', 'MAX_ADJUSTED_FOLLOWERS_SCORE', 25.0)
+        weights['max_median_rep_score'] = self.config.get_float('SCORING', 'MAX_MEDIAN_REP_SCORE', 15.0)
+        weights['max_age_score'] = self.config.get_float('SCORING', 'MAX_AGE_SCORE', 15.0)
+        weights['max_activity_score'] = self.config.get_float('SCORING', 'MAX_ACTIVITY_SCORE', 15.0)
+        weights['max_influence_score'] = self.config.get_float('SCORING', 'MAX_INFLUENCE_SCORE', 10.0)
+
+        # Content max component scores
+        weights['max_length_score'] = self.config.get_float('SCORING', 'MAX_LENGTH_SCORE', 30.0)
+        weights['max_title_score'] = self.config.get_float('SCORING', 'MAX_TITLE_SCORE', 10.0)
+        weights['max_tag_score'] = self.config.get_float('SCORING', 'MAX_TAG_SCORE', 15.0)
+        weights['max_language_score'] = self.config.get_float('SCORING', 'MAX_LANGUAGE_SCORE', 20.0)
+
         # Content quality weights
         weights['content_length'] = self.config.get_int('CONTENT', 'MIN_WORDS', 400) * 0.01
         weights['content_tags'] = self.config.get_int('CONTENT', 'MAX_TAG_COUNT', 10) * 0.5
@@ -62,7 +78,7 @@ class ContentScorer:
         weights['engagement_value'] = self.config.get_float('ENGAGEMENT', 'VALUE_WEIGHT', 1.0)
         
         # Additional engagement factors (currently not implemented but prepared)
-        weights['engagement_resteeems'] = self.config.get_float('ENGAGEMENT', 'RESTEEM_WEIGHT', 0.0)
+        weights['engagement_resteems'] = self.config.get_float('ENGAGEMENT', 'RESTEEM_WEIGHT', 0.0)
         weights['engagement_feed_reach'] = 0.1  # Placeholder for future implementation
         weights['engagement_downvotes'] = 0.5   # Penalty weight for downvotes
         
@@ -89,8 +105,39 @@ class ContentScorer:
         thresholds['min_value'] = self.config.get_float('ENGAGEMENT', 'VALUE_MIN', 0.25)
         thresholds['max_value'] = self.config.get_float('ENGAGEMENT', 'VALUE_MAX', 100.0)
         
+        thresholds['min_comment_count'] = self.config.get_int('ENGAGEMENT', 'COMMENT_MIN', -10)
+        thresholds['max_comment_count'] = self.config.get_int('ENGAGEMENT', 'COMMENT_MAX', 20)
+        thresholds['min_resteem_count'] = self.config.get_int('ENGAGEMENT', 'RESTEEM_MIN', 2)
+        thresholds['max_resteem_count'] = self.config.get_int('ENGAGEMENT', 'RESTEEM_MAX', 20)
+        
         return thresholds
     
+    def _parse_steem_date(self, date_val):
+        """Helper to safely parse Steem API dates into naive datetime objects."""
+        if isinstance(date_val, datetime):
+            return date_val.replace(tzinfo=None)
+            
+        if not isinstance(date_val, str) or not date_val:
+            return datetime.utcnow() - timedelta(days=3650)
+            
+        try:
+            return datetime.strptime(date_val.replace('Z', ''), '%Y-%m-%dT%H:%M:%S')
+        except Exception:
+            return datetime.utcnow() - timedelta(days=3650)
+
+    def _extract_tags(self, post):
+        """Safely extract tags from post metadata."""
+        try:
+            if post.get('json_metadata'):
+                if isinstance(post['json_metadata'], dict):
+                    return post['json_metadata'].get('tags', [])
+                elif isinstance(post['json_metadata'], str):
+                    metadata = json.loads(post['json_metadata'])
+                    return metadata.get('tags', [])
+        except Exception:
+            pass
+        return []
+
     def score_content(self, post_data, content_data=None):
         """
         Score a piece of content across multiple dimensions.
@@ -139,7 +186,7 @@ class ContentScorer:
                     'total_payout_value': post['total_payout_value'],
                     'children': post['children'],
                     'created': post['created'],
-                    'tags': post['json_metadata'].get('tags', []) if post['json_metadata'] and isinstance(post['json_metadata'], dict) else []
+                    'tags': self._extract_tags(post)
                 }
             }
             
@@ -164,90 +211,66 @@ class ContentScorer:
             followers = follow_counts['follower_count']
             following = follow_counts['following_count']
             
-            # Calculate adjusted followers (followers - following to account for spam follows)
-            adjusted_followers = max(0, followers - following)
+            # Calculate influence ratio with Laplace smoothing (small account boost)
+            smoothed_followers = followers + 50
+            smoothed_following = following + 50
+            influence_ratio = smoothed_followers / smoothed_following
             
             # Check account age
-            created_date = account['created']
-            # created_date may be returned as a string from the Steem API
-            if isinstance(created_date, str):
-                try:
-                    # Accept ISO formats with or without trailing Z
-                    if created_date.endswith('Z'):
-                        created_date = datetime.fromisoformat(created_date.replace('Z', '+00:00'))
-                    else:
-                        created_date = datetime.fromisoformat(created_date)
-                except (ValueError, TypeError):
-                    # Fallback to older strptime pattern
-                    try:
-                        created_date = datetime.strptime(created_date, '%Y-%m-%dT%H:%M:%S')
-                    except Exception:
-                        # If parsing fails entirely, treat as very old account
-                        created_date = datetime.now() - timedelta(days=3650)
-            account_age_days = (datetime.now() - created_date).days
+            created_date = self._parse_steem_date(account.get('created'))
+            account_age_days = (datetime.utcnow() - created_date).days
             
             # Check last activity
-            last_activity = max(
-                account['last_vote_time'], 
-                account['last_post'], 
-                account['last_root_post']
+            last_activity_date = max(
+                self._parse_steem_date(account.get('last_vote_time')),
+                self._parse_steem_date(account.get('last_post')),
+                self._parse_steem_date(account.get('last_root_post'))
             )
-            
-            # Ensure last_activity is a datetime object
-            if isinstance(last_activity, str):
-                try:
-                    # Handle different timestamp formats from Steem API
-                    # Format: "2026-03-04T12:25:13" or "2026-03-04T12:25:13Z"
-                    if last_activity.endswith('Z'):
-                        last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
-                    else:
-                        last_activity = datetime.fromisoformat(last_activity)
-                except (ValueError, TypeError):
-                    # If parsing fails, use a default old date to indicate inactivity
-                    last_activity = datetime.now() - timedelta(days=3650)  # 10 years ago
-            elif hasattr(last_activity, 'replace'):  # Already a datetime object
-                pass
-            else:
-                # Fallback for unexpected types
-                last_activity = datetime.now() - timedelta(days=3650)
-            
-            # Handle timezone-aware vs timezone-naive datetime comparison
-            now = datetime.now()
-            if hasattr(last_activity, 'tzinfo') and last_activity.tzinfo is not None:
-                # If last_activity is timezone-aware, make now timezone-aware too
-                from datetime import timezone
-                now = datetime.now(timezone.utc)
-            
-            last_activity_days = (now - last_activity).days
+            last_activity_days = (datetime.utcnow() - last_activity_date).days
             
             # Author score components
             # Reputation is typically 25-80. 
-            # Normalize: (Rep - 25) / 2. Example: Rep 75 -> 25 pts. Rep 25 -> 0 pts.
-            # Ensure we don't go below 0 or above 25.
-            reputation_score = min(max(0, (reputation - 25) / 2.0), 25.0)
+            # Normalize: (Rep - 25) / 2. Example: Rep 75 -> max pts. Rep 25 -> 0 pts.
+            # Ensure we don't go below 0 or above max.
+            max_rep_score = self.weights.get('max_reputation_score', 25.0)
+            reputation_score = min(max(0, (reputation - 25) / 2.0), max_rep_score)
             
             # Advanced follower metrics from authorValidation.py
             # 1. Followers per month (normalized)
+            max_fpm_score = self.weights.get('max_followers_per_month_score', 20.0)
             followers_per_month = followersPerMonth(account, {'author': author}, steem_instance=self.steem, cached_count=followers)
-            followers_per_month_score = min(followers_per_month * 2.0, 20.0)  # Max 20 points
+            followers_per_month_score = min(followers_per_month * 2.0, max_fpm_score)
             
             # 2. Adjusted followers per month (with half-life decay)
+            max_adj_fpm_score = self.weights.get('max_adjusted_followers_score', 25.0)
             adjusted_followers_per_month = adjustedFollowersPerMonth(account, {'author': author}, steem_instance=self.steem, cached_count=followers)
-            adjusted_followers_score = min(adjusted_followers_per_month * 2.5, 25.0)  # Max 25 points
+            adjusted_followers_score = min(adjusted_followers_per_month * 2.5, max_adj_fpm_score)
             
             # 3. Median follower reputation
-            # Optimization: Disabled because fetching all followers is too expensive for large accounts (O(N))
-            # median_follower_rep = getMedianFollowerRep(author, steem_instance=self.steem)
             median_rep_score = 0.0
-            # if median_follower_rep is not None:
-            #     # Normalize median rep (typically 0-80 range)
-            #     median_rep_score = min(max(0, median_follower_rep / 4.0), 15.0)  # Max 15 points
+            if self.config.get_boolean('AUTHOR', 'ENABLE_MEDIAN_REP_SCORING', fallback=False):
+                if author not in self.median_rep_cache:
+                    self.median_rep_cache[author] = getMedianFollowerRep(author, steem_instance=self.steem)
+                    
+                median_follower_rep = self.median_rep_cache[author]
+                if median_follower_rep is not None:
+                    # Normalize median rep (expected range 30-60)
+                    max_median_rep_score = self.weights.get('max_median_rep_score', 15.0)
+                    median_rep_score = min(max(0.0, ((median_follower_rep - 30.0) / 30.0) * max_median_rep_score), max_median_rep_score)
             
             # 4. Account age score (older accounts get more trust)
-            age_score = min(account_age_days / 100.0, 15.0)  # Reduced from 20 to 15 to make room for new metrics
+            max_age_score = self.weights.get('max_age_score', 15.0)
+            age_score = min(account_age_days / 100.0, max_age_score)
             
             # 5. Activity score (penalty for inactivity)
-            activity_score = max(0, 15.0 - (last_activity_days / 50.0))  # Reduced from 20 to 15
+            max_activity_score = self.weights.get('max_activity_score', 15.0)
+            activity_score = max(0, max_activity_score - (last_activity_days / 50.0))
+            
+            # 6. Influence Ratio score
+            # A ratio of 1.0 is neutral (0 points). Scales up to max points at a 3.0 ratio.
+            max_influence_score = self.weights.get('max_influence_score', 10.0)
+            influence_score = (influence_ratio - 1.0) * (max_influence_score / 2.0)
+            influence_score = max(-max_influence_score, min(influence_score, max_influence_score))
             
             # Combined author score (max 100)
             author_score = (
@@ -256,10 +279,11 @@ class ContentScorer:
                 adjusted_followers_score + 
                 median_rep_score + 
                 age_score + 
-                activity_score
+                activity_score + 
+                influence_score
             )
             
-            return min(author_score, 100.0)
+            return max(0.0, min(author_score, 100.0))
             
         except AccountDoesNotExistsException:
             logger.warning(f"Author account {author} does not exist")
@@ -279,19 +303,25 @@ class ContentScorer:
             title_length = len(post['title'])
             
             # Length scoring with optimal ranges
+            max_length_score = self.weights.get('max_length_score', 30.0)
+            base_length_score = max_length_score * (10.0 / 30.0)
+            bonus_length_score = max_length_score - base_length_score
+            
             length_score = 0.0
             if word_count >= 400:
-                length_score = min(word_count / 20.0, 30.0)  # Max 30 points (approx 600 words)
+                length_score = base_length_score + min((word_count - 400) / 20.0, bonus_length_score)
             elif word_count >= 100:
-                length_score = word_count / 40.0  # Partial credit for shorter posts
+                length_score = (word_count - 100) / (300.0 / base_length_score)
             
             # Title quality score
-            title_score = min(title_length / 5.0, 10.0)
+            max_title_score = self.weights.get('max_title_score', 10.0)
+            title_score = min(title_length / 5.0, max_title_score)
             
             # Tag quality score
-            tags = post['json_metadata'].get('tags', []) if post['json_metadata'] and isinstance(post['json_metadata'], dict) else []
+            tags = self._extract_tags(post)
             tag_count = len(tags)
-            tag_score = max(0, 15.0 - abs(tag_count - 3) * 2.0)  # Optimal around 3 tags
+            max_tag_score = self.weights.get('max_tag_score', 15.0)
+            tag_score = max(0, max_tag_score - abs(tag_count - 3) * 2.0)  # Optimal around 3 tags
             
             # Language detection (simplified - just check for common language patterns)
             language_score = self._score_language(clean_body)
@@ -340,7 +370,8 @@ class ContentScorer:
             
             # Basic readability score
             avg_word_length = sum(len(word) for word in words) / len(words) if words else 0
-            readability_score = min(avg_word_length * 2, 20.0)
+            max_language_score = self.weights.get('max_language_score', 20.0)
+            readability_score = min(avg_word_length * 2, max_language_score)
             
             return readability_score
         except UnicodeEncodeError as e:
@@ -375,22 +406,22 @@ class ContentScorer:
             total_payout = float(post['total_payout_value'].split()[0])
             total_value = pending_payout + total_payout
 
-            # Load scaling params and weights from config
-            vote_min = self.config.get_int('ENGAGEMENT', 'VOTE_COUNT_MIN', 10)
-            vote_max = self.config.get_int('ENGAGEMENT', 'VOTE_COUNT_MAX', 200)
-            vote_weight = self.config.get_float('ENGAGEMENT', 'VOTE_COUNT_WEIGHT', 1.0)
+            # Load scaling params and weights from pre-loaded config
+            vote_min = self.thresholds['min_vote_count']
+            vote_max = self.thresholds['max_vote_count']
+            vote_weight = self.weights['engagement_votes']
 
-            comment_min = self.config.get_int('ENGAGEMENT', 'COMMENT_MIN', -10)
-            comment_max = self.config.get_int('ENGAGEMENT', 'COMMENT_MAX', 20)
-            comment_weight = self.config.get_float('ENGAGEMENT', 'COMMENT_WEIGHT', 2.0)
+            comment_min = self.thresholds['min_comment_count']
+            comment_max = self.thresholds['max_comment_count']
+            comment_weight = self.weights['engagement_comments']
 
-            value_min = self.config.get_float('ENGAGEMENT', 'VALUE_MIN', 0.25)
-            value_max = self.config.get_float('ENGAGEMENT', 'VALUE_MAX', 100.0)
-            value_weight = self.config.get_float('ENGAGEMENT', 'VALUE_WEIGHT', 1.0)
+            value_min = self.thresholds['min_value']
+            value_max = self.thresholds['max_value']
+            value_weight = self.weights['engagement_value']
 
-            resteem_min = self.config.get_int('ENGAGEMENT', 'RESTEEM_MIN', 2)
-            resteem_max = self.config.get_int('ENGAGEMENT', 'RESTEEM_MAX', 20)
-            resteem_weight = self.config.get_float('ENGAGEMENT', 'RESTEEM_WEIGHT', 0.0)
+            resteem_min = self.thresholds['min_resteem_count']
+            resteem_max = self.thresholds['max_resteem_count']
+            resteem_weight = self.weights['engagement_resteems']
 
             # Calculate scaled scores (0-100 for each component)
             vote_score_scaled = self._scale(net_votes, vote_min, vote_max)

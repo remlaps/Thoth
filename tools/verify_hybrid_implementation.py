@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Simple verification script for the hybrid screening implementation.
 This script verifies that the hybrid screening system is properly integrated.

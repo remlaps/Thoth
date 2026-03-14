@@ -13,7 +13,6 @@ import aiCurator # From the thoth package
 import postHelper # From the thoth package
 import delegationInfo
 from configValidator import ConfigValidator
-from contentScoring import ContentScorer
 from hybridScreening import HybridScreening
 from modelManager import ModelManager
 from statsTracker import StatsTracker
@@ -51,42 +50,47 @@ config = configparser.ConfigParser()
 # Read the config.ini file
 config.read('config/config.ini')
 
-arliaiKey = os.getenv('LLMAPIKEY')
+llmKey = os.getenv('LLMAPIKEY')
 source_msg = "Using LLM API key from environment variable 'LLMAPIKEY'."
 
-if not arliaiKey:
+if not llmKey:
     source_msg = "LLMAPIKEY environment variable not set, falling back to config file."
     # Use fallback to prevent an error if the key is missing in the config.
-    arliaiKey = config.get('ARLIAI', 'ARLIAI_KEY', fallback='')
+    llmKey = config.get('LLM', 'LLM_API_KEY', fallback='')
 
 # It's crucial to have a key. Exit if it's missing or empty.
-if not arliaiKey.strip():
-    print("FATAL: LLM API key is missing or empty. Please set LLMAPIKEY or configure ARLIAI_KEY in config.ini.")
+if not llmKey.strip():
+    print("FATAL: LLM API key is missing or empty. Please set LLMAPIKEY or configure LLM_API_KEY in config.ini.")
 
 print(source_msg)
 
 # Clean the key. This handles comments from the config file (e.g., "key # comment")
 # and also strips quotes or whitespace that might be included from an environment variable.
-arliaiKey = arliaiKey.split('#', 1)[0].strip().strip('"\'')
-arliaiModel=config.get('ARLIAI', 'ARLIAI_MODEL')
-arliaiUrl=config.get('ARLIAI', 'ARLIAI_URL')
+llmKey = llmKey.split('#', 1)[0].strip().strip('"\'')
+llmModel=config.get('LLM', 'LLM_MODEL')
+llmUrl=config.get('LLM', 'LLM_URL')
 
 # Initialize the ModelManager for handling multiple models and rate limiting
-model_manager = ModelManager(arliaiModel)
+model_manager = ModelManager(llmModel)
 print(f"Initialized model manager with models: {model_manager.models}")
 
 # Feature flag: enable model switching and optional dry-run
 try:
-    enable_model_switching = config.getboolean('ARLIAI', 'ARLIAI_ENABLE_MODEL_SWITCHING', fallback=False)
+    enable_model_switching = config.getboolean('LLM', 'LLM_ENABLE_MODEL_SWITCHING', fallback=False)
 except Exception:
-    enable_model_switching = config.get('ARLIAI', 'ARLIAI_ENABLE_MODEL_SWITCHING', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+    enable_model_switching = config.get('LLM', 'LLM_ENABLE_MODEL_SWITCHING', fallback='False').lower() in ('1', 'true', 'yes', 'on')
 
 try:
-    model_switching_dry_run = config.getboolean('ARLIAI', 'ARLIAI_MODEL_SWITCHING_DRY_RUN', fallback=False)
+    model_switching_dry_run = config.getboolean('LLM', 'LLM_MODEL_SWITCHING_DRY_RUN', fallback=False)
 except Exception:
-    model_switching_dry_run = config.get('ARLIAI', 'ARLIAI_MODEL_SWITCHING_DRY_RUN', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+    model_switching_dry_run = config.get('LLM', 'LLM_MODEL_SWITCHING_DRY_RUN', fallback='False').lower() in ('1', 'true', 'yes', 'on')
 
-print(f"Model switching enabled: {enable_model_switching}. Dry run: {model_switching_dry_run}")
+try:
+    skip_ai_curation = config.getboolean('LLM', 'SKIP_AI_CURATION', fallback=False)
+except Exception:
+    skip_ai_curation = config.get('LLM', 'SKIP_AI_CURATION', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+
+print(f"Model switching enabled: {enable_model_switching}. Dry run: {model_switching_dry_run}. Skip AI curation: {skip_ai_curation}")
 
 ### Validate the config to avoid failures at posting time.
 validator = ConfigValidator()
@@ -265,12 +269,16 @@ while retry_count <= max_retries:
                         print(f"Content accepted for curation with {ai_intensity} AI analysis.")
 
                         ### Get the AI Evaluation with score context
-                        aiResponse = aiCurator.aicurate(
-                            arliaiKey, arliaiModel, arliaiUrl, tmpBody,
-                            model_manager=model_manager,
-                            enable_switching=enable_model_switching,
-                            dry_run=model_switching_dry_run
-                        )
+                        if skip_ai_curation:
+                            print(f"Skipping AI Curation API call for @{operation['author']}/{operation['permlink']} (SKIP_AI_CURATION is enabled).")
+                            aiResponse = f"[SKIP_AI_CURATION ENABLED] Mock AI curation summary for post by @{operation['author']}. This placeholder text ensures the minimum response length requirement is met without calling the LLM API. {'=' * 50}"
+                        else:
+                            aiResponse = aiCurator.aicurate(
+                                llmKey, llmModel, llmUrl, tmpBody,
+                                model_manager=model_manager,
+                                enable_switching=enable_model_switching,
+                                dry_run=model_switching_dry_run
+                            )
                         with open('data/output.html', 'a', encoding='utf-8') as f:
                             print(f"URL: https://steemit.com/@{comment['author']}/{comment['permlink']}")
                             print(f"Title: {latestPostVersion['title']}")
@@ -338,15 +346,19 @@ if earliest_timestamp and latest_timestamp:
     # The timestamps from the stream are already datetime objects.
     print(f"Posts processed ranged from {earliest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')} to {latest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')}")
 
-    aiIntroString = aiIntro.aiIntro(
-        arliaiKey, arliaiModel, arliaiUrl,
-        earliest_timestamp, latest_timestamp,
-        "\n\n".join(aiResponseList), 16384,
-        model_manager=model_manager,
-        enable_switching=enable_model_switching,
-        dry_run=model_switching_dry_run,
-        score_data=scoreList
-    )
+    if skip_ai_curation:
+        print("Skipping AI Intro generation (SKIP_AI_CURATION is enabled).")
+        aiIntroString = f"[SKIP_AI_CURATION ENABLED] Mock AI Intro summary. This placeholder text is generated because the AI API calls are bypassed in the configuration. {'=' * 50}"
+    else:
+        aiIntroString = aiIntro.aiIntro(
+            llmKey, llmModel, llmUrl,
+            earliest_timestamp, latest_timestamp,
+            "\n\n".join(aiResponseList), 16384,
+            model_manager=model_manager,
+            enable_switching=enable_model_switching,
+            dry_run=model_switching_dry_run,
+            score_data=scoreList
+        )
     # Retrieve delegations once and pass into postHelper to avoid duplicate RPC calls
     postingAccount_main = config.get('STEEM', 'POSTING_ACCOUNT')
     try:

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Test script for the enhanced content scoring system with advanced follower metrics.
 This script tests the integration of authorValidation.py follower metrics into contentScoring.py.
@@ -116,6 +117,29 @@ def test_follower_metrics_functions():
         print(f"✗ Failed to test follower metrics functions: {e}")
         return False
 
+def test_influence_ratio_scoring():
+    """Test that the influence ratio score is integrated properly."""
+    try:
+        from contentScoring import ContentScorer
+        from configValidator import ConfigValidator
+        from steem import Steem
+        
+        config = ConfigValidator()
+        steem = Steem()
+        scorer = ContentScorer(steem, config)
+        
+        # Using thoth as a generic test author
+        test_author = "thoth"
+        author_score = scorer._score_author(test_author)
+        
+        # Verify it executes cleanly since influence_ratio was added to the score calculation
+        print("✓ Influence ratio scoring calculated within _score_author without errors")
+        return True
+        
+    except Exception as e:
+        print(f"✗ Failed to test influence ratio scoring: {e}")
+        return False
+
 def main():
     """Run all tests for the enhanced content scoring system."""
     print("Testing Enhanced Content Scoring System with Advanced Follower Metrics")
@@ -126,6 +150,7 @@ def main():
         ("Content Scorer Initialization", test_content_scorer_initialization),
         ("Author Scoring with Follower Metrics", test_author_scoring_with_follower_metrics),
         ("Individual Follower Metrics Functions", test_follower_metrics_functions),
+        ("Influence Ratio Scoring", test_influence_ratio_scoring),
     ]
     
     passed = 0

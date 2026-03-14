@@ -17,14 +17,14 @@ config = configparser.ConfigParser()
 config.read('config/config.ini')
 
 # Initialize ModelManager with potentially comma-separated model list
-model_manager = ModelManager(config.get('ARLIAI', 'ARLIAI_MODEL', fallback='gemini'))
+model_manager = ModelManager(config.get('LLM', 'LLM_MODEL', fallback='gemini'))
 modelPrefix = model_manager.get_model_prefix()
 print(f"Using model prefix: {modelPrefix}")
 
-systemPromptFile=config.get('ARLIAI', 'SYSTEM_PROMPT_FILE')
-systemPromptTemplateFile=f"{config.get('ARLIAI', 'SYSTEM_PROMPT_TEMPLATE', fallback=None)}_{modelPrefix}.txt"
-userPromptFile=config.get('ARLIAI', 'USER_PROMPT_FILE')
-userPromptTemplateFile=f"{config.get('ARLIAI', 'USER_PROMPT_TEMPLATE', fallback=None)}_{modelPrefix}.txt"
+systemPromptFile=config.get('LLM', 'SYSTEM_PROMPT_FILE')
+systemPromptTemplateFile=f"{config.get('LLM', 'SYSTEM_PROMPT_TEMPLATE', fallback=None)}_{modelPrefix}.txt"
+userPromptFile=config.get('LLM', 'USER_PROMPT_FILE')
+userPromptTemplateFile=f"{config.get('LLM', 'USER_PROMPT_TEMPLATE', fallback=None)}_{modelPrefix}.txt"
 print(f"Using system prompt file: {systemPromptFile}")
 print(f"Using user prompt file: {userPromptFile}")
 print(f"Using system prompt template file: {systemPromptTemplateFile}")
@@ -32,9 +32,9 @@ print(f"Using user prompt template file: {userPromptTemplateFile}")
 print(f"Available models: {model_manager.models}")
 
 # API Retry settings
-MAX_RETRIES = int(config.get('ARLIAI', 'MAX_RETRIES', fallback=3))
-INITIAL_BACKOFF_SECONDS = float(config.get('ARLIAI', 'INITIAL_BACKOFF_SECONDS', fallback=2.0))
-JITTER_FACTOR = float(config.get('ARLIAI', 'JITTER_FACTOR', fallback=0.2))
+MAX_RETRIES = int(config.get('LLM', 'MAX_RETRIES', fallback=3))
+INITIAL_BACKOFF_SECONDS = float(config.get('LLM', 'INITIAL_BACKOFF_SECONDS', fallback=2.0))
+JITTER_FACTOR = float(config.get('LLM', 'JITTER_FACTOR', fallback=0.2))
 
 def ensurePromptFileExists(promptFilePath, templateFilePath, promptTypeName):
     """Checks if a prompt file exists, and copies from template if not."""
@@ -59,14 +59,14 @@ def ensurePromptFileExists(promptFilePath, templateFilePath, promptTypeName):
 ensurePromptFileExists(systemPromptFile, systemPromptTemplateFile, "System")
 ensurePromptFileExists(userPromptFile, userPromptTemplateFile, "User")
 
-def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_manager=None, enable_switching=False, dry_run=False):
+def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=None, enable_switching=False, dry_run=False):
     """
     Curate a post using the AI API.
     
     Args:
-        arliaiKey: API key for the LLM service
-        arliaiModel: Model name (can be comma-separated list; will be handled by model_manager)
-        arliaiUrl: URL for the LLM API
+        llmKey: API key for the LLM service
+        llmModel: Model name (can be comma-separated list; will be handled by model_manager)
+        llmUrl: URL for the LLM API
         postBody: The post content to evaluate
         maxTokens: Maximum tokens for the response
         model_manager: Optional ModelManager instance for handling multiple models
@@ -75,14 +75,14 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
         str: The AI curation response or error message
     """
     today = datetime.now()
-    arliaiKey = arliaiKey.split()[0]  # Eliminate comments after the key (should be redundant)
+    llmKey = llmKey.split()[0]  # Eliminate comments after the key (should be redundant)
     loc = Localization()
     
     # Use provided model_manager or create one from the model string
     if model_manager is None:
-        model_manager = ModelManager(arliaiModel)
+        model_manager = ModelManager(llmModel)
     
-    output_language = config.get('ARLIAI', 'OUTPUT_LANGUAGE', fallback='English')
+    output_language = config.get('LLM', 'OUTPUT_LANGUAGE', fallback='English')
     try:
         with open(systemPromptFile, 'r', encoding='utf-8') as f:
             systemPrompt = f.read().format(language=output_language)
@@ -109,14 +109,14 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
         logging.error("aicurate: Received an empty or whitespace-only postBody. Cannot proceed.")
         return "Content Error - Empty Body"
 
-    if arliaiUrl.startswith("https://generativelanguage.googleapis.com"):  # Google API/models OpenAI compatibility mode
+    if llmUrl.startswith("https://generativelanguage.googleapis.com"):  # Google API/models OpenAI compatibility mode
         stop_param_name = "stop"
     else:
         stop_param_name = "stop_sequences"
 
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': f"Bearer {arliaiKey}"
+        'Authorization': f"Bearer {llmKey}"
     }
 
     # Try models in sequence if rate limiting occurs
@@ -125,7 +125,7 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
         
         payloadDict = {
             "model": current_model,
-            "messages": construct_messages(arliaiUrl, current_model, systemPrompt, f"{curationPrompt}\n\n## ARTICLE FOR EVALUATION\n\n{postBody}"),
+            "messages": construct_messages(llmUrl, current_model, systemPrompt, f"{curationPrompt}\n\n## ARTICLE FOR EVALUATION\n\n{postBody}"),
             "temperature": 0.3,
             "top_p": 0.85,
             "max_tokens": maxTokens,
@@ -133,7 +133,7 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
             stop_param_name: ["END_OF_CURATION_REPORT", "DO NOT CURATE"]
         }
 
-        # if arliaiUrl.startswith("https://api.arliai.com"):  # ARLIAI API/models (vllm API)
+        # if llmUrl.startswith("https://api.arliai.com"):  # VLLM API/models
         #     payloadDict["repetition_penalty"] = 1.1
         #     payloadDict["top_k"] = 40
         #     payloadDict["frequency_penalty"] = 0.3
@@ -147,8 +147,8 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
 
         for attempt in range(MAX_RETRIES + 1):
             try:
-                logging.debug(f"Attempt {attempt + 1}/{MAX_RETRIES + 1} to call AI API: {arliaiUrl} with model {current_model}")
-                response = requests.post(arliaiUrl, headers=headers, data=payload)
+                logging.debug(f"Attempt {attempt + 1}/{MAX_RETRIES + 1} to call AI API: {llmUrl} with model {current_model}")
+                response = requests.post(llmUrl, headers=headers, data=payload)
                 response.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
                 rawResponse = response.json()['choices'][0]['message']['content']
 
