@@ -39,8 +39,8 @@ def get_delegations(account):
     """
     url = f"https://sds1.steemworld.org/delegations_api/getIncomingDelegations/{account}"
 
-    max_retries = 5
-    initial_backoff = 1.0
+    max_retries = 7
+    initial_backoff = 30.0
 
     for attempt in range(1, max_retries + 1):
         try:
