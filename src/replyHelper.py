@@ -205,8 +205,8 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
             selected_delegators = all_delegators_list[:num_delegators_to_select]
 
     except Exception as e:
-        print(f"Warning: Could not retrieve or shuffle delegators for reply: {e}")
-        # all_delegators_list and selected_delegators will remain empty
+        print(f"FATAL: Could not retrieve or shuffle delegators for reply: {e}")
+        exit(1)
 
     # Safely calculate the adjusted weight, avoiding division by zero.
     if len(selected_delegators) > 0:
