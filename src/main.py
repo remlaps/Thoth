@@ -239,7 +239,7 @@ while retry_count <= max_retries:
 
                     # Use hybrid screening system (rule-based first, then score-based)
                     try:
-                        screening_result = hybrid_screening.screen_content(comment)
+                        screening_result = hybrid_screening.screen_content(comment, included_posts=commentList)
                         status = screening_result['status']
                         reason = screening_result['reason']
                         
