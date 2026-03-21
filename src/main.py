@@ -6,6 +6,7 @@ from datetime import datetime
 import math
 import io
 import sys
+import logging
 
 import aiIntro
 import utils  # From the thoth package
@@ -243,17 +244,17 @@ while retry_count <= max_retries:
                         status = screening_result['status']
                         reason = screening_result['reason']
                         
-                        print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}")
-                        print(f"Screening Status: {status} ({reason})")
+                        logging.info(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}")
+                        logging.info(f"Screening Status: {status} ({reason})")
                         
                         if screening_result['score_result']:
                             total_score = screening_result['total_score']
                             quality_tier = screening_result['quality_tier']
                             ai_intensity = screening_result['ai_intensity']
-                            print(f"Score: {total_score} ({quality_tier}) - AI Intensity: {ai_intensity}")
-                            print(f"Components: Author={screening_result['score_result']['components']['author']}, Content={screening_result['score_result']['components']['content']}, Engagement={screening_result['score_result']['components']['engagement']}")
+                            logging.info(f"Score: {total_score} ({quality_tier}) - AI Intensity: {ai_intensity}")
+                            logging.info(f"Components: Author={screening_result['score_result']['components']['author']}, Content={screening_result['score_result']['components']['content']}, Engagement={screening_result['score_result']['components']['engagement']}")
                         else:
-                            print("No score available (rejected by rule-based screening)")
+                            logging.info("No score available (rejected by rule-based screening)")
                     except Exception as e:
                         print(f"Error in hybrid screening for {comment['author']}/{comment['permlink']}: {e}")
                         continue
@@ -266,18 +267,21 @@ while retry_count <= max_retries:
                         ### Retrieve the latest version of the post
                         latestPostVersion=steemdInstance.get_content(comment['author'],comment['permlink'])
                         tmpBody = utils.remove_formatting(latestPostVersion['body'])
-                        print(f"Content accepted for curation with {ai_intensity} AI analysis.")
+                        logging.info(f"Content accepted for curation with {ai_intensity} AI analysis.")
 
                         ### Get the AI Evaluation with score context
+                        logging.info(f"[{streamFromBlock}/{postCount}] Starting AI Curation evaluation for @{operation['author']}/{operation['permlink']}...")
                         if skip_ai_curation:
-                            print(f"Skipping AI Curation API call for @{operation['author']}/{operation['permlink']} (SKIP_AI_CURATION is enabled).")
+                            logging.info(f"Skipping AI Curation API call for @{operation['author']}/{operation['permlink']} (SKIP_AI_CURATION is enabled).")
                             aiResponse = f"[SKIP_AI_CURATION ENABLED] Mock AI curation summary for post by @{operation['author']}. This placeholder text ensures the minimum response length requirement is met without calling the LLM API. {'=' * 50}"
                         else:
                             aiResponse = aiCurator.aicurate(
                                 llmKey, llmModel, llmUrl, tmpBody,
                                 model_manager=model_manager,
                                 enable_switching=enable_model_switching,
-                                dry_run=model_switching_dry_run
+                                dry_run=model_switching_dry_run,
+                                author=operation['author'],
+                                permlink=operation['permlink']
                             )
                         with open('data/output.html', 'a', encoding='utf-8') as f:
                             print(f"URL: https://steemit.com/@{comment['author']}/{comment['permlink']}")
@@ -285,20 +289,21 @@ while retry_count <= max_retries:
                             if screening_result['score_result']:
                                 print(f"Score: {screening_result['total_score']} ({screening_result['quality_tier']})")
                             print(f"Body (first 200 chars): {tmpBody[:200]}...\n\nAI Response: {aiResponse}\n", file=f)
-                        print (f"\n\nAI Response: {aiResponse}\n")
+                        logging.info(f"[{streamFromBlock}/{postCount}] Finished AI Curation for @{operation['author']}/{operation['permlink']}.")
+                        logging.info(f"AI Response:\n{aiResponse}\n")
 
                         MIN_AI_RESPONSE_LENGTH = 100 # Define a reasonable minimum length
                         if (re.search("DO NOT CURATE", aiResponse) or (aiResponse == "Content Error - Empty Body" )):
-                            print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: disqualified by AI.")
+                            logging.info(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: disqualified by AI.")
                         elif aiResponse.startswith("API Error") or \
                              aiResponse == "JSON Error" or \
                              aiResponse == "Response Error" or \
                              aiResponse == "Unexpected Error":
                             # aiCurator has already attempted retries for relevant API errors.
                             # Log the failure and continue with the next post.
-                            print(f"{streamFromBlock}/{postCount}: AI Curation for @{operation['author']}/{operation['permlink']} failed. AI System Response: '{aiResponse}'. Skipping this post.")
+                            logging.error(f"{streamFromBlock}/{postCount}: AI Curation for @{operation['author']}/{operation['permlink']} failed. AI System Response: '{aiResponse}'. Skipping this post.")
                         elif len(aiResponse) < MIN_AI_RESPONSE_LENGTH:
-                            print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: disqualified by AI (response too short: '{aiResponse}').")
+                            logging.warning(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: disqualified by AI (response too short: '{aiResponse}').")
                         else:
                             commentList.append(comment)
                             aiResponseList.append(aiResponse)
@@ -313,10 +318,10 @@ while retry_count <= max_retries:
                                     'components': {'author': 0.0, 'content': 0.0, 'engagement': 0.0}
                                 })
                             postCount = postCount + 1
-                            print(f"Content curated successfully! ({postCount}/{maxSize})")
+                            logging.info(f"Content curated successfully! ({postCount}/{maxSize})")
                     else:
                         reason = screening_result['reason']
-                        print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: excluded by hybrid screening ({reason})")
+                        logging.info(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: excluded by hybrid screening ({reason})")
                 # else:
                     # print(f"{postCount}: {operation['type']}")
         
@@ -347,9 +352,10 @@ if earliest_timestamp and latest_timestamp:
     print(f"Posts processed ranged from {earliest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')} to {latest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')}")
 
     if skip_ai_curation:
-        print("Skipping AI Intro generation (SKIP_AI_CURATION is enabled).")
+        logging.info("Skipping AI Intro generation (SKIP_AI_CURATION is enabled).")
         aiIntroString = f"[SKIP_AI_CURATION ENABLED] Mock AI Intro summary. This placeholder text is generated because the AI API calls are bypassed in the configuration. {'=' * 50}"
     else:
+        logging.info("Starting AI Intro generation...")
         aiIntroString = aiIntro.aiIntro(
             llmKey, llmModel, llmUrl,
             earliest_timestamp, latest_timestamp,
@@ -359,6 +365,7 @@ if earliest_timestamp and latest_timestamp:
             dry_run=model_switching_dry_run,
             score_data=scoreList
         )
+        logging.info("Finished AI Intro generation.")
     # Retrieve delegations once and pass into postHelper to avoid duplicate RPC calls
     postingAccount_main = config.get('STEEM', 'POSTING_ACCOUNT')
     try:

@@ -91,7 +91,7 @@ def main():
     print(f"Days Inactive: {days_inactive} (Max: {max_inactive_days}, Is Inactive: {is_inactive})")
 
     # Hive Activity
-    last_hive_age = config.getint('AUTHOR', 'LAST_HIVE_ACTIVITY_AGE')
+    last_hive_age = config.getint('AUTHOR', 'MIN_HIVE_INACTIVITY_HARD', fallback=7)
     hive_too_recent = authorValidation.isHiveActivityTooRecent(author_name)
     print(f"Hive Activity Too Recent (less than {last_hive_age} days ago): {hive_too_recent}")
 

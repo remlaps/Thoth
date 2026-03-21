@@ -15,7 +15,7 @@ from steem.account import Account
 from steem.account import AccountDoesNotExistsException
 
 from utils import get_rng, remove_formatting
-from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep
+from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep, hiveInactiveDays
 from steemHelpers import get_resteem_count
 
 logger = logging.getLogger(__name__)
@@ -60,6 +60,7 @@ class ContentScorer:
         weights['max_age_score'] = self.config.get_float('SCORING', 'MAX_AGE_SCORE', 15.0)
         weights['max_activity_score'] = self.config.get_float('SCORING', 'MAX_ACTIVITY_SCORE', 15.0)
         weights['max_influence_score'] = self.config.get_float('SCORING', 'MAX_INFLUENCE_SCORE', 10.0)
+        weights['max_hive_inactivity_score'] = self.config.get_float('SCORING', 'MAX_HIVE_INACTIVITY_SCORE', 10.0)
 
         # Content max component scores
         weights['max_length_score'] = self.config.get_float('SCORING', 'MAX_LENGTH_SCORE', 30.0)
@@ -272,6 +273,15 @@ class ContentScorer:
             influence_score = (influence_ratio - 1.0) * (max_influence_score / 2.0)
             influence_score = max(-max_influence_score, min(influence_score, max_influence_score))
             
+            # 7. Hive Inactivity score
+            max_hive_inactivity_score = self.weights.get('max_hive_inactivity_score', 10.0)
+            hive_inactivity_days = hiveInactiveDays(author)
+            if hive_inactivity_days is not None:
+                target_hive_inactivity = self.config.get_int('AUTHOR', 'TARGET_HIVE_INACTIVITY_DAYS', 60)
+                hive_inactivity_score = min((hive_inactivity_days / max(1, target_hive_inactivity)) * max_hive_inactivity_score, max_hive_inactivity_score)
+            else:
+                hive_inactivity_score = max_hive_inactivity_score
+            
             # Combined author score (max 100)
             author_score = (
                 reputation_score + 
@@ -280,7 +290,8 @@ class ContentScorer:
                 median_rep_score + 
                 age_score + 
                 activity_score + 
-                influence_score
+                influence_score +
+                hive_inactivity_score
             )
             
             return max(0.0, min(author_score, 100.0))

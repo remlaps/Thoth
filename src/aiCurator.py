@@ -59,7 +59,7 @@ def ensurePromptFileExists(promptFilePath, templateFilePath, promptTypeName):
 ensurePromptFileExists(systemPromptFile, systemPromptTemplateFile, "System")
 ensurePromptFileExists(userPromptFile, userPromptTemplateFile, "User")
 
-def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=None, enable_switching=False, dry_run=False):
+def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=None, enable_switching=False, dry_run=False, author="", permlink=""):
     """
     Curate a post using the AI API.
     
@@ -70,6 +70,8 @@ def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=N
         postBody: The post content to evaluate
         maxTokens: Maximum tokens for the response
         model_manager: Optional ModelManager instance for handling multiple models
+        author: Optional author name for debugging/logging
+        permlink: Optional permlink for debugging/logging
         
     Returns:
         str: The AI curation response or error message
@@ -109,10 +111,17 @@ def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=N
         logging.error("aicurate: Received an empty or whitespace-only postBody. Cannot proceed.")
         return "Content Error - Empty Body"
 
-    if llmUrl.startswith("https://generativelanguage.googleapis.com"):  # Google API/models OpenAI compatibility mode
-        stop_param_name = "stop"
-    else:
-        stop_param_name = "stop_sequences"
+    # Context token management for ArliAI's 12K limit
+    if llmUrl.startswith("https://api.arliai.com"):
+        if maxTokens > 4096:
+            maxTokens = 4096
+        # 1 token is approx 4 characters. 12K tokens is approx 48K characters.
+        # Cap post body at 30,000 chars to leave plenty of room for prompt and generation.
+        max_chars = 30000
+        if len(postBody) > max_chars:
+            post_id = f"@{author}/{permlink}" if author and permlink else "Unknown Post"
+            logging.warning(f"[{post_id}] Post body exceeds safe limit for ArliAI 12K context. Truncating from {len(postBody)} to {max_chars} characters.")
+            postBody = postBody[:max_chars] + "\n...[TRUNCATED FOR LENGTH]..."
 
     headers = {
         'Content-Type': 'application/json',
@@ -130,18 +139,15 @@ def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=N
             "top_p": 0.85,
             "max_tokens": maxTokens,
             "stream": False,
-            stop_param_name: ["END_OF_CURATION_REPORT", "DO NOT CURATE"]
+            "stop": ["END_OF_CURATION_REPORT"]
         }
 
-        # if llmUrl.startswith("https://api.arliai.com"):  # VLLM API/models
-        #     payloadDict["repetition_penalty"] = 1.1
-        #     payloadDict["top_k"] = 40
-        #     payloadDict["frequency_penalty"] = 0.3
-        #     payloadDict["presence_penalty"] = 0.3
-        #     payloadDict["min_p"] = 0.0
-        #     payloadDict["extra_body"] = {
-        #         "chat_template_kwargs": {"enable_thinking": False}
-        #     }
+        if llmUrl.startswith("https://api.arliai.com"):  # VLLM API/models
+            payloadDict["repetition_penalty"] = 1.1
+            payloadDict["top_k"] = 40
+            payloadDict["frequency_penalty"] = 0.3
+            payloadDict["presence_penalty"] = 0.3
+            payloadDict["min_p"] = 0.0
 
         payload = json.dumps(payloadDict)
 
@@ -150,15 +156,25 @@ def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=N
                 logging.debug(f"Attempt {attempt + 1}/{MAX_RETRIES + 1} to call AI API: {llmUrl} with model {current_model}")
                 response = requests.post(llmUrl, headers=headers, data=payload)
                 response.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
-                rawResponse = response.json()['choices'][0]['message']['content']
+                
+                data = response.json()
+                if isinstance(data, list):
+                    data = data[0] if len(data) > 0 else {}
+                rawResponse = data.get('choices', [{}])[0].get('message', {}).get('content') or ''
 
                 # Post-process to remove any <think>...</think> blocks that the model might still include.
                 # The re.DOTALL flag ensures that the pattern matches even if the block spans multiple lines.
                 # .strip() removes any leading/trailing whitespace left after the removal.
-                cleanedResponse = re.sub(r'<think>.*?</think>', '', rawResponse, flags=re.DOTALL).strip()
+                cleanedResponse = re.sub(r'<think>.*?</think>', '', str(rawResponse), flags=re.DOTALL).strip()
+
+                post_id = f"@{author}/{permlink}" if author and permlink else "Unknown Post"
+                
+                if not cleanedResponse:
+                    logging.info(f"[{post_id}] AI model returned a completely empty response. Interpreting as an implicit rejection.")
+                    return "DO NOT CURATE"
 
                 if len(cleanedResponse) < 100: # Or another threshold for "suspiciously short"
-                    logging.warning(f"Received suspiciously short AI response after cleaning: '{cleanedResponse}'.")
+                    logging.warning(f"[{post_id}] Received suspiciously short AI response after cleaning: '{cleanedResponse}'.")
                     logging.warning(f"Original raw response: '{rawResponse}'")  # Add this line
                     logging.warning(f"Request payload that led to short response: {json.dumps(payloadDict, indent=2)}")
 
@@ -252,7 +268,8 @@ def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=N
                 logging.error(f"KeyError accessing response data: {e_key}. Response JSON: {response.json() if 'response' in locals() and hasattr(response, 'json') else 'Response JSON not available'}")
                 return "Response Error"
             except Exception as e_unexp:
-                logging.error(f"An unexpected error occurred: {e_unexp}. Attempt {attempt + 1}/{MAX_RETRIES + 1}.")
+                import traceback
+                logging.error(f"An unexpected error occurred: {type(e_unexp).__name__} - {e_unexp}\n{traceback.format_exc()}\nAttempt {attempt + 1}/{MAX_RETRIES + 1}.")
                 return "Unexpected Error"
         else:
             # If we get here, we've exhausted retries for this model without switching

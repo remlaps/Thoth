@@ -11,8 +11,9 @@ from contentScoring import ContentScorer
 from authorValidation import isBlacklisted, isAuthorWhitelisted, isHiveActivityTooRecent, isAuthorPostLimitReached
 from contentValidation import isTooShortHard, isEdit, hasBlacklistedTag, hasRequiredTag
 from walletValidation import walletScreened
-from utils import detect_language
+from utils import detect_language, remove_formatting
 from configValidator import ConfigValidator
+from curationHistory import CurationHistory
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class HybridScreening:
         self.config = config
         self.stats_tracker = stats_tracker
         self.content_scorer = ContentScorer(steem_instance, config)
+        self.curation_history = CurationHistory()
         
     def screen_content(self, post_data, latest_content=None, included_posts=None):
         """
@@ -98,6 +100,7 @@ class HybridScreening:
                 else:
                     # This is a score-based rejection
                     self.stats_tracker.track_rejection('score_rejected', score=score_result['total_score'])
+                    logger.info(f"Score-based rejection: {post_data['author']}/{post_data['permlink']} failed curation threshold (Score: {score_result['total_score']}, Tier: {quality_tier})")
 
             return {
                 'status': 'accepted' if should_curate else 'score_rejected',
@@ -138,14 +141,15 @@ class HybridScreening:
         permlink = post_data['permlink']
         body = post['body']
         title = post['title']
+        
+        clean_body = remove_formatting(body)
 
         # --- FAST, LOCAL CHECKS (ordered by rejection rate) ---
 
         # Rule 1: Word count must exceed the hard minimum (fastest check, highest rejection rate)
-        if isTooShortHard(body):
+        if isTooShortHard(clean_body):
             min_words_hard = self.config.get_int('CONTENT', 'MIN_WORDS_HARD', 0)
-            # The body is likely to contain HTML, but for this hard check, a simple split is fast and sufficient.
-            word_count = len(body.split())
+            word_count = len(clean_body.split())
             logger.info(f"Rule-based rejection: {author}/{permlink} below hard minimum word count ({word_count} < {min_words_hard})")
             return {
                 'passed': False,
@@ -157,7 +161,7 @@ class HybridScreening:
         try:
             target_languages = [lang.strip() for lang in self.config.get('CONTENT', 'LANGUAGE').split(',') if lang.strip()]
             if target_languages:  # Only perform check if languages are configured
-                body_language = detect_language(body)
+                body_language = detect_language(clean_body)
                 title_language = detect_language(title)
 
                 if body_language not in target_languages or title_language not in target_languages:
@@ -209,6 +213,41 @@ class HybridScreening:
                 'rule_type': 'author_post_limit'
             }
 
+        # --- HISTORY CHECKS (Local Database) ---
+
+        # Rule: Post curation frequency limit (30 days)
+        if self.curation_history.has_post_been_curated(author, permlink, days=30):
+            logger.info(f"Rule-based rejection: {author}/{permlink} was already curated in the last 30 days")
+            return {
+                'passed': False,
+                'reason': 'post_already_curated: post was curated within the last 30 days',
+                'rule_type': 'history_post_limit'
+            }
+
+        # Rule: Author daily curation limit
+        max_author_per_day = self.config.get_int('HISTORY', 'MAX_AUTHOR_PER_DAY', 1)
+        if max_author_per_day > 0:
+            daily_count = self.curation_history.get_author_curation_count(author, days=1)
+            if daily_count >= max_author_per_day:
+                logger.info(f"Rule-based rejection: {author}/{permlink} exceeded daily curation limit ({daily_count} >= {max_author_per_day})")
+                return {
+                    'passed': False,
+                    'reason': f'daily_author_limit: author has been curated {daily_count} times in the last 24 hours (max {max_author_per_day})',
+                    'rule_type': 'history_author_limit'
+                }
+
+        # Rule: Author weekly curation limit
+        max_author_per_week = self.config.get_int('HISTORY', 'MAX_AUTHOR_PER_WEEK', 2)
+        if max_author_per_week > 0:
+            weekly_count = self.curation_history.get_author_curation_count(author, days=7)
+            if weekly_count >= max_author_per_week:
+                logger.info(f"Rule-based rejection: {author}/{permlink} exceeded weekly curation limit ({weekly_count} >= {max_author_per_week})")
+                return {
+                    'passed': False,
+                    'reason': f'weekly_author_limit: author has been curated {weekly_count} times in the last 7 days (max {max_author_per_week})',
+                    'rule_type': 'history_author_limit'
+                }
+
         # --- FUNDAMENTAL AUTHOR STATUS CHECKS (Whitelist is a "pass", so check blacklist first) ---
 
         # Rule 7: Blacklisted authors must be excluded (absolute rule, first network call)
@@ -233,7 +272,7 @@ class HybridScreening:
 
         # Rule 9: Hive inactivity must be higher than specified days (network call)
         if isHiveActivityTooRecent(author):
-            hive_inactivity_days = self.config.get_int('AUTHOR', 'LAST_HIVE_ACTIVITY_AGE', 60)
+            hive_inactivity_days = self.config.get_int('AUTHOR', 'MIN_HIVE_INACTIVITY_HARD', 7)
             logger.info(f"Rule-based rejection: {author}/{permlink} has recent Hive activity (below {hive_inactivity_days} days)")
             return {
                 'passed': False,

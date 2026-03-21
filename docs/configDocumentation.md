@@ -8,7 +8,7 @@ This document explains the purpose of the sections and parameters in the `config
 This section configures the AI model and related parameters.
 
 - **LLM_API_KEY**: The API key for the AI model.  ***DO NOT USE THIS / PROTECT YOUR KEY***
-- **LLM_MODEL**: Specifies the AI model to use. Options include `Qwen3-14B`, `gemini-2.0-flash`, etc.
+- **LLM_MODEL**: Specifies the AI model to use. Options include `Qwen3.5-27B-Derestricted`, `gemini-2.5-pro`, etc.
 - **LLM_URL**: The API endpoint for the AI model.
 - **LLM_ENABLE_MODEL_SWITCHING**: Enable automatic model switching when the current model is rate-limited.
 - **LLM_MODEL_SWITCHING_DRY_RUN**: When enabled, logs rate-limit events but does not actually switch to the next model.
@@ -41,7 +41,8 @@ This section defines author validation rules.
 - **ENABLE_MEDIAN_REP_SCORING**: Set to `True` to enable median follower reputation scoring (can be slow for large accounts).
 - **FOLLOWER_HALFLIFE_YEARS**: Half-life of followers for activity calculation.
 - **LAST_BLURT_ACTIVITY_AGE**: Required days since last activity on Blurt.
-- **LAST_HIVE_ACTIVITY_AGE**: Required days since last activity on Hive.
+- **MIN_HIVE_INACTIVITY_HARD**: Minimum days since last activity on Hive (hard limit for screening).
+- **TARGET_HIVE_INACTIVITY_DAYS**: Target days since last activity on Hive for full score.
 - **MAX_FOLLOWER_INACTIVITY_DAYS**: Maximum allowed inactivity days for followers.
 - **MAX_INACTIVITY_DAYS**: Maximum allowed inactivity days for the author.
 - **MAX_INCLUDED_POSTS_PER_AUTHOR**: Maximum number of posts allowed per author in the included posts list. When an author reaches this limit, additional posts from that author will be rejected by the screening system.
@@ -119,6 +120,7 @@ This section configures the quality scoring system.
 - **MAX_LENGTH_SCORE**: Maximum points awarded for content length.
 - **MAX_MEDIAN_REP_SCORE**: Maximum points awarded for median follower reputation.
 - **MAX_INFLUENCE_SCORE**: Maximum points awarded (or penalized) for the author's influence ratio (followers/following).
+- **MAX_HIVE_INACTIVITY_SCORE**: Maximum points awarded for the author's Hive inactivity period.
 - **MAX_REPUTATION_SCORE**: Maximum points awarded for author reputation.
 - **MAX_TAG_SCORE**: Maximum points awarded for optimal tag usage.
 - **MAX_TITLE_SCORE**: Maximum points awarded for title length/quality.

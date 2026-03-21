@@ -147,10 +147,10 @@ def verify_configuration_usage():
             print("✗ MIN_WORDS_HARD configuration not used")
             return False
         
-        if "self.config.get_int('AUTHOR', 'LAST_HIVE_ACTIVITY_AGE'" in content:
-            print("✓ LAST_HIVE_ACTIVITY_AGE configuration used")
+        if "self.config.get_int('AUTHOR', 'MIN_HIVE_INACTIVITY_HARD'" in content:
+            print("✓ MIN_HIVE_INACTIVITY_HARD configuration used")
         else:
-            print("✗ LAST_HIVE_ACTIVITY_AGE configuration not used")
+            print("✗ MIN_HIVE_INACTIVITY_HARD configuration not used")
             return False
         
         return True

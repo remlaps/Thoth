@@ -8,11 +8,11 @@
 [LLM]
 # ArliAI info here - https://www.arliai.com/quick-start
 # Gemini info here - https://ai.google.dev/gemini-api/docs/quickstart
-##### ArliAI switched again.  This time to Gemma3-27B models for free tier.  These are mostly untested.
+##### ArliAI switched their free tier to Qwen3.5-27B-Derestricted.
 
 ### LLM_API_KEY = # This can be pulled from an environment variable.   ***DO NOT USE THIS / PROTECT YOUR KEY***
 #ARLIAI example
-### LLM_MODEL = Gemma-3-27B-it
+### LLM_MODEL = Qwen3.5-27B-Derestricted
 ### LLM_URL = https://api.arliai.com/v1/chat/completions
 
 #Gemini example
@@ -44,8 +44,8 @@ ENABLE_MEDIAN_REP_SCORING = False
 FOLLOWER_HALFLIFE_YEARS = 2
 # required days since the account was active on Blurt (not yet implemented)
 LAST_BLURT_ACTIVITY_AGE = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
-# required days since the account was active on Hive
-LAST_HIVE_ACTIVITY_AGE = 60
+# minimum days since the account was active on Hive (hard limit)
+MIN_HIVE_INACTIVITY_HARD = 7
 MAX_FOLLOWER_INACTIVITY_DAYS = 90
 MAX_INACTIVITY_DAYS = 4000
 MAX_INCLUDED_POSTS_PER_AUTHOR = 1
@@ -56,8 +56,8 @@ MIN_FOLLOWERS = 350
 MIN_FOLLOWERS_PER_MONTH = 10
 MIN_FOLLOWER_MEDIAN_REP = 40
 MIN_REPUTATION = 6
-### Implemented: MIN_REPUTATION, MIN_FOLLOWERS, MIN_FOLLOWERS_PER_MONTH, MAX_INACTIVITY_DAYS, MIN_FOLLOWER_MEDIAN_REP
-###              LAST_HIVE_ACTIVITY_AGE, MIN_UNDELEGATED_SP, MAX_DELEGATION_PCT
+# target days since the account was active on Hive for maximum score
+TARGET_HIVE_INACTIVITY_DAYS = 60
 
 [BLOG]
 CURATED_AUTHOR_WEIGHT = 900
@@ -127,6 +127,17 @@ VOTE_COUNT_MAX = 200
 VOTE_COUNT_MIN = 10 
 VOTE_COUNT_WEIGHT = 1
 
+[HISTORY]
+# Maximum number of times a specific author can be curated in a single day (24 hours)
+MAX_AUTHOR_PER_DAY = 1
+
+# Maximum number of times a specific author can be curated in a 7-day period
+MAX_AUTHOR_PER_WEEK = 4
+
+# Maximum number of times a specific post can be curated in a 30-day period
+# (The system currently defaults to a 30-day lookback for posts, but adding this keeps your configuration organized)
+MAX_POST_PER_MONTH = 2
+
 [SCORING]
 # Author Component Max Scores
 MAX_REPUTATION_SCORE = 25.0
@@ -136,6 +147,7 @@ MAX_MEDIAN_REP_SCORE = 15.0
 MAX_AGE_SCORE = 15.0
 MAX_ACTIVITY_SCORE = 15.0
 MAX_INFLUENCE_SCORE = 10.0
+MAX_HIVE_INACTIVITY_SCORE = 10.0
 
 # Component Weights (Should sum to 1.0)
 # These determine how much each factor contributes to the total score.
@@ -151,10 +163,10 @@ MAX_LANGUAGE_SCORE = 20.0
 
 # Quality Tiers (0-100)
 # These thresholds determine the label assigned to a post based on its total score.
-TIER_EXCELLENT_MIN = 90.0
-TIER_GOOD_MIN = 80.0
-TIER_FAIR_MIN = 70.0
-TIER_POOR_MIN = 60.0
+TIER_EXCELLENT_MIN = 60.0
+TIER_GOOD_MIN = 50.0
+TIER_FAIR_MIN = 45.0
+TIER_POOR_MIN = 35.0
 
 [STEEM]
 DEFAULT_START_BLOCK = 3250000

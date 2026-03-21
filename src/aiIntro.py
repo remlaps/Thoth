@@ -3,6 +3,7 @@ import requests
 import json
 import re
 import time
+import random
 import configparser
 import logging
 from pathlib import Path
@@ -82,6 +83,15 @@ def aiIntro(llmKey, llmModel, llmUrl, startTime, endTime, combinedComment, maxTo
         score_summary = f"\n\n{loc.get('curated_posts_average_score', avg_score=round(avg_score, 1))}"
         datePrompt += score_summary
     
+    # Context token management for ArliAI's 12K limit
+    if llmUrl.startswith("https://api.arliai.com"):
+        if maxTokens > 4096:
+            maxTokens = 4096
+        max_chars = 30000
+        if len(combinedComment) > max_chars:
+            logging.warning(f"Combined comments exceed safe limit for ArliAI 12K context. Truncating from {len(combinedComment)} to {max_chars} characters.")
+            combinedComment = combinedComment[:max_chars] + "\n...[TRUNCATED FOR LENGTH]..."
+
     try:
         with open('config/introSystemPrompt.txt', 'r', encoding='utf-8') as f:
             systemPrompt = f.read().format(datePrompt=datePrompt, language=output_language)
@@ -94,34 +104,29 @@ def aiIntro(llmKey, llmModel, llmUrl, startTime, endTime, combinedComment, maxTo
         logging.error(f"Error reading prompt file: {e}")
         return loc.get('error_prompt_error')
     
-    if llmUrl.startswith("https://generativelanguage.googleapis.com"):  ## Google API/models
-        stop_param_name = "stop"
-    else:
-        stop_param_name = "stop_sequences"
-
     payloadDict = {
         "temperature": 0.3,
         "top_p": 0.85,
         "max_tokens": maxTokens,
         "stream": False,
-        stop_param_name: ["END_OF_CURATION_REPORT", "DO NOT CURATE"]
+        "stop": ["END_OF_CURATION_REPORT"]
     }
 
     if llmUrl.startswith("https://api.arliai.com"):      ## VLLM API/models
         payloadDict["repetition_penalty"] = 1.1
         payloadDict["top_k"] = 40
-        payloadDict["frequency_penalty"] = 0.8
-        payloadDict["presence_penalty"] = 0.8
-        payloadDict["extra_body"] = {
-            "chat_template_kwargs": {"enable_thinking": False}
-        }
+        payloadDict["frequency_penalty"] = 0.3
+        payloadDict["presence_penalty"] = 0.3
+        payloadDict["min_p"] = 0.0
 
     headers = {
         'Content-Type': 'application/json',
         'Authorization': f"Bearer {llmKey}"
     }
 
-    max_retries = 5
+    max_retries = int(config.get('LLM', 'MAX_RETRIES', fallback=5))
+    initial_backoff = float(config.get('LLM', 'INITIAL_BACKOFF_SECONDS', fallback=2.0))
+    jitter_factor = float(config.get('LLM', 'JITTER_FACTOR', fallback=0.2))
     
     # Try models in sequence if rate limiting occurs
     while True:
@@ -138,11 +143,11 @@ def aiIntro(llmKey, llmModel, llmUrl, startTime, endTime, combinedComment, maxTo
                 response.raise_for_status()  # Raise an exception for bad status codes (4xx or 5xx)
                 data = response.json()
                 if isinstance(data, list):
-                    data = data[0]
-                rawResponse = data['choices'][0]['message']['content']
+                    data = data[0] if len(data) > 0 else {}
+                rawResponse = data.get('choices', [{}])[0].get('message', {}).get('content') or ''
 
                 # Post-process to remove any <think>...</think> blocks that the model might still include.
-                cleanedResponse = re.sub(r'<think>.*?</think>', '', rawResponse, flags=re.DOTALL).strip()
+                cleanedResponse = re.sub(r'<think>.*?</think>', '', str(rawResponse), flags=re.DOTALL).strip()
 
                 print(f"Intro Response before cleaning: {rawResponse}")
                 print(f"Intro Response after cleaning: {cleanedResponse}")
@@ -166,6 +171,8 @@ def aiIntro(llmKey, llmModel, llmUrl, startTime, endTime, combinedComment, maxTo
                             is_rate_limited = True
                     except (json.JSONDecodeError, KeyError, AttributeError):
                         pass
+                elif status_code in [500, 502, 504]:
+                    is_rate_limited = True # Treat server errors like rate limits to trigger fallback models
                 
                 # If rate limited and we have another model available, mark it and optionally switch
                 if is_rate_limited and model_manager.has_next_model():
@@ -188,8 +195,10 @@ def aiIntro(llmKey, llmModel, llmUrl, startTime, endTime, combinedComment, maxTo
                     logging.error(f"Response body: {response.text}")
                 
                 if attempt < max_retries - 1:
-                    logging.info("Retrying in 60 seconds...")
-                    time.sleep(60)
+                    backoff_time = initial_backoff * (2 ** attempt)
+                    actual_wait_time = backoff_time + random.uniform(0, jitter_factor * backoff_time)
+                    logging.info(f"Retrying in {actual_wait_time:.2f} seconds...")
+                    time.sleep(actual_wait_time)
                     
             except (json.JSONDecodeError, KeyError, IndexError) as e:
                 logging.error(f"Error during AI Intro generation (Attempt {attempt + 1}/{max_retries}): {e}")
@@ -197,13 +206,17 @@ def aiIntro(llmKey, llmModel, llmUrl, startTime, endTime, combinedComment, maxTo
                     logging.error(f"Response body: {response.text}")
                 
                 if attempt < max_retries - 1:
-                    logging.info("Retrying in 60 seconds...")
-                    time.sleep(60)
+                    backoff_time = initial_backoff * (2 ** attempt)
+                    actual_wait_time = backoff_time + random.uniform(0, jitter_factor * backoff_time)
+                    logging.info(f"Retrying in {actual_wait_time:.2f} seconds...")
+                    time.sleep(actual_wait_time)
             except Exception as e:
                 logging.error(f"Unexpected error during AI Intro generation (Attempt {attempt + 1}/{max_retries}): {e}")
                 if attempt < max_retries - 1:
-                    logging.info("Retrying in 60 seconds...")
-                    time.sleep(60)
+                    backoff_time = initial_backoff * (2 ** attempt)
+                    actual_wait_time = backoff_time + random.uniform(0, jitter_factor * backoff_time)
+                    logging.info(f"Retrying in {actual_wait_time:.2f} seconds...")
+                    time.sleep(actual_wait_time)
         else:
             # If we exhaust retries for this model, log and exit
             logging.error(f"Exhausted all retries for model {current_model}.")

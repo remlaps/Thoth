@@ -52,7 +52,8 @@ def create_mock_config():
     mock_config = Mock(spec=ConfigValidator)
     mock_config.get_int = Mock(side_effect=lambda section, key, fallback=0: {
         ('CONTENT', 'MIN_WORDS_HARD'): 100,
-        ('AUTHOR', 'LAST_HIVE_ACTIVITY_AGE'): 60,
+        ('AUTHOR', 'MIN_HIVE_INACTIVITY_HARD'): 7,
+        ('AUTHOR', 'TARGET_HIVE_INACTIVITY_DAYS'): 60,
         ('AUTHOR', 'MIN_FOLLOWERS'): 350,
         ('AUTHOR', 'MIN_FOLLOWERS_PER_MONTH'): 10,
         ('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP'): 40,
@@ -87,6 +88,7 @@ def create_mock_config():
         ('SCORING', 'COMPONENT_AUTHOR_WEIGHT'): 0.40,
         ('SCORING', 'COMPONENT_CONTENT_WEIGHT'): 0.35,
         ('SCORING', 'COMPONENT_ENGAGEMENT_WEIGHT'): 0.25,
+        ('SCORING', 'MAX_HIVE_INACTIVITY_SCORE'): 10.0,
     }.get((section, key), fallback))
     mock_config.get = Mock(side_effect=lambda section, key, fallback='': {
         ('CONTENT', 'LANGUAGE'): 'en',

@@ -5,8 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 
+## [Unreleased]
 ### Added
+
+### Changed
+
+### Fixed
+
+## [0.1.3] - 2026-03-21
+### Added
+- Implemented a two-tiered Hive inactivity screening system: a hard minimum cutoff (`MIN_HIVE_INACTIVITY_HARD`) for instant rejection, and a scaled scoring component (`TARGET_HIVE_INACTIVITY_DAYS`, `MAX_HIVE_INACTIVITY_SCORE`) for rewarding longer inactivity.
+- Added automated truncation for post bodies to ~30,000 characters when using ArliAI to prevent exceeding their new 12K context limit.
+- Added explicit start/finish log markers for the AI curation and intro generation processes to track progress.
 - `DRY_RUN` configuration parameter in the `[STEEM]` section to skip blockchain posting, replying, and voting.
 - `SKIP_AI_CURATION` configuration parameter in the `[LLM]` section to bypass LLM API calls and generate placeholder text instead.
 - `StatsTracker` system (`src/statsTracker.py`) to collect and report detailed run statistics, including rejection reasons and score distributions.
@@ -24,7 +34,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Enhanced author quality scoring with advanced follower metrics:
   - Followers per month (normalized growth rate, 0-20 points)
   - Adjusted followers per month (with half-life decay, 0-25 points)
-  - ~~Median follower reputation (audience quality, 0-15 points)~~ (Disabled for performance)
 - New `src/hybridScreening.py` module with HybridScreening class
 - Comprehensive verification script `tools/verify_hybrid_implementation.py`
 - Enhanced testing script `tools/test_enhanced_content_scoring.py`
@@ -35,6 +44,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Integrated `influence_ratio` metric (followers/following) into author scoring, complete with Laplace smoothing to provide a grace period for brand new authors.
 
 ### Changed
+- Synchronized logging in `main.py` and `hybridScreening.py` by replacing standard `print()` statements with `logging.info()` to prevent async console buffering issues.
+- Optimized AI prompt payloads for ArliAI's shift to `Qwen3.5-27B-Derestricted` models (removed `extra_body`, lowered repetition penalties to `0.3`, and standardized the early termination parameter to `"stop"`).
+- Status changed from Beta to Stable for the 0.1.3 release.
 - Renamed all `ARLIAI` configuration parameters to use a generic `LLM` prefix (e.g., `LLM_API_KEY`, `LLM_MODEL`) to better reflect support for multiple AI providers.
 - The hard minimum word count check is now the first rule executed in the screening process for significant performance improvement.
 - The engagement scoring logic in `contentScoring.py` was refactored to use a configurable weighted-average model based on settings in `config.ini`.
@@ -52,6 +64,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rescaled the Median Follower Reputation scoring to map dynamically between a reputation range of 30 and 60 (previously assumed 0-80).
 
 ### Fixed
+- **Crash Fix**: Removed unsupported `extra_body` chat template arguments that were causing `502 Bad Gateway` crashes on the ArliAI API.
+- **Crash Fix**: Added safe parsing for `null` JSON API responses when stop sequences trigger on the very first generated token (now correctly interprets as an implicit AI rejection).
+- **Accuracy Issue**: The hard minimum word count check now correctly strips HTML and Markdown before counting words, preventing short posts with long URLs from sneaking past the filter.
+- **Logging**: Missing author and permlink context in AI response warnings has been restored.
 - **Major Performance Issue**: Made the `getMedianFollowerRep` calculation conditionally optional (default: False) to prevent extreme slowdowns and API spam.
 - **Performance Issue**: Replaced inefficient `len(account.get_followers())` with the fast `get_follow_count` API call to get follower counts.
 - **Performance Issue**: Eliminated a redundant `get_content` API call by passing the post object from the screening stage to the scoring stage.

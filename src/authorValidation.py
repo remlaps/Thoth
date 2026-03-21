@@ -503,7 +503,8 @@ def getMedianFollowerRep(author, steem_instance=None):
 def isHiveActivityTooRecent(account):
     hiveInactivity = hiveInactiveDays(account)
     if ( hiveInactivity != None ):
-        if ( hiveInactivity < config.getint('AUTHOR','LAST_HIVE_ACTIVITY_AGE') ):
+        limit = config.getint('AUTHOR', 'MIN_HIVE_INACTIVITY_HARD', fallback=7)
+        if ( hiveInactivity < limit ):
             return True
     return False
 
