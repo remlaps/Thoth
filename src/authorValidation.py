@@ -19,6 +19,7 @@ config.read('config/config.ini')
 logging.getLogger('steem.http_client').setLevel(logging.CRITICAL)
 logging.getLogger('steem.steemd').setLevel(logging.CRITICAL)
 logging.getLogger('urllib3.connectionpool').setLevel(logging.CRITICAL)
+logger = logging.getLogger(__name__)
 
 ### rep_log10 is straight from here - https://developers.steem.io/tutorials-python/account_reputation
 def rep_log10(rep):
@@ -62,7 +63,7 @@ def isBlacklisted(account, steem_instance=None, registryAccount=None):
             if attempt < max_retries - 1:
                 time.sleep(2)
                 continue
-            print(f"Error checking blacklist status for {account}: {e}")
+            logger.error(f"Error checking blacklist status for {account}: {e}")
             return False
     
     return False
@@ -99,19 +100,19 @@ def isAuthorScreened(comment, included_posts=None, steem_instance=None):
         # Iterate through included_posts to count how many posts this author has
         current_count = sum(1 for p in included_posts if p['author'] == comment['author'])
         if current_count >= max_posts:
-            print(f"DEBUG: isAuthorScreened({comment['author']}) -> max posts reached ({current_count} >= {max_posts}): True")
+            logger.debug(f"isAuthorScreened({comment['author']}) -> max posts reached ({current_count} >= {max_posts}): True")
             return True
 
     if ( isBlacklisted(comment['author'], steem_instance=s) ):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isBlacklisted: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isBlacklisted: True")
         return True
     
     if ( isAuthorWhitelisted(comment['author']) ):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isAuthorWhitelisted: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isAuthorWhitelisted: True")
         return False
     
     if isHiveActivityTooRecent(comment['author']):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isHiveActivityTooRecent: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isHiveActivityTooRecent: True")
         return True
 
     # Optimization: Fetch Follower Count ONCE
@@ -119,13 +120,13 @@ def isAuthorScreened(comment, included_posts=None, steem_instance=None):
     try:
         follower_count = s.get_follow_count(comment['author'])['follower_count']
     except Exception as e:
-        print(f"Error fetching follower count for {comment['author']}: {e}")
+        logger.error(f"Error fetching follower count for {comment['author']}: {e}")
         # If we can't get follower count, we might default to screening or retrying. 
         # For now, let's assume 0 to be safe/strict.
         follower_count = 0
 
     if isFollowerCountTooLow(comment['author'], steem_instance=s, cached_count=follower_count):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isFollowerCountTooLow: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isFollowerCountTooLow: True")
         return True
 
     accountInfo = None
@@ -138,28 +139,28 @@ def isAuthorScreened(comment, included_posts=None, steem_instance=None):
             if attempt < max_retries - 1:
                 time.sleep(2)
                 continue
-            print(f"Error fetching account info for {comment['author']}: {e}")
+            logger.error(f"Error fetching account info for {comment['author']}: {e}")
             return False
 
     if isInactive(accountInfo, steem_instance=s) :
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isInactive: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isInactive: True")
         return True
         
     if isRepTooLow(accountInfo['reputation']) :
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isRepTooLow: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isRepTooLow: True")
         return True
     
     if isMonthlyFollowersTooLow(accountInfo, comment, steem_instance=s, cached_count=follower_count):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isMonthlyFollowersTooLow: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isMonthlyFollowersTooLow: True")
         return True
     
     if isAdjustedMonthlyFollowersTooLow ( accountInfo, comment, steem_instance=s, cached_count=follower_count):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isAdjustedMonthlyFollowersTooLow: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isAdjustedMonthlyFollowersTooLow: True")
         return True
 
     median_rep = getMedianFollowerRep(comment['author'], steem_instance=s)
     if median_rep is not None and median_rep < config.getint('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP'):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> median follower rep {median_rep} < MIN_FOLLOWER_MEDIAN_REP {config.getint('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP')}: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> median follower rep {median_rep} < MIN_FOLLOWER_MEDIAN_REP {config.getint('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP')}: True")
         return True
         
     return False
@@ -186,7 +187,7 @@ def isAuthorPostLimitReached(comment, included_posts=None):
     current_count = sum(1 for p in included_posts if p['author'] == comment['author'])
     
     if current_count >= max_posts:
-        print(f"DEBUG: isAuthorPostLimitReached({comment['author']}) -> max posts reached ({current_count} >= {max_posts}): True")
+        logger.debug(f"isAuthorPostLimitReached({comment['author']}) -> max posts reached ({current_count} >= {max_posts}): True")
         return True
     
     return False
@@ -208,7 +209,7 @@ def isFollowerCountTooLow(commentAuthor, steem_instance=None, cached_count=None)
                 if attempt < max_retries - 1:
                     time.sleep(2)
                     continue
-                print(f"Error checking follower count for {commentAuthor}: {e}")
+                logger.error(f"Error checking follower count for {commentAuthor}: {e}")
                 return False
                 
     return followerCount < config.getint('AUTHOR','MIN_FOLLOWERS')
@@ -228,7 +229,7 @@ def followersPerMonth(accountInfo, comment, steem_instance=None, cached_count=No
                 if attempt < max_retries - 1:
                     time.sleep(2)
                     continue
-                print(f"Error getting follower count in followersPerMonth for {comment['author']}: {e}")
+                logger.error(f"Error getting follower count in followersPerMonth for {comment['author']}: {e}")
                 return float('inf')
 
     accountCreated = datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
@@ -255,7 +256,7 @@ def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_i
                 if attempt < max_retries - 1:
                     time.sleep(2)
                     continue
-                print(f"Error getting follower count in adjustedFollowersPerMonth for {comment['author']}: {e}")
+                logger.error(f"Error getting follower count in adjustedFollowersPerMonth for {comment['author']}: {e}")
                 return float('inf')
 
     accountCreated = datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
@@ -279,7 +280,7 @@ def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_i
         # Avoid division by zero for accounts less than a day old.
         adjustedFollowersPerMonth = 0.0
 
-    print(f"DEBUG: adjustedFollowersPerMonth({comment['author']}) -> followerCount: {followerCount}, age (days): {age.days}, halfLife (days): {halfLife}, adjustedFollowerCount: {adjustedFollowerCount:.2f}, adjustedFollowersPerMonth: {adjustedFollowersPerMonth:.2f}")
+    logger.debug(f"adjustedFollowersPerMonth({comment['author']}) -> followerCount: {followerCount}, age (days): {age.days}, halfLife (days): {halfLife}, adjustedFollowerCount: {adjustedFollowerCount:.2f}, adjustedFollowersPerMonth: {adjustedFollowersPerMonth:.2f}")
     return adjustedFollowersPerMonth
 
 def isMonthlyFollowersTooLow (accountInfo, comment, steem_instance=None, cached_count=None):
@@ -343,22 +344,22 @@ def isActiveFollowerCountTooLow(accountName, steem_instance=None):
                         active_followers_found += 1
                         if active_followers_found >= min_followers_needed:
                             # Success: enough active followers found. Count is NOT too low.
-                            print(f"DEBUG: isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: True. Result (is_too_low): False")
+                            logger.debug(f"isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: True. Result (is_too_low): False")
                             return False
             except Exception as e:
-                print(f"Warning: Error checking batch of followers for {accountName}: {e}")
+                logger.warning(f"Error checking batch of followers for {accountName}: {e}")
                 continue
         
         # If the loop completes without reaching the threshold, the count is too low.
         has_enough = active_followers_found >= min_followers_needed
         is_too_low = not has_enough
-        print(f"DEBUG: isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: {has_enough}. Result (is_too_low): {is_too_low}")
+        logger.debug(f"isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: {has_enough}. Result (is_too_low): {is_too_low}")
         return is_too_low
 
     except Exception as e:
         # This catches errors from config.getint, getAllFollowers, etc.
-        print(f"Error during active follower check for {accountName}: {e}")
-        print(f"DEBUG: isActiveFollowerCountTooLow({accountName}) -> Exception occurred. Returning True.")
+        logger.error(f"Error during active follower check for {accountName}: {e}")
+        logger.debug(f"isActiveFollowerCountTooLow({accountName}) -> Exception occurred. Returning True.")
         return True # Fail safe: if we can't check, screen the author (i.e., count is "too low").
 
 def isInactive(accountInfo, steem_instance=None):
@@ -409,7 +410,7 @@ def inactiveDays(accountName, steem_instance=None):
             if attempt < max_retries - 1:
                 time.sleep(2)
                 continue
-            print(f"Error checking inactivity for {accountName}: {e}")
+            logger.error(f"Error checking inactivity for {accountName}: {e}")
             return 0
 
 def getAllFollowers(account, account_type='blog', steem_instance=None):
@@ -441,10 +442,10 @@ def getAllFollowers(account, account_type='blog', steem_instance=None):
            except Exception as e:
                if attempt < max_retries - 1:
                    sleep_time = 2 * (attempt + 1)
-                   print(f"Warning: Error fetching followers batch (Attempt {attempt+1}/{max_retries}): {e}. Retrying in {sleep_time}s...")
+                   logger.warning(f"Error fetching followers batch (Attempt {attempt+1}/{max_retries}): {e}. Retrying in {sleep_time}s...")
                    time.sleep(sleep_time)
                    continue
-               print(f"Error fetching followers batch for {account}: {e}")
+               logger.error(f"Error fetching followers batch for {account}: {e}")
        
        if not batch_success:
            break
@@ -585,8 +586,8 @@ def getLastHiveActivityDate(account):
             return None
             
     except requests.exceptions.RequestException as e:
-        print(f"Error querying API: {e}")
+        logger.error(f"Error querying API: {e}")
         return None
     except (json.JSONDecodeError, KeyError, ValueError) as e:
-        print(f"Error processing response: {e}")
+        logger.error(f"Error processing response: {e}")
         return None

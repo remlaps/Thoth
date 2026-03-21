@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.1.4] - 2026-03-21
+### Changed
+- Synchronized logging in `walletValidation.py` and `authorValidation.py` by replacing standard `print()` statements with the `logging` module to prevent asynchronous console buffering issues.
+
 ## [0.1.3] - 2026-03-21
 ### Added
 - Implemented a two-tiered Hive inactivity screening system: a hard minimum cutoff (`MIN_HIVE_INACTIVITY_HARD`) for instant rejection, and a scaled scoring component (`TARGET_HIVE_INACTIVITY_DAYS`, `MAX_HIVE_INACTIVITY_SCORE`) for rewarding longer inactivity.
