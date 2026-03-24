@@ -12,6 +12,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [0.1.5] - 2026-03-24
+### Added
+- Implemented dynamic screening for DMCA/copyright claims by automatically fetching and caching Steemit Condenser's official DMCA blocklist from GitHub once per run.
+- Added a hard rejection rule for posts that have been replaced with frontend DMCA/takedown notices (e.g., "This post is not available due to a copyright claim.").
+- Added a hard minimum reputation check (`MIN_REPUTATION`) to the hybrid screening rules that bypasses scoring entirely for low-reputation authors.
+- Added a hard rejection rule for Steem inactivity to instantly reject posts if the author has been inactive for more than `MAX_INACTIVITY_DAYS`.
+
+### Changed
+- Updated the author activity scoring component to scale linearly from maximum points at 0 days of inactivity down to exactly 0 points at the `MAX_INACTIVITY_DAYS` limit.
+
+### Fixed
+- Fixed an issue where model switching would not trigger on `503` errors if the API provider returned non-JSON responses or differently formatted error messages. Thoth now robustly handles `500`, `502`, `503`, and `504` HTTP status codes as rate limits to properly activate fallback models.
+- Fixed an issue where Thoth evaluated and logged the original, unedited version of posts. All screening, AI evaluation, and reporting now properly refer to the final updated state of the post.
+- Fixed a silent configuration bug where the hard minimum word count check could temporarily default to 0 words. The check is now natively enforced within the hybrid screening sequence using globally verified configuration objects.
+- Upgraded the `word_count` function to use regular expressions to count actual alphanumeric words, preventing Markdown formatting (like tables and URLs) from falsely inflating the length count and tricking the `MIN_WORDS_HARD` check.
+- Updated the dynamic reputation scoring calculation to scale its baseline from the `MIN_REPUTATION` threshold rather than a hardcoded base of 25.
+
 ## [0.1.4] - 2026-03-21
 ### Changed
 - Synchronized logging in `walletValidation.py` and `authorValidation.py` by replacing standard `print()` statements with the `logging` module to prevent asynchronous console buffering issues.
