@@ -305,7 +305,7 @@ while retry_count <= max_retries:
                         elif len(aiResponse) < MIN_AI_RESPONSE_LENGTH:
                             logging.warning(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: disqualified by AI (response too short: '{aiResponse}').")
                         else:
-                            commentList.append(comment)
+                            commentList.append(latestPostVersion)
                             aiResponseList.append(aiResponse)
                             # Track scores for each curated post (only if scoring was performed)
                             if screening_result['score_result']:

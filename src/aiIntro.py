@@ -159,20 +159,8 @@ def aiIntro(llmKey, llmModel, llmUrl, startTime, endTime, combinedComment, maxTo
                 status_code = e.response.status_code if e.response is not None else "Unknown"
                 
                 # Check for rate limiting
-                if status_code == 429:
+                if status_code in [429, 500, 502, 503, 504]:
                     is_rate_limited = True
-                elif status_code == 503:
-                    try:
-                        error_details = e.response.json()
-                        if isinstance(error_details, list) and len(error_details) > 0 and \
-                           isinstance(error_details[0], dict) and 'error' in error_details[0] and \
-                           isinstance(error_details[0]['error'], dict) and \
-                           "overloaded" in error_details[0]['error'].get('message', '').lower():
-                            is_rate_limited = True
-                    except (json.JSONDecodeError, KeyError, AttributeError):
-                        pass
-                elif status_code in [500, 502, 504]:
-                    is_rate_limited = True # Treat server errors like rate limits to trigger fallback models
                 
                 # If rate limited and we have another model available, mark it and optionally switch
                 if is_rate_limited and model_manager.has_next_model():

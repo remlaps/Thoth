@@ -99,8 +99,9 @@ def verify_rule_precedence_logic():
             ('isAuthorPostLimitReached', '6. Author post limit'),
             ('isBlacklisted', '7. Blacklisted author'),
             ('isAuthorWhitelisted', '8. Whitelisted author'),
-            ('isHiveActivityTooRecent', '9. Hive inactivity'),
-            ('walletScreened', '10. Wallet screening')
+            ('inactiveDays', '9. Steem inactivity'),
+            ('isHiveActivityTooRecent', '10. Hive inactivity'),
+            ('walletScreened', '11. Wallet screening')
         ]
         
         last_pos = -1

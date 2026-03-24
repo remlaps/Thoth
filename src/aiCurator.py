@@ -192,19 +192,20 @@ def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=N
                     error_details = e.response.json()
                     error_details_text = json.dumps(error_details, indent=2)
                     
-                    # Check for rate limiting (429 or 503 with overloaded message)
+                    # Check for rate limiting (429 or server errors like 502, 503, 504)
                     if status_code == 429:
                         is_rate_limited = True
-                    elif status_code == 503 and \
-                       isinstance(error_details, list) and len(error_details) > 0 and \
-                       isinstance(error_details[0], dict) and 'error' in error_details[0] and \
-                       isinstance(error_details[0]['error'], dict) and \
-                       error_details[0]['error'].get('code') == 503 and \
-                       "The model is overloaded. Please try again later." in error_details[0]['error'].get('message', ''):
+                    elif status_code == 503:
                         is_overloaded_error = True
+                        is_rate_limited = True
+                    elif status_code in [500, 502, 504]:
                         is_rate_limited = True
                 except json.JSONDecodeError:
                     error_details_text = e.response.text if e.response is not None else "No response text available"
+                    if status_code in [429, 500, 502, 503, 504]:
+                        is_rate_limited = True
+                        if status_code == 503:
+                            is_overloaded_error = True
 
                 # If rate limited and we have another model available, mark it and optionally switch
                 if is_rate_limited and model_manager.has_next_model():

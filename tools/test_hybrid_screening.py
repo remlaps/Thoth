@@ -294,6 +294,9 @@ def test_hive_inactivity_rule():
     original_isAuthorWhitelisted = hybridScreening.isAuthorWhitelisted
     hybridScreening.isAuthorWhitelisted = Mock(return_value=False)
     
+    original_inactiveDays = hybridScreening.inactiveDays
+    hybridScreening.inactiveDays = Mock(return_value=0)
+    
     try:
         mock_steem = create_mock_steem_instance()
         mock_config = create_mock_config()
@@ -323,6 +326,7 @@ def test_hive_inactivity_rule():
         hybridScreening.hasRequiredTag = original_hasRequiredTag
         hybridScreening.isBlacklisted = original_isBlacklisted
         hybridScreening.isAuthorWhitelisted = original_isAuthorWhitelisted
+        hybridScreening.inactiveDays = original_inactiveDays
 
 def test_word_count_rule():
     """Test that posts below hard minimum word count are rejected."""
@@ -356,6 +360,65 @@ def test_word_count_rule():
         # Restore original function
         hybridScreening.isTooShortHard = original_isTooShortHard
 
+def test_reputation_rule():
+    """Test that authors below minimum reputation are rejected."""
+    logger.info("Testing reputation rule...")
+    
+    original_isRepTooLow = hybridScreening.isRepTooLow
+    hybridScreening.isRepTooLow = Mock(return_value=True)
+    
+    # Mock preceding checks
+    original_detect_language = hybridScreening.detect_language
+    hybridScreening.detect_language = Mock(return_value='en')
+    
+    original_isEdit = hybridScreening.isEdit
+    hybridScreening.isEdit = Mock(return_value=False)
+    
+    original_hasBlacklistedTag = hybridScreening.hasBlacklistedTag
+    original_hasRequiredTag = hybridScreening.hasRequiredTag
+    hybridScreening.hasBlacklistedTag = Mock(return_value=False)
+    hybridScreening.hasRequiredTag = Mock(return_value=True)
+    
+    original_isBlacklisted = hybridScreening.isBlacklisted
+    hybridScreening.isBlacklisted = Mock(return_value=False)
+    
+    original_isAuthorWhitelisted = hybridScreening.isAuthorWhitelisted
+    hybridScreening.isAuthorWhitelisted = Mock(return_value=False)
+    
+    # We also need to mock rep_log10 to return a value for the reason string
+    original_rep_log10 = hybridScreening.rep_log10
+    hybridScreening.rep_log10 = Mock(return_value=5.0)
+
+    try:
+        mock_steem = create_mock_steem_instance()
+        mock_config = create_mock_config()
+        hybrid_screening = HybridScreening(mock_steem, mock_config)
+        
+        test_post = {
+            'author': 'low_rep_user',
+            'permlink': 'test-post',
+            'title': 'Low Rep Post',
+            'timestamp': '2023-01-01T00:00:00'
+        }
+        
+        result = hybrid_screening.screen_content(test_post)
+        
+        assert result['status'] == 'rejected', f"Expected rejected status, got {result['status']}"
+        assert result['rule_type'] == 'reputation', f"Expected reputation rule type, got {result['rule_type']}"
+        assert 'below_minimum_reputation' in result['reason'], f"Expected below_minimum_reputation in reason, got {result['reason']}"
+        assert result['score_result'] is None, f"Expected no score result for low reputation, got {result['score_result']}"
+        
+        logger.info("✓ Reputation rule test passed")
+    finally:
+        hybridScreening.isRepTooLow = original_isRepTooLow
+        hybridScreening.detect_language = original_detect_language
+        hybridScreening.isEdit = original_isEdit
+        hybridScreening.hasBlacklistedTag = original_hasBlacklistedTag
+        hybridScreening.hasRequiredTag = original_hasRequiredTag
+        hybridScreening.isBlacklisted = original_isBlacklisted
+        hybridScreening.isAuthorWhitelisted = original_isAuthorWhitelisted
+        hybridScreening.rep_log10 = original_rep_log10
+
 def test_successful_screening():
     """Test that posts passing all rule-based checks proceed to scoring."""
     logger.info("Testing successful screening (passes rules, proceeds to scoring)...")
@@ -372,6 +435,8 @@ def test_successful_screening():
     original_isAuthorPostLimitReached = hybridScreening.isAuthorPostLimitReached
     original_detect_language = hybridScreening.detect_language
     original_walletScreened = hybridScreening.walletScreened
+    original_inactiveDays = hybridScreening.inactiveDays
+    original_isRepTooLow = hybridScreening.isRepTooLow
     
     hybridScreening.isBlacklisted = Mock(return_value=False)
     hybridScreening.isAuthorWhitelisted = Mock(return_value=False)
@@ -383,6 +448,8 @@ def test_successful_screening():
     hybridScreening.isAuthorPostLimitReached = Mock(return_value=False)
     hybridScreening.detect_language = Mock(return_value='en')
     hybridScreening.walletScreened = Mock(return_value=False)
+    hybridScreening.inactiveDays = Mock(return_value=0)
+    hybridScreening.isRepTooLow = Mock(return_value=False)
 
     # Mock score_content to return a passing score to verify acceptance
     original_score_content = contentScoring.ContentScorer.score_content
@@ -426,6 +493,8 @@ def test_successful_screening():
         hybridScreening.isAuthorPostLimitReached = original_isAuthorPostLimitReached
         hybridScreening.walletScreened = original_walletScreened
         hybridScreening.detect_language = original_detect_language
+        hybridScreening.inactiveDays = original_inactiveDays
+        hybridScreening.isRepTooLow = original_isRepTooLow
         contentScoring.ContentScorer.score_content = original_score_content
 
 def test_author_post_limit_reached():
@@ -496,6 +565,9 @@ def test_author_post_limit_not_reached():
     original_walletScreened = hybridScreening.walletScreened
     hybridScreening.walletScreened = Mock(return_value=False)
     
+    original_inactiveDays = hybridScreening.inactiveDays
+    hybridScreening.inactiveDays = Mock(return_value=0)
+    
     try:
         mock_steem = create_mock_steem_instance()
         mock_config = create_mock_config()
@@ -529,6 +601,7 @@ def test_author_post_limit_not_reached():
         hybridScreening.detect_language = original_detect_language
         hybridScreening.isEdit = original_isEdit
         hybridScreening.walletScreened = original_walletScreened
+        hybridScreening.inactiveDays = original_inactiveDays
 
 def main():
     """Run all tests."""
@@ -545,6 +618,7 @@ def main():
         test_whitelisted_author_below_minimum()
         test_hive_inactivity_rule()
         test_word_count_rule()
+        test_reputation_rule()
         test_successful_screening()
         test_author_post_limit_reached()
         test_author_post_limit_not_reached()

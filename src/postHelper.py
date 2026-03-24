@@ -147,7 +147,7 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
                     tagString +=", "
         body += "<tr>\n"
         body += f'   <td><b>{lcv + 1}</b>: </td>\n'
-        body += f'   <td><A HREF="/thoth/@{comment["author"]}/{comment["permlink"]}" target="_blank">{repr(comment["title"])}</A>'
+        body += f'   <td><A HREF="/thoth/@{comment["author"]}/{comment["permlink"]}" target="_blank">{repr(steemPost["title"])}</A>'
         body += f'      <hr>\n'
         body += f'      <b>{loc.get("table_tags")}</b>: {tagString}</td>\n'
         body += f'   <td>@{commentList[lcv]["author"]}'

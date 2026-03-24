@@ -16,6 +16,7 @@ from steem.account import AccountDoesNotExistsException
 
 from utils import get_rng, remove_formatting
 from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep, hiveInactiveDays
+from contentValidation import word_count
 from steemHelpers import get_resteem_count
 
 logger = logging.getLogger(__name__)
@@ -230,11 +231,12 @@ class ContentScorer:
             last_activity_days = (datetime.utcnow() - last_activity_date).days
             
             # Author score components
-            # Reputation is typically 25-80. 
-            # Normalize: (Rep - 25) / 2. Example: Rep 75 -> max pts. Rep 25 -> 0 pts.
+            # Reputation is typically 25-80.
+            # Normalize: (Rep - MIN_REPUTATION) / 2. Example: Rep 75 -> max pts.
             # Ensure we don't go below 0 or above max.
             max_rep_score = self.weights.get('max_reputation_score', 25.0)
-            reputation_score = min(max(0, (reputation - 25) / 2.0), max_rep_score)
+            min_rep = self.config.get_float('AUTHOR', 'MIN_REPUTATION', 25.0)
+            reputation_score = min(max(0, (reputation - min_rep) / 2.0), max_rep_score)
             
             # Advanced follower metrics from authorValidation.py
             # 1. Followers per month (normalized)
@@ -263,9 +265,15 @@ class ContentScorer:
             max_age_score = self.weights.get('max_age_score', 15.0)
             age_score = min(account_age_days / 100.0, max_age_score)
             
-            # 5. Activity score (penalty for inactivity)
+            # 5. Activity score (scaled penalty for inactivity)
             max_activity_score = self.weights.get('max_activity_score', 15.0)
-            activity_score = max(0, max_activity_score - (last_activity_days / 50.0))
+            max_inactivity_days = self.config.get_int('AUTHOR', 'MAX_INACTIVITY_DAYS', 365)
+            
+            if max_inactivity_days > 0:
+                penalty_per_day = max_activity_score / max_inactivity_days
+                activity_score = max(0.0, max_activity_score - (last_activity_days * penalty_per_day))
+            else:
+                activity_score = max(0.0, max_activity_score - (last_activity_days / 50.0))
             
             # 6. Influence Ratio score
             # A ratio of 1.0 is neutral (0 points). Scales up to max points at a 3.0 ratio.
@@ -309,8 +317,7 @@ class ContentScorer:
             # Content length score
             # Use word count instead of character count
             clean_body = remove_formatting(post['body'])
-            words = clean_body.split()
-            word_count = len(words)
+            content_word_count = word_count(clean_body)
             title_length = len(post['title'])
             
             # Length scoring with optimal ranges
@@ -319,10 +326,10 @@ class ContentScorer:
             bonus_length_score = max_length_score - base_length_score
             
             length_score = 0.0
-            if word_count >= 400:
-                length_score = base_length_score + min((word_count - 400) / 20.0, bonus_length_score)
-            elif word_count >= 100:
-                length_score = (word_count - 100) / (300.0 / base_length_score)
+            if content_word_count >= 400:
+                length_score = base_length_score + min((content_word_count - 400) / 20.0, bonus_length_score)
+            elif content_word_count >= 100:
+                length_score = (content_word_count - 100) / (300.0 / base_length_score)
             
             # Title quality score
             max_title_score = self.weights.get('max_title_score', 10.0)

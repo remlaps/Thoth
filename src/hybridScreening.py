@@ -8,8 +8,8 @@ over content scores for specific hard constraints.
 
 import logging
 from contentScoring import ContentScorer
-from authorValidation import isBlacklisted, isAuthorWhitelisted, isHiveActivityTooRecent, isAuthorPostLimitReached
-from contentValidation import isTooShortHard, isEdit, hasBlacklistedTag, hasRequiredTag
+from authorValidation import isBlacklisted, isAuthorWhitelisted, isHiveActivityTooRecent, isAuthorPostLimitReached, inactiveDays, isRepTooLow, rep_log10
+from contentValidation import isTooShortHard, isEdit, hasBlacklistedTag, hasRequiredTag, word_count, is_dmca
 from walletValidation import walletScreened
 from utils import detect_language, remove_formatting
 from configValidator import ConfigValidator
@@ -149,11 +149,11 @@ class HybridScreening:
         # Rule 1: Word count must exceed the hard minimum (fastest check, highest rejection rate)
         if isTooShortHard(clean_body):
             min_words_hard = self.config.get_int('CONTENT', 'MIN_WORDS_HARD', 0)
-            word_count = len(clean_body.split())
-            logger.info(f"Rule-based rejection: {author}/{permlink} below hard minimum word count ({word_count} < {min_words_hard})")
+            actual_word_count = word_count(clean_body)
+            logger.info(f"Rule-based rejection: {author}/{permlink} below hard minimum word count ({actual_word_count} < {min_words_hard})")
             return {
                 'passed': False,
-                'reason': f'below_minimum_words: {word_count} < {min_words_hard}',
+                'reason': f'below_minimum_words: {actual_word_count} < {min_words_hard}',
                 'rule_type': 'word_count'
             }
 
@@ -187,7 +187,7 @@ class HybridScreening:
             }
 
         # Rule 4: Blacklisted tags must be rejected (fast check)
-        if hasBlacklistedTag(post_data):
+        if hasBlacklistedTag(post) or hasBlacklistedTag(post_data):
             logger.info(f"Rule-based rejection: {author}/{permlink} contains blacklisted tags")
             return {
                 'passed': False,
@@ -196,7 +196,7 @@ class HybridScreening:
             }
 
         # Rule 5: Check for required tags (fast check)
-        if not hasRequiredTag(post_data):
+        if not hasRequiredTag(post):
             logger.info(f"Rule-based rejection: {author}/{permlink} missing required tags")
             return {
                 'passed': False,
@@ -211,6 +211,15 @@ class HybridScreening:
                 'passed': False,
                 'reason': 'max_posts_per_author_reached: author has reached the maximum number of included posts',
                 'rule_type': 'author_post_limit'
+            }
+
+        # Rule 7: DMCA Check (fast in-memory/cached check)
+        if is_dmca(post_data):
+            logger.info(f"Rule-based rejection: {author}/{permlink} is on the Condenser DMCA list")
+            return {
+                'passed': False,
+                'reason': 'dmca_blocked: post is on the Condenser DMCA list',
+                'rule_type': 'dmca'
             }
 
         # --- HISTORY CHECKS (Local Database) ---
@@ -269,8 +278,31 @@ class HybridScreening:
             }
 
         # --- SLOW, NETWORK-INTENSIVE CHECKS (for non-whitelisted authors) ---
+        
+        # Rule 9: Author reputation must meet the hard minimum (fast check, but placed here to allow whitelist bypass)
+        if isRepTooLow(post['author_reputation']):
+            min_rep = self.config.get_int('AUTHOR', 'MIN_REPUTATION', 0)
+            actual_rep = rep_log10(post['author_reputation'])
+            logger.info(f"Rule-based rejection: {author}/{permlink} author reputation below minimum ({actual_rep:.2f} < {min_rep})")
+            return {
+                'passed': False,
+                'reason': f'below_minimum_reputation: {actual_rep:.2f} < {min_rep}',
+                'rule_type': 'reputation'
+            }
 
-        # Rule 9: Hive inactivity must be higher than specified days (network call)
+        # Rule 10: Steem inactivity must not exceed the hard limit (network call)
+        max_inactivity_days = self.config.get_int('AUTHOR', 'MAX_INACTIVITY_DAYS', 0)
+        if max_inactivity_days > 0:
+            steem_inactive_days = inactiveDays(author, steem_instance=self.steem)
+            if steem_inactive_days > max_inactivity_days:
+                logger.info(f"Rule-based rejection: {author}/{permlink} has been inactive on Steem for {steem_inactive_days} days (Hard Max: {max_inactivity_days})")
+                return {
+                    'passed': False,
+                    'reason': f'steem_inactivity: author inactive for {steem_inactive_days} days',
+                    'rule_type': 'steem_inactivity'
+                }
+
+        # Rule 11: Hive inactivity must be higher than specified days (network call)
         if isHiveActivityTooRecent(author):
             hive_inactivity_days = self.config.get_int('AUTHOR', 'MIN_HIVE_INACTIVITY_HARD', 7)
             logger.info(f"Rule-based rejection: {author}/{permlink} has recent Hive activity (below {hive_inactivity_days} days)")
@@ -280,7 +312,7 @@ class HybridScreening:
                 'rule_type': 'hive_inactivity'
             }
 
-        # Rule 10: Wallet screening (slowest check, do last)
+        # Rule 12: Wallet screening (slowest check, do last)
         if walletScreened(author, steem_instance=self.steem):
             logger.info(f"Rule-based rejection: {author}/{permlink} wallet flagged by screening")
             return {
