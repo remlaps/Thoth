@@ -2,3 +2,4 @@ langdetect
 numpy
 Requests
 steem==1.0.2
+git+https://github.com/remlaps/linkedListOnSteem.git
