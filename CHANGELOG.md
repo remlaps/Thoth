@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 
+## [0.1.6] - 2026-03-28
+### Added
+- Integrated `linkedListOnSteem` library to record Thoth's run history, state, and curated article metadata immutably on the Steem blockchain using `custom_json` transactions.
+
 ### Changed
 
 ### Fixed

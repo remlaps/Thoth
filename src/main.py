@@ -2,8 +2,7 @@ import configparser
 import re
 import os
 import time
-from datetime import datetime
-import math
+import datetime, math
 import io
 import sys
 import logging
@@ -22,6 +21,7 @@ import version
 
 from steem.blockchain import Blockchain
 from steem import Steem
+from linkedListOnSteem import SteemLinkedList
 
 # Create ONE high-quality RNG instance at module level with explicit entropy
 _rng = utils.get_rng()
@@ -91,7 +91,12 @@ try:
 except Exception:
     skip_ai_curation = config.get('LLM', 'SKIP_AI_CURATION', fallback='False').lower() in ('1', 'true', 'yes', 'on')
 
-print(f"Model switching enabled: {enable_model_switching}. Dry run: {model_switching_dry_run}. Skip AI curation: {skip_ai_curation}")
+try:
+    steem_dry_run = config.getboolean('STEEM', 'DRY_RUN', fallback=False)
+except Exception:
+    steem_dry_run = config.get('STEEM', 'DRY_RUN', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+
+print(f"Model switching enabled: {enable_model_switching}. Model Dry run: {model_switching_dry_run}. Skip AI: {skip_ai_curation}. Steem Dry run: {steem_dry_run}")
 
 ### Validate the config to avoid failures at posting time.
 validator = ConfigValidator()
@@ -128,17 +133,31 @@ retry_count=0
 max_retries = 5
 retry_delay = 0.25  # Base delay in seconds
 
+steemdInstance = initialize_steem_with_retry(node_api=steemApi)
+if not steemdInstance:
+    exit(1) # Exit if Steem connection failed
+
+# Initialize the on-chain linked list for state management
+sll = SteemLinkedList(
+    steem_instance=steemdInstance,
+    account=config.get('STEEM', 'POSTING_ACCOUNT'),
+    ll_id="thoth_history_test_1",
+    custom_json_id="thoth_state",
+    use_active_key=False
+)
+print("Rebuilding on-chain state index...")
+sll.rebuild_index()
+print(f"On-chain index rebuilt with {len(sll)} nodes.")
+
 # File to store the last processed block
 BLOCK_FILE = 'config/last_block.txt'
 if os.path.exists(BLOCK_FILE):
     with open(BLOCK_FILE, 'r') as f:
         lastBlock = int(f.read().strip())
+    print(f"Resuming from local file block memory: {lastBlock}")
 else:
     lastBlock = 0
-
-steemdInstance = initialize_steem_with_retry(node_api=steemApi)
-if not steemdInstance:
-    exit(1) # Exit if Steem connection failed
+    print("No previous local history found, will use default start block.")
 
 # Initialize the statistics tracker
 stats_tracker = StatsTracker()
@@ -222,7 +241,7 @@ while retry_count <= max_retries:
             # Save the current block number to file
             with open(BLOCK_FILE, 'w') as f:
                 f.write(str(streamFromBlock))
-                
+
             retry_count = 0
             if (postCount >= maxSize):
                 break    
@@ -377,6 +396,26 @@ if earliest_timestamp and latest_timestamp:
     postHelper.postCuration(commentList, aiResponseList, aiIntroString, model_manager=model_manager, full_delegations=full_delegations)
     print("Posting finished.")
 
+    # Create the curation record from the list of curated posts
+    curation_record = [
+        {"title": post.get("title", ""), "author": post.get("author", ""), "permlink": post.get("permlink", "")}
+        for post in commentList
+    ]
+
+    # Save the new state to the blockchain via the linked list
+    print("Saving Thoth's updated state to the blockchain...")
+    try:
+        sll.safe_append({
+            "event": "thoth_run_complete",
+            "last_block": streamFromBlock,
+            "posts_curated_count": postCount,
+            "curated_articles": curation_record,
+            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+        })
+        print("On-chain state saved successfully.")
+    except Exception as e:
+        print(f"FATAL: Could not save on-chain state: {e}")
+
     # Generate and print statistics report
     stats_report = stats_tracker.generate_report()
     print(stats_report)
@@ -385,6 +424,22 @@ if earliest_timestamp and latest_timestamp:
         print(f"\n<hr>\n<h2>Run Statistics</h2>\n<pre>{stats_report}</pre>", file=f)
 else:
     print("No posts were found to curate in the specified block range. Exiting.")
+    # Even if no posts were curated, save the state to update the last processed block
+    if not steem_dry_run:
+        print("Saving Thoth's updated state to the blockchain (no new posts)...")
+        try:
+            sll.safe_append({
+                "event": "thoth_run_complete_empty",
+                "last_block": streamFromBlock,
+                "posts_curated_count": 0,
+                "curated_articles": [],
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+            })
+            print("On-chain state saved successfully.")
+        except Exception as e:
+            print(f"FATAL: Could not save on-chain state: {e}")
+    else:
+        print("DRY RUN: Skipped saving Thoth's updated state to the blockchain.")
     # Also print stats here, in case some posts were evaluated but none were accepted.
     stats_report = stats_tracker.generate_report()
     print(stats_report)

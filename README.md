@@ -19,6 +19,8 @@ Each post and reply provides the ability to direct beneficiary rewards to the fo
 - The Thoth account, itself
 - @null for reward-burning
 
+Additionally, Thoth maintains an immutable, on-chain record of its state and run history using a linked list data structure broadcasted via Steem `custom_json` transactions.
+
 After posting is done, the post and replies receive upvotes from the Thoth account and the blockchain consensus will eventually distribute all rewards as specified in the beneficiary settings.
 
 ---
