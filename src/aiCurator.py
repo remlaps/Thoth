@@ -166,6 +166,7 @@ def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=N
                 # The re.DOTALL flag ensures that the pattern matches even if the block spans multiple lines.
                 # .strip() removes any leading/trailing whitespace left after the removal.
                 cleanedResponse = re.sub(r'<think>.*?</think>', '', str(rawResponse), flags=re.DOTALL).strip()
+                cleanedResponse = re.sub(r'<thought>.*?</thought>', '', str(rawResponse), flags=re.DOTALL).strip()
 
                 post_id = f"@{author}/{permlink}" if author and permlink else "Unknown Post"
                 

@@ -148,6 +148,7 @@ def aiIntro(llmKey, llmModel, llmUrl, startTime, endTime, combinedComment, maxTo
 
                 # Post-process to remove any <think>...</think> blocks that the model might still include.
                 cleanedResponse = re.sub(r'<think>.*?</think>', '', str(rawResponse), flags=re.DOTALL).strip()
+                cleanedResponse = re.sub(r'<thought>.*?</thought>', '', str(rawResponse), flags=re.DOTALL).strip()
 
                 print(f"Intro Response before cleaning: {rawResponse}")
                 print(f"Intro Response after cleaning: {cleanedResponse}")
