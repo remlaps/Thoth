@@ -138,6 +138,9 @@ MAX_AUTHOR_PER_WEEK = 4
 # (The system currently defaults to a 30-day lookback for posts, but adding this keeps your configuration organized)
 MAX_POST_PER_MONTH = 2
 
+# When True, skips saving the curation history linked list on the blockchain via custom_json.
+SKIP_ONCHAIN_HISTORY = False
+
 [SCORING]
 # Author Component Max Scores
 MAX_REPUTATION_SCORE = 25.0

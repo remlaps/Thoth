@@ -109,6 +109,16 @@ This section defines engagement metrics.
 
 ---
 
+## [HISTORY]
+This section configures limits on how often authors and posts can be curated.
+
+- **MAX_AUTHOR_PER_DAY**: Maximum number of times a specific author can be curated in a single day.
+- **MAX_AUTHOR_PER_WEEK**: Maximum number of times a specific author can be curated in a 7-day period.
+- **MAX_POST_PER_MONTH**: Maximum number of times a specific post can be curated in a 30-day period.
+- **SKIP_ONCHAIN_HISTORY**: Set to `True` to skip saving the curation history linked list on the blockchain via custom_json.
+
+---
+
 ## [SCORING]
 This section configures the quality scoring system.
 

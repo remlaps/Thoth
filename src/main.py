@@ -96,7 +96,12 @@ try:
 except Exception:
     steem_dry_run = config.get('STEEM', 'DRY_RUN', fallback='False').lower() in ('1', 'true', 'yes', 'on')
 
-print(f"Model switching enabled: {enable_model_switching}. Model Dry run: {model_switching_dry_run}. Skip AI: {skip_ai_curation}. Steem Dry run: {steem_dry_run}")
+try:
+    skip_onchain_history = config.getboolean('HISTORY', 'SKIP_ONCHAIN_HISTORY', fallback=False)
+except Exception:
+    skip_onchain_history = config.get('HISTORY', 'SKIP_ONCHAIN_HISTORY', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+
+print(f"Model switching enabled: {enable_model_switching}. Model Dry run: {model_switching_dry_run}. Skip AI: {skip_ai_curation}. Steem Dry run: {steem_dry_run}. Skip on-chain history: {skip_onchain_history}")
 
 ### Validate the config to avoid failures at posting time.
 validator = ConfigValidator()
@@ -138,16 +143,20 @@ if not steemdInstance:
     exit(1) # Exit if Steem connection failed
 
 # Initialize the on-chain linked list for state management
-sll = SteemLinkedList(
-    steem_instance=steemdInstance,
-    account=config.get('STEEM', 'POSTING_ACCOUNT'),
-    ll_id="thoth_history_test_1",
-    custom_json_id="thoth_state",
-    use_active_key=False
-)
-print("Rebuilding on-chain state index...")
-sll.rebuild_index()
-print(f"On-chain index rebuilt with {len(sll)} nodes.")
+if not skip_onchain_history:
+    sll = SteemLinkedList(
+        steem_instance=steemdInstance,
+        account=config.get('STEEM', 'POSTING_ACCOUNT'),
+        ll_id="thoth_history_test_1",
+        custom_json_id="thoth_state",
+        use_active_key=False
+    )
+    print("Rebuilding on-chain state index...")
+    sll.rebuild_index()
+    print(f"On-chain index rebuilt with {len(sll)} nodes.")
+else:
+    sll = None
+    print("Skipping on-chain state index rebuild (SKIP_ONCHAIN_HISTORY is enabled).")
 
 # File to store the last processed block
 BLOCK_FILE = 'config/last_block.txt'
@@ -403,18 +412,21 @@ if earliest_timestamp and latest_timestamp:
     ]
 
     # Save the new state to the blockchain via the linked list
-    print("Saving Thoth's updated state to the blockchain...")
-    try:
-        sll.safe_append({
-            "event": "thoth_run_complete",
-            "last_block": streamFromBlock,
-            "posts_curated_count": postCount,
-            "curated_articles": curation_record,
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
-        })
-        print("On-chain state saved successfully.")
-    except Exception as e:
-        print(f"FATAL: Could not save on-chain state: {e}")
+    if not skip_onchain_history and sll:
+        print("Saving Thoth's updated state to the blockchain...")
+        try:
+            sll.safe_append({
+                "event": "thoth_run_complete",
+                "last_block": streamFromBlock,
+                "posts_curated_count": postCount,
+                "curated_articles": curation_record,
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+            })
+            print("On-chain state saved successfully.")
+        except Exception as e:
+            print(f"FATAL: Could not save on-chain state: {e}")
+    else:
+        print("Skipped saving Thoth's updated state to the blockchain (SKIP_ONCHAIN_HISTORY is enabled).")
 
     # Generate and print statistics report
     stats_report = stats_tracker.generate_report()
@@ -426,18 +438,21 @@ else:
     print("No posts were found to curate in the specified block range. Exiting.")
     # Even if no posts were curated, save the state to update the last processed block
     if not steem_dry_run:
-        print("Saving Thoth's updated state to the blockchain (no new posts)...")
-        try:
-            sll.safe_append({
-                "event": "thoth_run_complete_empty",
-                "last_block": streamFromBlock,
-                "posts_curated_count": 0,
-                "curated_articles": [],
-                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
-            })
-            print("On-chain state saved successfully.")
-        except Exception as e:
-            print(f"FATAL: Could not save on-chain state: {e}")
+        if not skip_onchain_history and sll:
+            print("Saving Thoth's updated state to the blockchain (no new posts)...")
+            try:
+                sll.safe_append({
+                    "event": "thoth_run_complete_empty",
+                    "last_block": streamFromBlock,
+                    "posts_curated_count": 0,
+                    "curated_articles": [],
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                })
+                print("On-chain state saved successfully.")
+            except Exception as e:
+                print(f"FATAL: Could not save on-chain state: {e}")
+        else:
+            print("Skipped saving Thoth's updated state to the blockchain (no new posts, SKIP_ONCHAIN_HISTORY is enabled).")
     else:
         print("DRY RUN: Skipped saving Thoth's updated state to the blockchain.")
     # Also print stats here, in case some posts were evaluated but none were accepted.
