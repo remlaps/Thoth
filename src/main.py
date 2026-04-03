@@ -175,6 +175,9 @@ stats_tracker = StatsTracker()
 hybrid_screening = HybridScreening(steemdInstance, validator, stats_tracker=stats_tracker)
 print("Hybrid screening system initialized.")
 
+# Clean up old records from curation history database
+hybrid_screening.curation_history.cleanup_old_records()
+
 blockchain = Blockchain(steemd_instance=steemdInstance)
 print(f"Using blockchain with nodes: {steemdInstance.steemd.nodes}")
 
@@ -402,7 +405,17 @@ if earliest_timestamp and latest_timestamp:
         print(f"FATAL: Could not fetch delegations in main: {e}")
         exit(1)
 
-    postHelper.postCuration(commentList, aiResponseList, aiIntroString, model_manager=model_manager, full_delegations=full_delegations)
+    post_success = postHelper.postCuration(commentList, aiResponseList, aiIntroString, model_manager=model_manager, full_delegations=full_delegations)
+
+    try:
+        dry_run = config.getboolean('STEEM', 'DRY_RUN', fallback=False)
+    except Exception:
+        dry_run = config.get('STEEM', 'DRY_RUN', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+        
+    if post_success and not dry_run:
+        for comment in commentList:
+            hybrid_screening.curation_history.record_curation(comment['author'], comment['permlink'])
+
     print("Posting finished.")
 
     # Create the curation record from the list of curated posts

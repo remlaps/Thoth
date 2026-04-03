@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+- Fixed an issue where historical post curation limits (`MAX_AUTHOR_PER_DAY`, `MAX_AUTHOR_PER_WEEK`, and 30-day post duplication) were not being enforced because successful curations were not being saved to the local SQLite database. Thoth now correctly persists this history after successfully broadcasting to the blockchain.
 
 ## [0.1.5] - 2026-03-24
 ### Added
