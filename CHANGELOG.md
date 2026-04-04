@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 ### Added
 
+## [0.1.8] - 2026-04-04
+### Added
+- Implemented a two-tiered Blurt inactivity screening system: a hard minimum cutoff (`MIN_BLURT_INACTIVITY_HARD`) for instant rejection, and a scaled scoring component (`TARGET_BLURT_INACTIVITY_DAYS`, `MAX_BLURT_INACTIVITY_SCORE`) for rewarding longer inactivity on the platform.
+- Added support for Blurt node RPC calls (`condenser_api.get_accounts`) to verify cross-platform activity.
+- Updated the `checkValidation.py` test tool to output Blurt activity metrics.
+
+### Changed
+- Renamed `LAST_BLURT_ACTIVITY_AGE` to `MIN_BLURT_INACTIVITY_HARD` to maintain consistency with the Hive configuration naming conventions.
+- Updated hybrid screening rule evaluations to incorporate the new Blurt inactivity metrics.
+
 ## [0.1.7] - 2026-04-03
 ### Added
 - Added `SKIP_ONCHAIN_HISTORY` configuration option in the `[HISTORY]` section to optionally disable saving the curation history linked list on the blockchain via `custom_json`.

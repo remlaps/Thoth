@@ -95,6 +95,11 @@ def main():
     hive_too_recent = authorValidation.isHiveActivityTooRecent(author_name)
     print(f"Hive Activity Too Recent (less than {last_hive_age} days ago): {hive_too_recent}")
 
+    # Blurt Activity
+    last_blurt_age = config.getint('AUTHOR', 'MIN_BLURT_INACTIVITY_HARD', fallback=7)
+    blurt_too_recent = authorValidation.isBlurtActivityTooRecent(author_name)
+    print(f"Blurt Activity Too Recent (less than {last_blurt_age} days ago): {blurt_too_recent}")
+
     # Follower counts
     min_followers = config.getint('AUTHOR', 'MIN_FOLLOWERS')
     follower_count = s.get_follow_count(author_name)['follower_count']

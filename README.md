@@ -86,6 +86,10 @@ Customize the `config/config.ini` file to your preferences.
 | `STEEM`   | `DEFAULT_START_BLOCK`         | The block number to start from if no history is found.                                                  |
 | `BLOG`    | `NUMBER_OF_REVIEWED_POSTS`      | The number of posts to find and review before generating the curation summary (max 5).                            |
 | `BLOG`    | `NUMBER_OF_DELEGATORS_PER_POST` | The number of top delegators to include as beneficiaries in each reply post (max 5).                              |
+| `AUTHOR`  | `MIN_BLURT_INACTIVITY_HARD`     | Minimum days since the account was active on Blurt to avoid instant rejection.                            |
+| `AUTHOR`  | `MIN_HIVE_INACTIVITY_HARD`      | Minimum days since the account was active on Hive to avoid instant rejection.                             |
+| `SCORING` | `MAX_BLURT_INACTIVITY_SCORE`    | Maximum points awarded in the content scoring step for Blurt inactivity.                                  |
+| `SCORING` | `MAX_HIVE_INACTIVITY_SCORE`     | Maximum points awarded in the content scoring step for Hive inactivity.                                   |
 | `BLOG`    | `CURATED_AUTHOR_WEIGHT`         | The beneficiary weight (e.g., 1000 for 10%) for each curated author in the top-level post.                                      |
 | `BLOG`    | `DELEGATOR_WEIGHT`              | The beneficiary weight for each included delegator in the top-level post.                                                     |
 | `BLOG`    | `POSTING_ACCOUNT_WEIGHT`        | The beneficiary weight for the Thoth account itself.                                                    |

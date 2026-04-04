@@ -15,7 +15,7 @@ from steem.account import Account
 from steem.account import AccountDoesNotExistsException
 
 from utils import get_rng, remove_formatting
-from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep, hiveInactiveDays
+from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep, hiveInactiveDays, blurtInactiveDays
 from contentValidation import word_count
 from steemHelpers import get_resteem_count
 
@@ -62,6 +62,7 @@ class ContentScorer:
         weights['max_activity_score'] = self.config.get_float('SCORING', 'MAX_ACTIVITY_SCORE', 15.0)
         weights['max_influence_score'] = self.config.get_float('SCORING', 'MAX_INFLUENCE_SCORE', 10.0)
         weights['max_hive_inactivity_score'] = self.config.get_float('SCORING', 'MAX_HIVE_INACTIVITY_SCORE', 10.0)
+        weights['max_blurt_inactivity_score'] = self.config.get_float('SCORING', 'MAX_BLURT_INACTIVITY_SCORE', 10.0)
 
         # Content max component scores
         weights['max_length_score'] = self.config.get_float('SCORING', 'MAX_LENGTH_SCORE', 30.0)
@@ -290,6 +291,15 @@ class ContentScorer:
             else:
                 hive_inactivity_score = max_hive_inactivity_score
             
+            # 8. Blurt Inactivity score
+            max_blurt_inactivity_score = self.weights.get('max_blurt_inactivity_score', 10.0)
+            blurt_inactivity_days = blurtInactiveDays(author)
+            if blurt_inactivity_days is not None:
+                target_blurt_inactivity = self.config.get_int('AUTHOR', 'TARGET_BLURT_INACTIVITY_DAYS', 60)
+                blurt_inactivity_score = min((blurt_inactivity_days / max(1, target_blurt_inactivity)) * max_blurt_inactivity_score, max_blurt_inactivity_score)
+            else:
+                blurt_inactivity_score = max_blurt_inactivity_score
+            
             # Combined author score (max 100)
             author_score = (
                 reputation_score + 
@@ -299,7 +309,8 @@ class ContentScorer:
                 age_score + 
                 activity_score + 
                 influence_score +
-                hive_inactivity_score
+                hive_inactivity_score +
+                blurt_inactivity_score
             )
             
             return max(0.0, min(author_score, 100.0))

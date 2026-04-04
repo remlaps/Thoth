@@ -115,6 +115,10 @@ def isAuthorScreened(comment, included_posts=None, steem_instance=None):
         logger.debug(f"isAuthorScreened({comment['author']}) -> isHiveActivityTooRecent: True")
         return True
 
+    if isBlurtActivityTooRecent(comment['author']):
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isBlurtActivityTooRecent: True")
+        return True
+
     # Optimization: Fetch Follower Count ONCE
     follower_count = 0
     try:
@@ -590,4 +594,95 @@ def getLastHiveActivityDate(account):
         return None
     except (json.JSONDecodeError, KeyError, ValueError) as e:
         logger.error(f"Error processing response: {e}")
+        return None
+
+def isBlurtActivityTooRecent(account):
+    blurtInactivity = blurtInactiveDays(account)
+    if ( blurtInactivity != None ):
+        limit = config.getint('AUTHOR', 'MIN_BLURT_INACTIVITY_HARD', fallback=7)
+        if ( blurtInactivity < limit ):
+            return True
+    return False
+
+def blurtInactiveDays(account):
+    """
+    Calculate the number of days since the last activity for a Blurt account.
+    
+    Args:
+        account (str): The Blurt account name to query
+        
+    Returns:
+        int: Number of days since last activity, or None if the activity date couldn't be retrieved
+    """
+    lastBlurtActivity = getLastBlurtActivityDate(account)
+    
+    if not lastBlurtActivity:
+        return None
+    
+    # Convert string date to datetime object
+    lastBlurtActivityDt = datetime.strptime(lastBlurtActivity, "%Y-%m-%d %H:%M:%S")
+    
+    # Get current datetime
+    now = datetime.now()
+    
+    # Calculate the difference in days
+    daysPassed = (now - lastBlurtActivityDt).days
+    
+    return daysPassed
+
+def getLastBlurtActivityDate(account):
+    """
+    Query the Blurt API for an account and return the last activity date.
+    
+    Args:
+        account (str): The Blurt account name to query
+        
+    Returns:
+        str: The last activity date as a formatted date string, or None if the API call fails
+    """
+    url = "https://rpc.blurt.world"
+    payload = {
+        "jsonrpc": "2.0", 
+        "method": "condenser_api.get_accounts", 
+        "params": [[account]], 
+        "id": 1
+    }
+    
+    try:
+        response = requests.post(url, json=payload)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+        
+        data = response.json()
+        
+        # Check if we got a valid response with results
+        if "result" in data and data["result"] and len(data["result"]) > 0:
+            account_data = data["result"][0]
+            
+            # Extract the last_post and last_vote_time fields
+            lastBlurtPostTime = account_data.get("last_post")
+            lastBlurtVoteTime = account_data.get("last_vote_time")
+            
+            # Convert string dates to datetime objects
+            lastBlurtPostTime = datetime.fromisoformat(lastBlurtPostTime.replace("Z", "+00:00")) if lastBlurtPostTime else None
+            lastBlurtVoteTime = datetime.fromisoformat(lastBlurtVoteTime.replace("Z", "+00:00")) if lastBlurtVoteTime else None
+            
+            # Find the most recent date
+            if lastBlurtPostTime and lastBlurtVoteTime:
+                lastBlurtActivityTime = max(lastBlurtPostTime, lastBlurtVoteTime)
+            elif lastBlurtPostTime:
+                lastBlurtActivityTime = lastBlurtPostTime
+            elif lastBlurtVoteTime:
+                lastBlurtActivityTime = lastBlurtVoteTime
+            else:
+                return None
+                
+            return lastBlurtActivityTime.strftime("%Y-%m-%d %H:%M:%S")
+        else:
+            return None
+            
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error querying Blurt API: {e}")
+        return None
+    except (json.JSONDecodeError, KeyError, ValueError) as e:
+        logger.error(f"Error processing Blurt response: {e}")
         return None

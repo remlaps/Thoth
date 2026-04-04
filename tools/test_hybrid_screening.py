@@ -53,7 +53,9 @@ def create_mock_config():
     mock_config.get_int = Mock(side_effect=lambda section, key, fallback=0: {
         ('CONTENT', 'MIN_WORDS_HARD'): 100,
         ('AUTHOR', 'MIN_HIVE_INACTIVITY_HARD'): 7,
+        ('AUTHOR', 'MIN_BLURT_INACTIVITY_HARD'): 7,
         ('AUTHOR', 'TARGET_HIVE_INACTIVITY_DAYS'): 60,
+        ('AUTHOR', 'TARGET_BLURT_INACTIVITY_DAYS'): 60,
         ('AUTHOR', 'MIN_FOLLOWERS'): 350,
         ('AUTHOR', 'MIN_FOLLOWERS_PER_MONTH'): 10,
         ('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP'): 40,
@@ -89,6 +91,7 @@ def create_mock_config():
         ('SCORING', 'COMPONENT_CONTENT_WEIGHT'): 0.35,
         ('SCORING', 'COMPONENT_ENGAGEMENT_WEIGHT'): 0.25,
         ('SCORING', 'MAX_HIVE_INACTIVITY_SCORE'): 10.0,
+        ('SCORING', 'MAX_BLURT_INACTIVITY_SCORE'): 10.0,
     }.get((section, key), fallback))
     mock_config.get = Mock(side_effect=lambda section, key, fallback='': {
         ('CONTENT', 'LANGUAGE'): 'en',
@@ -328,6 +331,70 @@ def test_hive_inactivity_rule():
         hybridScreening.isAuthorWhitelisted = original_isAuthorWhitelisted
         hybridScreening.inactiveDays = original_inactiveDays
 
+def test_blurt_inactivity_rule():
+    """Test that authors with recent Blurt activity are rejected."""
+    logger.info("Testing Blurt inactivity rule...")
+    
+    # Mock the isBlurtActivityTooRecent function to return True
+    original_isBlurtActivityTooRecent = hybridScreening.isBlurtActivityTooRecent
+    hybridScreening.isBlurtActivityTooRecent = Mock(return_value=True)
+    
+    # --- Mock preceding checks to ensure this rule is reached ---
+    original_detect_language = hybridScreening.detect_language
+    hybridScreening.detect_language = Mock(return_value='en')
+    
+    original_isEdit = hybridScreening.isEdit
+    hybridScreening.isEdit = Mock(return_value=False)
+    
+    original_hasBlacklistedTag = hybridScreening.hasBlacklistedTag
+    original_hasRequiredTag = hybridScreening.hasRequiredTag
+    hybridScreening.hasBlacklistedTag = Mock(return_value=False)
+    hybridScreening.hasRequiredTag = Mock(return_value=True)
+    
+    original_isBlacklisted = hybridScreening.isBlacklisted
+    hybridScreening.isBlacklisted = Mock(return_value=False)
+    
+    original_isAuthorWhitelisted = hybridScreening.isAuthorWhitelisted
+    hybridScreening.isAuthorWhitelisted = Mock(return_value=False)
+    
+    original_inactiveDays = hybridScreening.inactiveDays
+    hybridScreening.inactiveDays = Mock(return_value=0)
+    
+    original_isHiveActivityTooRecent = hybridScreening.isHiveActivityTooRecent
+    hybridScreening.isHiveActivityTooRecent = Mock(return_value=False)
+    
+    try:
+        mock_steem = create_mock_steem_instance()
+        mock_config = create_mock_config()
+        hybrid_screening = HybridScreening(mock_steem, mock_config)
+        
+        test_post = {
+            'author': 'recent_blurt_user',
+            'permlink': 'test-post',
+            'title': 'Recent Blurt Activity Post',
+            'timestamp': '2023-01-01T00:00:00'
+        }
+        
+        result = hybrid_screening.screen_content(test_post)
+        
+        assert result['status'] == 'rejected', f"Expected rejected status, got {result['status']}"
+        assert result['rule_type'] == 'blurt_inactivity', f"Expected blurt_inactivity rule type, got {result['rule_type']}"
+        assert 'recent_blurt_activity' in result['reason'], f"Expected recent_blurt_activity in reason, got {result['reason']}"
+        assert result['score_result'] is None, f"Expected no score result for recent Blurt activity, got {result['score_result']}"
+        
+        logger.info("✓ Blurt inactivity rule test passed")
+    finally:
+        # Restore original functions
+        hybridScreening.isBlurtActivityTooRecent = original_isBlurtActivityTooRecent
+        hybridScreening.detect_language = original_detect_language
+        hybridScreening.isEdit = original_isEdit
+        hybridScreening.hasBlacklistedTag = original_hasBlacklistedTag
+        hybridScreening.hasRequiredTag = original_hasRequiredTag
+        hybridScreening.isBlacklisted = original_isBlacklisted
+        hybridScreening.isAuthorWhitelisted = original_isAuthorWhitelisted
+        hybridScreening.inactiveDays = original_inactiveDays
+        hybridScreening.isHiveActivityTooRecent = original_isHiveActivityTooRecent
+
 def test_word_count_rule():
     """Test that posts below hard minimum word count are rejected."""
     logger.info("Testing word count rule...")
@@ -428,6 +495,7 @@ def test_successful_screening():
     original_isBlacklisted = hybridScreening.isBlacklisted
     original_isAuthorWhitelisted = hybridScreening.isAuthorWhitelisted
     original_isHiveActivityTooRecent = hybridScreening.isHiveActivityTooRecent
+    original_isBlurtActivityTooRecent = hybridScreening.isBlurtActivityTooRecent
     original_isTooShortHard = hybridScreening.isTooShortHard
     original_isEdit = hybridScreening.isEdit
     original_hasBlacklistedTag = hybridScreening.hasBlacklistedTag
@@ -441,6 +509,7 @@ def test_successful_screening():
     hybridScreening.isBlacklisted = Mock(return_value=False)
     hybridScreening.isAuthorWhitelisted = Mock(return_value=False)
     hybridScreening.isHiveActivityTooRecent = Mock(return_value=False)
+    hybridScreening.isBlurtActivityTooRecent = Mock(return_value=False)
     hybridScreening.isTooShortHard = Mock(return_value=False)
     hybridScreening.isEdit = Mock(return_value=False)
     hybridScreening.hasBlacklistedTag = Mock(return_value=False)
@@ -486,6 +555,7 @@ def test_successful_screening():
         hybridScreening.isBlacklisted = original_isBlacklisted
         hybridScreening.isAuthorWhitelisted = original_isAuthorWhitelisted
         hybridScreening.isHiveActivityTooRecent = original_isHiveActivityTooRecent
+        hybridScreening.isBlurtActivityTooRecent = original_isBlurtActivityTooRecent
         hybridScreening.isTooShortHard = original_isTooShortHard
         hybridScreening.isEdit = original_isEdit
         hybridScreening.hasBlacklistedTag = original_hasBlacklistedTag
@@ -617,6 +687,7 @@ def main():
         test_whitelisted_author()
         test_whitelisted_author_below_minimum()
         test_hive_inactivity_rule()
+        test_blurt_inactivity_rule()
         test_word_count_rule()
         test_reputation_rule()
         test_successful_screening()

@@ -8,7 +8,7 @@ over content scores for specific hard constraints.
 
 import logging
 from contentScoring import ContentScorer
-from authorValidation import isBlacklisted, isAuthorWhitelisted, isHiveActivityTooRecent, isAuthorPostLimitReached, inactiveDays, isRepTooLow, rep_log10
+from authorValidation import isBlacklisted, isAuthorWhitelisted, isHiveActivityTooRecent, isBlurtActivityTooRecent, isAuthorPostLimitReached, inactiveDays, isRepTooLow, rep_log10
 from contentValidation import isTooShortHard, isEdit, hasBlacklistedTag, hasRequiredTag, word_count, is_dmca
 from walletValidation import walletScreened
 from utils import detect_language, remove_formatting
@@ -310,6 +310,16 @@ class HybridScreening:
                 'passed': False,
                 'reason': f'recent_hive_activity: author has been active on Hive recently',
                 'rule_type': 'hive_inactivity'
+            }
+
+        # Rule 11b: Blurt inactivity must be higher than specified days (network call)
+        if isBlurtActivityTooRecent(author):
+            blurt_inactivity_days = self.config.get_int('AUTHOR', 'MIN_BLURT_INACTIVITY_HARD', 7)
+            logger.info(f"Rule-based rejection: {author}/{permlink} has recent Blurt activity (below {blurt_inactivity_days} days)")
+            return {
+                'passed': False,
+                'reason': f'recent_blurt_activity: author has been active on Blurt recently',
+                'rule_type': 'blurt_inactivity'
             }
 
         # Rule 12: Wallet screening (slowest check, do last)

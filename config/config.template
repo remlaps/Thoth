@@ -42,8 +42,8 @@ SKIP_AI_CURATION = False
 [AUTHOR]
 ENABLE_MEDIAN_REP_SCORING = False
 FOLLOWER_HALFLIFE_YEARS = 2
-# required days since the account was active on Blurt (not yet implemented)
-LAST_BLURT_ACTIVITY_AGE = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+# minimum days since the account was active on Blurt (hard limit)
+MIN_BLURT_INACTIVITY_HARD = 7
 # minimum days since the account was active on Hive (hard limit)
 MIN_HIVE_INACTIVITY_HARD = 7
 MAX_FOLLOWER_INACTIVITY_DAYS = 90
@@ -56,8 +56,11 @@ MIN_FOLLOWERS = 350
 MIN_FOLLOWERS_PER_MONTH = 10
 MIN_FOLLOWER_MEDIAN_REP = 40
 MIN_REPUTATION = 6
+# target days since the account was active on Blurt for maximum score
+TARGET_BLURT_INACTIVITY_DAYS = 60
 # target days since the account was active on Hive for maximum score
 TARGET_HIVE_INACTIVITY_DAYS = 60
+
 
 [BLOG]
 CURATED_AUTHOR_WEIGHT = 900
@@ -149,8 +152,9 @@ MAX_ADJUSTED_FOLLOWERS_SCORE = 25.0
 MAX_MEDIAN_REP_SCORE = 15.0
 MAX_AGE_SCORE = 15.0
 MAX_ACTIVITY_SCORE = 15.0
-MAX_INFLUENCE_SCORE = 10.0
+MAX_BLURT_INACTIVITY_SCORE = 10.0
 MAX_HIVE_INACTIVITY_SCORE = 10.0
+MAX_INFLUENCE_SCORE = 10.0
 
 # Component Weights (Should sum to 1.0)
 # These determine how much each factor contributes to the total score.
