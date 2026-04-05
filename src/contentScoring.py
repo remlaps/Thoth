@@ -15,7 +15,7 @@ from steem.account import Account
 from steem.account import AccountDoesNotExistsException
 
 from utils import get_rng, remove_formatting
-from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep, hiveInactiveDays, blurtInactiveDays
+from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep, remoteInactiveDays
 from contentValidation import word_count
 from steemHelpers import get_resteem_count
 
@@ -284,7 +284,7 @@ class ContentScorer:
             
             # 7. Hive Inactivity score
             max_hive_inactivity_score = self.weights.get('max_hive_inactivity_score', 10.0)
-            hive_inactivity_days = hiveInactiveDays(author)
+            hive_inactivity_days = remoteInactiveDays(author, 'hive')
             if hive_inactivity_days is not None:
                 target_hive_inactivity = self.config.get_int('AUTHOR', 'TARGET_HIVE_INACTIVITY_DAYS', 60)
                 hive_inactivity_score = min((hive_inactivity_days / max(1, target_hive_inactivity)) * max_hive_inactivity_score, max_hive_inactivity_score)
@@ -293,7 +293,7 @@ class ContentScorer:
             
             # 8. Blurt Inactivity score
             max_blurt_inactivity_score = self.weights.get('max_blurt_inactivity_score', 10.0)
-            blurt_inactivity_days = blurtInactiveDays(author)
+            blurt_inactivity_days = remoteInactiveDays(author, 'blurt')
             if blurt_inactivity_days is not None:
                 target_blurt_inactivity = self.config.get_int('AUTHOR', 'TARGET_BLURT_INACTIVITY_DAYS', 60)
                 blurt_inactivity_score = min((blurt_inactivity_days / max(1, target_blurt_inactivity)) * max_blurt_inactivity_score, max_blurt_inactivity_score)

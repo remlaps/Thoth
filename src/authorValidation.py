@@ -506,141 +506,67 @@ def getMedianFollowerRep(author, steem_instance=None):
        return (middle1 + middle2) / 2
 
 def isHiveActivityTooRecent(account):
-    hiveInactivity = hiveInactiveDays(account)
-    if ( hiveInactivity != None ):
+    inactivity = remoteInactiveDays(account, 'hive')
+    if inactivity is not None:
         limit = config.getint('AUTHOR', 'MIN_HIVE_INACTIVITY_HARD', fallback=7)
-        if ( hiveInactivity < limit ):
+        if inactivity < limit:
             return True
     return False
-
-def hiveInactiveDays(account):
-    """
-    Calculate the number of days since the last activity for a Hive account.
-    
-    Args:
-        account (str): The Hive account name to query
-        
-    Returns:
-        int: Number of days since last activity, or None if the activity date couldn't be retrieved
-    """
-    lastHiveActivity = getLastHiveActivityDate(account)
-    
-    if not lastHiveActivity:
-        return None
-    
-    # Convert string date to datetime object
-    lastHiveActivityDt = datetime.strptime(lastHiveActivity, "%Y-%m-%d %H:%M:%S")
-    
-    # Get current datetime
-    now = datetime.now()
-    
-    # Calculate the difference in days
-    daysPassed = (now - lastHiveActivityDt).days
-    
-    return daysPassed
-
-def getLastHiveActivityDate(account):
-    """
-    Query the Hive API for an account and return the last activity date.
-    
-    Args:
-        account (str): The Hive account name to query
-        
-    Returns:
-        str: The last activity date as a formatted date string, or None if the API call fails
-    """
-    url = "https://api.hive.blog"
-    payload = {
-        "jsonrpc": "2.0", 
-        "method": "condenser_api.get_accounts", 
-        "params": [[account]], 
-        "id": 1
-    }
-    
-    try:
-        response = requests.post(url, json=payload)
-        response.raise_for_status()  # Raise an exception for HTTP errors
-        
-        data = response.json()
-        
-        # Check if we got a valid response with results
-        if "result" in data and data["result"] and len(data["result"]) > 0:
-            account_data = data["result"][0]
-            
-            # Extract the last_post and last_vote_time fields
-            lastHivePostTime = account_data.get("last_post")
-            lastHiveVoteTime = account_data.get("last_vote_time")
-            
-            # Convert string dates to datetime objects
-            lastHivePostTime = datetime.fromisoformat(lastHivePostTime.replace("Z", "+00:00")) if lastHivePostTime else None
-            lastHiveVoteTime = datetime.fromisoformat(lastHiveVoteTime.replace("Z", "+00:00")) if lastHiveVoteTime else None
-            
-            # Find the most recent date
-            if lastHivePostTime and lastHiveVoteTime:
-                lastHiveActivityTime = max(lastHivePostTime, lastHiveVoteTime)
-            elif lastHivePostTime:
-                lastHiveActivityTime = lastHivePostTime
-            elif lastHiveVoteTime:
-                lastHiveActivityTime = lastHiveVoteTime
-            else:
-                return None
-                
-            return lastHiveActivityTime.strftime("%Y-%m-%d %H:%M:%S")
-        else:
-            return None
-            
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Error querying API: {e}")
-        return None
-    except (json.JSONDecodeError, KeyError, ValueError) as e:
-        logger.error(f"Error processing response: {e}")
-        return None
 
 def isBlurtActivityTooRecent(account):
-    blurtInactivity = blurtInactiveDays(account)
-    if ( blurtInactivity != None ):
+    inactivity = remoteInactiveDays(account, 'blurt')
+    if inactivity is not None:
         limit = config.getint('AUTHOR', 'MIN_BLURT_INACTIVITY_HARD', fallback=7)
-        if ( blurtInactivity < limit ):
+        if inactivity < limit:
             return True
     return False
 
-def blurtInactiveDays(account):
+def remoteInactiveDays(account, chain):
     """
-    Calculate the number of days since the last activity for a Blurt account.
+    Calculate the number of days since the last activity for a remote account (Hive or Blurt).
     
     Args:
-        account (str): The Blurt account name to query
+        account (str): The account name to query
+        chain (str): The blockchain to query ('hive' or 'blurt')
         
     Returns:
         int: Number of days since last activity, or None if the activity date couldn't be retrieved
     """
-    lastBlurtActivity = getLastBlurtActivityDate(account)
+    lastActivity = getLastRemoteActivityDate(account, chain)
     
-    if not lastBlurtActivity:
+    if not lastActivity:
         return None
     
     # Convert string date to datetime object
-    lastBlurtActivityDt = datetime.strptime(lastBlurtActivity, "%Y-%m-%d %H:%M:%S")
+    lastActivityDt = datetime.strptime(lastActivity, "%Y-%m-%d %H:%M:%S")
     
     # Get current datetime
     now = datetime.now()
     
     # Calculate the difference in days
-    daysPassed = (now - lastBlurtActivityDt).days
+    daysPassed = (now - lastActivityDt).days
     
     return daysPassed
 
-def getLastBlurtActivityDate(account):
+def getLastRemoteActivityDate(account, chain):
     """
-    Query the Blurt API for an account and return the last activity date.
+    Query a remote API (Hive or Blurt) for an account and return the last activity date.
     
     Args:
-        account (str): The Blurt account name to query
+        account (str): The account name to query
+        chain (str): The blockchain to query ('hive' or 'blurt')
         
     Returns:
         str: The last activity date as a formatted date string, or None if the API call fails
     """
-    url = "https://rpc.blurt.world"
+    if chain.lower() == 'hive':
+        url = "https://api.hive.blog"
+    elif chain.lower() == 'blurt':
+        url = "https://rpc.blurt.world"
+    else:
+        logger.error(f"Unsupported chain requested: {chain}")
+        return None
+        
     payload = {
         "jsonrpc": "2.0", 
         "method": "condenser_api.get_accounts", 
@@ -659,30 +585,30 @@ def getLastBlurtActivityDate(account):
             account_data = data["result"][0]
             
             # Extract the last_post and last_vote_time fields
-            lastBlurtPostTime = account_data.get("last_post")
-            lastBlurtVoteTime = account_data.get("last_vote_time")
+            lastPostTime = account_data.get("last_post")
+            lastVoteTime = account_data.get("last_vote_time")
             
             # Convert string dates to datetime objects
-            lastBlurtPostTime = datetime.fromisoformat(lastBlurtPostTime.replace("Z", "+00:00")) if lastBlurtPostTime else None
-            lastBlurtVoteTime = datetime.fromisoformat(lastBlurtVoteTime.replace("Z", "+00:00")) if lastBlurtVoteTime else None
+            lastPostTime = datetime.fromisoformat(lastPostTime.replace("Z", "+00:00")) if lastPostTime else None
+            lastVoteTime = datetime.fromisoformat(lastVoteTime.replace("Z", "+00:00")) if lastVoteTime else None
             
             # Find the most recent date
-            if lastBlurtPostTime and lastBlurtVoteTime:
-                lastBlurtActivityTime = max(lastBlurtPostTime, lastBlurtVoteTime)
-            elif lastBlurtPostTime:
-                lastBlurtActivityTime = lastBlurtPostTime
-            elif lastBlurtVoteTime:
-                lastBlurtActivityTime = lastBlurtVoteTime
+            if lastPostTime and lastVoteTime:
+                lastActivityTime = max(lastPostTime, lastVoteTime)
+            elif lastPostTime:
+                lastActivityTime = lastPostTime
+            elif lastVoteTime:
+                lastActivityTime = lastVoteTime
             else:
                 return None
                 
-            return lastBlurtActivityTime.strftime("%Y-%m-%d %H:%M:%S")
+            return lastActivityTime.strftime("%Y-%m-%d %H:%M:%S")
         else:
             return None
             
     except requests.exceptions.RequestException as e:
-        logger.error(f"Error querying Blurt API: {e}")
+        logger.error(f"Error querying {chain} API: {e}")
         return None
     except (json.JSONDecodeError, KeyError, ValueError) as e:
-        logger.error(f"Error processing Blurt response: {e}")
+        logger.error(f"Error processing {chain} response: {e}")
         return None

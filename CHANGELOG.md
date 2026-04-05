@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - Renamed `LAST_BLURT_ACTIVITY_AGE` to `MIN_BLURT_INACTIVITY_HARD` to maintain consistency with the Hive configuration naming conventions.
 - Updated hybrid screening rule evaluations to incorporate the new Blurt inactivity metrics.
+- Refactored `hiveInactiveDays` and `blurtInactiveDays` into a unified `remoteInactiveDays` function to eliminate redundant code while preserving independent configuration thresholds for each blockchain.
+- Combined `getLastHiveActivityDate` and `getLastBlurtActivityDate` into a single parameterized `getLastRemoteActivityDate` function.
 
 ## [0.1.7] - 2026-04-03
 ### Added
