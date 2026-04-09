@@ -2,8 +2,10 @@ import configparser
 import re
 import os
 import time
-from datetime import datetime
-import math
+import datetime, math
+import io
+import sys
+import logging
 
 import aiIntro
 import utils  # From the thoth package
@@ -11,15 +13,27 @@ import aiCurator # From the thoth package
 import postHelper # From the thoth package
 import delegationInfo
 from configValidator import ConfigValidator
+from hybridScreening import HybridScreening
 from modelManager import ModelManager
+from statsTracker import StatsTracker
 from steemHelpers import initialize_steem_with_retry
 import version
 
 from steem.blockchain import Blockchain
 from steem import Steem
+from linkedListOnSteem import SteemLinkedList
 
 # Create ONE high-quality RNG instance at module level with explicit entropy
 _rng = utils.get_rng()
+
+# Reconfigure stdout and stderr to use UTF-8 encoding, especially for Windows,
+# to prevent 'charmap' codec errors when printing non-ASCII characters.
+if sys.stdout.encoding.lower().replace('-', '') != 'utf8':
+    try:
+        sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+        sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+    except Exception as e:
+        print(f"Warning: Could not reconfigure stdout/stderr to UTF-8: {e}")
 
 print(f"Starting Thoth v{version.__version__} ({version.__status__})")
 
@@ -37,42 +51,57 @@ config = configparser.ConfigParser()
 # Read the config.ini file
 config.read('config/config.ini')
 
-arliaiKey = os.getenv('LLMAPIKEY')
+llmKey = os.getenv('LLMAPIKEY')
 source_msg = "Using LLM API key from environment variable 'LLMAPIKEY'."
 
-if not arliaiKey:
+if not llmKey:
     source_msg = "LLMAPIKEY environment variable not set, falling back to config file."
     # Use fallback to prevent an error if the key is missing in the config.
-    arliaiKey = config.get('ARLIAI', 'ARLIAI_KEY', fallback='')
+    llmKey = config.get('LLM', 'LLM_API_KEY', fallback='')
 
 # It's crucial to have a key. Exit if it's missing or empty.
-if not arliaiKey.strip():
-    print("FATAL: LLM API key is missing or empty. Please set LLMAPIKEY or configure ARLIAI_KEY in config.ini.")
+if not llmKey.strip():
+    print("FATAL: LLM API key is missing or empty. Please set LLMAPIKEY or configure LLM_API_KEY in config.ini.")
 
 print(source_msg)
 
 # Clean the key. This handles comments from the config file (e.g., "key # comment")
 # and also strips quotes or whitespace that might be included from an environment variable.
-arliaiKey = arliaiKey.split('#', 1)[0].strip().strip('"\'')
-arliaiModel=config.get('ARLIAI', 'ARLIAI_MODEL')
-arliaiUrl=config.get('ARLIAI', 'ARLIAI_URL')
+llmKey = llmKey.split('#', 1)[0].strip().strip('"\'')
+llmModel=config.get('LLM', 'LLM_MODEL')
+llmUrl=config.get('LLM', 'LLM_URL')
 
 # Initialize the ModelManager for handling multiple models and rate limiting
-model_manager = ModelManager(arliaiModel)
+model_manager = ModelManager(llmModel)
 print(f"Initialized model manager with models: {model_manager.models}")
 
 # Feature flag: enable model switching and optional dry-run
 try:
-    enable_model_switching = config.getboolean('ARLIAI', 'ARLIAI_ENABLE_MODEL_SWITCHING', fallback=False)
+    enable_model_switching = config.getboolean('LLM', 'LLM_ENABLE_MODEL_SWITCHING', fallback=False)
 except Exception:
-    enable_model_switching = config.get('ARLIAI', 'ARLIAI_ENABLE_MODEL_SWITCHING', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+    enable_model_switching = config.get('LLM', 'LLM_ENABLE_MODEL_SWITCHING', fallback='False').lower() in ('1', 'true', 'yes', 'on')
 
 try:
-    model_switching_dry_run = config.getboolean('ARLIAI', 'ARLIAI_MODEL_SWITCHING_DRY_RUN', fallback=False)
+    model_switching_dry_run = config.getboolean('LLM', 'LLM_MODEL_SWITCHING_DRY_RUN', fallback=False)
 except Exception:
-    model_switching_dry_run = config.get('ARLIAI', 'ARLIAI_MODEL_SWITCHING_DRY_RUN', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+    model_switching_dry_run = config.get('LLM', 'LLM_MODEL_SWITCHING_DRY_RUN', fallback='False').lower() in ('1', 'true', 'yes', 'on')
 
-print(f"Model switching enabled: {enable_model_switching}. Dry run: {model_switching_dry_run}")
+try:
+    skip_ai_curation = config.getboolean('LLM', 'SKIP_AI_CURATION', fallback=False)
+except Exception:
+    skip_ai_curation = config.get('LLM', 'SKIP_AI_CURATION', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+
+try:
+    steem_dry_run = config.getboolean('STEEM', 'DRY_RUN', fallback=False)
+except Exception:
+    steem_dry_run = config.get('STEEM', 'DRY_RUN', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+
+try:
+    skip_onchain_history = config.getboolean('HISTORY', 'SKIP_ONCHAIN_HISTORY', fallback=False)
+except Exception:
+    skip_onchain_history = config.get('HISTORY', 'SKIP_ONCHAIN_HISTORY', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+
+print(f"Model switching enabled: {enable_model_switching}. Model Dry run: {model_switching_dry_run}. Skip AI: {skip_ai_curation}. Steem Dry run: {steem_dry_run}. Skip on-chain history: {skip_onchain_history}")
 
 ### Validate the config to avoid failures at posting time.
 validator = ConfigValidator()
@@ -99,6 +128,7 @@ maxSize=config.getint('BLOG', 'NUMBER_OF_REVIEWED_POSTS')
 
 commentList = []
 aiResponseList = []
+scoreList = []  # Track scores for each curated post
 
 earliest_timestamp = None
 latest_timestamp = None
@@ -108,17 +138,45 @@ retry_count=0
 max_retries = 5
 retry_delay = 0.25  # Base delay in seconds
 
+steemdInstance = initialize_steem_with_retry(node_api=steemApi)
+if not steemdInstance:
+    exit(1) # Exit if Steem connection failed
+
+# Initialize the on-chain linked list for state management
+if not skip_onchain_history:
+    sll = SteemLinkedList(
+        steem_instance=steemdInstance,
+        account=config.get('STEEM', 'POSTING_ACCOUNT'),
+        ll_id="thoth_history_test_1",
+        custom_json_id="thoth_state",
+        use_active_key=False
+    )
+    print("Rebuilding on-chain state index...")
+    sll.rebuild_index()
+    print(f"On-chain index rebuilt with {len(sll)} nodes.")
+else:
+    sll = None
+    print("Skipping on-chain state index rebuild (SKIP_ONCHAIN_HISTORY is enabled).")
+
 # File to store the last processed block
 BLOCK_FILE = 'config/last_block.txt'
 if os.path.exists(BLOCK_FILE):
     with open(BLOCK_FILE, 'r') as f:
         lastBlock = int(f.read().strip())
+    print(f"Resuming from local file block memory: {lastBlock}")
 else:
     lastBlock = 0
+    print("No previous local history found, will use default start block.")
 
-steemdInstance = initialize_steem_with_retry(node_api=steemApi)
-if not steemdInstance:
-    exit(1) # Exit if Steem connection failed
+# Initialize the statistics tracker
+stats_tracker = StatsTracker()
+
+# Initialize the Hybrid Screening system for quality-based curation
+hybrid_screening = HybridScreening(steemdInstance, validator, stats_tracker=stats_tracker)
+print("Hybrid screening system initialized.")
+
+# Clean up old records from curation history database
+hybrid_screening.curation_history.cleanup_old_records()
 
 blockchain = Blockchain(steemd_instance=steemdInstance)
 print(f"Using blockchain with nodes: {steemdInstance.steemd.nodes}")
@@ -195,7 +253,7 @@ while retry_count <= max_retries:
             # Save the current block number to file
             with open(BLOCK_FILE, 'w') as f:
                 f.write(str(streamFromBlock))
-                
+
             retry_count = 0
             if (postCount >= maxSize):
                 break    
@@ -211,44 +269,90 @@ while retry_count <= max_retries:
                     if latest_timestamp is None or current_timestamp > latest_timestamp:
                         latest_timestamp = current_timestamp
 
-                    screenResult = utils.screenPost(comment, included_posts=commentList, steem_instance=steemdInstance)
-                    if screenResult == "Accept": 
+                    # Use hybrid screening system (rule-based first, then score-based)
+                    try:
+                        screening_result = hybrid_screening.screen_content(comment, included_posts=commentList)
+                        status = screening_result['status']
+                        reason = screening_result['reason']
+                        
+                        logging.info(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}")
+                        logging.info(f"Screening Status: {status} ({reason})")
+                        
+                        if screening_result['score_result']:
+                            total_score = screening_result['total_score']
+                            quality_tier = screening_result['quality_tier']
+                            ai_intensity = screening_result['ai_intensity']
+                            logging.info(f"Score: {total_score} ({quality_tier}) - AI Intensity: {ai_intensity}")
+                            logging.info(f"Components: Author={screening_result['score_result']['components']['author']}, Content={screening_result['score_result']['components']['content']}, Engagement={screening_result['score_result']['components']['engagement']}")
+                        else:
+                            logging.info("No score available (rejected by rule-based screening)")
+                    except Exception as e:
+                        print(f"Error in hybrid screening for {comment['author']}/{comment['permlink']}: {e}")
+                        continue
+                    
+                    # Determine if content should be curated based on hybrid screening
+                    should_curate = hybrid_screening.should_curate(screening_result)
+                    ai_intensity = hybrid_screening.get_ai_analysis_intensity(screening_result)
+                    
+                    if should_curate and ai_intensity != 'none':
                         ### Retrieve the latest version of the post
                         latestPostVersion=steemdInstance.get_content(comment['author'],comment['permlink'])
                         tmpBody = utils.remove_formatting(latestPostVersion['body'])
-                        print(f"Comment by {comment['author']}/{comment['permlink']}: {comment['title']}\n{tmpBody[:100]}...")
+                        logging.info(f"Content accepted for curation with {ai_intensity} AI analysis.")
 
-                        ### Get the AI Evaluation
-                        aiResponse = aiCurator.aicurate(
-                            arliaiKey, arliaiModel, arliaiUrl, tmpBody,
-                            model_manager=model_manager,
-                            enable_switching=enable_model_switching,
-                            dry_run=model_switching_dry_run
-                        )
+                        ### Get the AI Evaluation with score context
+                        logging.info(f"[{streamFromBlock}/{postCount}] Starting AI Curation evaluation for @{operation['author']}/{operation['permlink']}...")
+                        if skip_ai_curation:
+                            logging.info(f"Skipping AI Curation API call for @{operation['author']}/{operation['permlink']} (SKIP_AI_CURATION is enabled).")
+                            aiResponse = f"[SKIP_AI_CURATION ENABLED] Mock AI curation summary for post by @{operation['author']}. This placeholder text ensures the minimum response length requirement is met without calling the LLM API. {'=' * 50}"
+                        else:
+                            aiResponse = aiCurator.aicurate(
+                                llmKey, llmModel, llmUrl, tmpBody,
+                                model_manager=model_manager,
+                                enable_switching=enable_model_switching,
+                                dry_run=model_switching_dry_run,
+                                author=operation['author'],
+                                permlink=operation['permlink']
+                            )
                         with open('data/output.html', 'a', encoding='utf-8') as f:
                             print(f"URL: https://steemit.com/@{comment['author']}/{comment['permlink']}")
                             print(f"Title: {latestPostVersion['title']}")
+                            if screening_result['score_result']:
+                                print(f"Score: {screening_result['total_score']} ({screening_result['quality_tier']})")
                             print(f"Body (first 200 chars): {tmpBody[:200]}...\n\nAI Response: {aiResponse}\n", file=f)
-                        print (f"\n\nAI Response: {aiResponse}\n")
+                        logging.info(f"[{streamFromBlock}/{postCount}] Finished AI Curation for @{operation['author']}/{operation['permlink']}.")
+                        logging.info(f"AI Response:\n{aiResponse}\n")
 
                         MIN_AI_RESPONSE_LENGTH = 100 # Define a reasonable minimum length
                         if (re.search("DO NOT CURATE", aiResponse) or (aiResponse == "Content Error - Empty Body" )):
-                            print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: disqualified by AI.")
+                            logging.info(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: disqualified by AI.")
                         elif aiResponse.startswith("API Error") or \
                              aiResponse == "JSON Error" or \
                              aiResponse == "Response Error" or \
                              aiResponse == "Unexpected Error":
                             # aiCurator has already attempted retries for relevant API errors.
                             # Log the failure and continue with the next post.
-                            print(f"{streamFromBlock}/{postCount}: AI Curation for @{operation['author']}/{operation['permlink']} failed. AI System Response: '{aiResponse}'. Skipping this post.")
+                            logging.error(f"{streamFromBlock}/{postCount}: AI Curation for @{operation['author']}/{operation['permlink']} failed. AI System Response: '{aiResponse}'. Skipping this post.")
                         elif len(aiResponse) < MIN_AI_RESPONSE_LENGTH:
-                            print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: disqualified by AI (response too short: '{aiResponse}').")
+                            logging.warning(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: disqualified by AI (response too short: '{aiResponse}').")
                         else:
-                            commentList.append(comment)
+                            commentList.append(latestPostVersion)
                             aiResponseList.append(aiResponse)
+                            # Track scores for each curated post (only if scoring was performed)
+                            if screening_result['score_result']:
+                                scoreList.append(screening_result['score_result'])
+                            else:
+                                # Create a minimal score entry for rejected posts
+                                scoreList.append({
+                                    'total_score': 0.0,
+                                    'quality_tier': 'rejected',
+                                    'components': {'author': 0.0, 'content': 0.0, 'engagement': 0.0}
+                                })
                             postCount = postCount + 1
+                            logging.info(f"Content curated successfully! ({postCount}/{maxSize})")
                     else:
-                        print(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: excluded by screening: {screenResult}.")
+                        reason = screening_result['reason']
+                        logging.info(f"{streamFromBlock}/{postCount}: @{operation['author']}/{operation['permlink']}: excluded by hybrid screening ({reason})")
                 # else:
                     # print(f"{postCount}: {operation['type']}")
         
@@ -278,14 +382,21 @@ if earliest_timestamp and latest_timestamp:
     # The timestamps from the stream are already datetime objects.
     print(f"Posts processed ranged from {earliest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')} to {latest_timestamp.strftime('%Y-%m-%dT%H:%M:%S')}")
 
-    aiIntroString = aiIntro.aiIntro(
-        arliaiKey, arliaiModel, arliaiUrl,
-        earliest_timestamp, latest_timestamp,
-        "\n\n".join(aiResponseList), 16384,
-        model_manager=model_manager,
-        enable_switching=enable_model_switching,
-        dry_run=model_switching_dry_run
-    )
+    if skip_ai_curation:
+        logging.info("Skipping AI Intro generation (SKIP_AI_CURATION is enabled).")
+        aiIntroString = f"[SKIP_AI_CURATION ENABLED] Mock AI Intro summary. This placeholder text is generated because the AI API calls are bypassed in the configuration. {'=' * 50}"
+    else:
+        logging.info("Starting AI Intro generation...")
+        aiIntroString = aiIntro.aiIntro(
+            llmKey, llmModel, llmUrl,
+            earliest_timestamp, latest_timestamp,
+            "\n\n".join(aiResponseList), 16384,
+            model_manager=model_manager,
+            enable_switching=enable_model_switching,
+            dry_run=model_switching_dry_run,
+            score_data=scoreList
+        )
+        logging.info("Finished AI Intro generation.")
     # Retrieve delegations once and pass into postHelper to avoid duplicate RPC calls
     postingAccount_main = config.get('STEEM', 'POSTING_ACCOUNT')
     try:
@@ -294,7 +405,71 @@ if earliest_timestamp and latest_timestamp:
         print(f"FATAL: Could not fetch delegations in main: {e}")
         exit(1)
 
-    postHelper.postCuration(commentList, aiResponseList, aiIntroString, model_manager=model_manager, full_delegations=full_delegations)
+    post_success = postHelper.postCuration(commentList, aiResponseList, aiIntroString, model_manager=model_manager, full_delegations=full_delegations)
+
+    try:
+        dry_run = config.getboolean('STEEM', 'DRY_RUN', fallback=False)
+    except Exception:
+        dry_run = config.get('STEEM', 'DRY_RUN', fallback='False').lower() in ('1', 'true', 'yes', 'on')
+        
+    if post_success and not dry_run:
+        for comment in commentList:
+            hybrid_screening.curation_history.record_curation(comment['author'], comment['permlink'])
+
     print("Posting finished.")
+
+    # Create the curation record from the list of curated posts
+    curation_record = [
+        {"title": post.get("title", ""), "author": post.get("author", ""), "permlink": post.get("permlink", "")}
+        for post in commentList
+    ]
+
+    # Save the new state to the blockchain via the linked list
+    if not skip_onchain_history and sll:
+        print("Saving Thoth's updated state to the blockchain...")
+        try:
+            sll.safe_append({
+                "event": "thoth_run_complete",
+                "last_block": streamFromBlock,
+                "posts_curated_count": postCount,
+                "curated_articles": curation_record,
+                "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+            })
+            print("On-chain state saved successfully.")
+        except Exception as e:
+            print(f"FATAL: Could not save on-chain state: {e}")
+    else:
+        print("Skipped saving Thoth's updated state to the blockchain (SKIP_ONCHAIN_HISTORY is enabled).")
+
+    # Generate and print statistics report
+    stats_report = stats_tracker.generate_report()
+    print(stats_report)
+    with open('data/output.html', 'a', encoding='utf-8') as f:
+        # Use <pre> for preformatted text in HTML
+        print(f"\n<hr>\n<h2>Run Statistics</h2>\n<pre>{stats_report}</pre>", file=f)
 else:
     print("No posts were found to curate in the specified block range. Exiting.")
+    # Even if no posts were curated, save the state to update the last processed block
+    if not steem_dry_run:
+        if not skip_onchain_history and sll:
+            print("Saving Thoth's updated state to the blockchain (no new posts)...")
+            try:
+                sll.safe_append({
+                    "event": "thoth_run_complete_empty",
+                    "last_block": streamFromBlock,
+                    "posts_curated_count": 0,
+                    "curated_articles": [],
+                    "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat()
+                })
+                print("On-chain state saved successfully.")
+            except Exception as e:
+                print(f"FATAL: Could not save on-chain state: {e}")
+        else:
+            print("Skipped saving Thoth's updated state to the blockchain (no new posts, SKIP_ONCHAIN_HISTORY is enabled).")
+    else:
+        print("DRY RUN: Skipped saving Thoth's updated state to the blockchain.")
+    # Also print stats here, in case some posts were evaluated but none were accepted.
+    stats_report = stats_tracker.generate_report()
+    print(stats_report)
+    with open('data/output.html', 'a', encoding='utf-8') as f:
+        print(f"\n<hr>\n<h2>Run Statistics</h2>\n<pre>{stats_report}</pre>", file=f)

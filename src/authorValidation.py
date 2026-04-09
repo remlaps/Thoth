@@ -19,6 +19,7 @@ config.read('config/config.ini')
 logging.getLogger('steem.http_client').setLevel(logging.CRITICAL)
 logging.getLogger('steem.steemd').setLevel(logging.CRITICAL)
 logging.getLogger('urllib3.connectionpool').setLevel(logging.CRITICAL)
+logger = logging.getLogger(__name__)
 
 ### rep_log10 is straight from here - https://developers.steem.io/tutorials-python/account_reputation
 def rep_log10(rep):
@@ -62,7 +63,7 @@ def isBlacklisted(account, steem_instance=None, registryAccount=None):
             if attempt < max_retries - 1:
                 time.sleep(2)
                 continue
-            print(f"Error checking blacklist status for {account}: {e}")
+            logger.error(f"Error checking blacklist status for {account}: {e}")
             return False
     
     return False
@@ -99,19 +100,23 @@ def isAuthorScreened(comment, included_posts=None, steem_instance=None):
         # Iterate through included_posts to count how many posts this author has
         current_count = sum(1 for p in included_posts if p['author'] == comment['author'])
         if current_count >= max_posts:
-            print(f"DEBUG: isAuthorScreened({comment['author']}) -> max posts reached ({current_count} >= {max_posts}): True")
+            logger.debug(f"isAuthorScreened({comment['author']}) -> max posts reached ({current_count} >= {max_posts}): True")
             return True
 
     if ( isBlacklisted(comment['author'], steem_instance=s) ):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isBlacklisted: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isBlacklisted: True")
         return True
     
     if ( isAuthorWhitelisted(comment['author']) ):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isAuthorWhitelisted: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isAuthorWhitelisted: True")
         return False
     
     if isHiveActivityTooRecent(comment['author']):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isHiveActivityTooRecent: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isHiveActivityTooRecent: True")
+        return True
+
+    if isBlurtActivityTooRecent(comment['author']):
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isBlurtActivityTooRecent: True")
         return True
 
     # Optimization: Fetch Follower Count ONCE
@@ -119,13 +124,13 @@ def isAuthorScreened(comment, included_posts=None, steem_instance=None):
     try:
         follower_count = s.get_follow_count(comment['author'])['follower_count']
     except Exception as e:
-        print(f"Error fetching follower count for {comment['author']}: {e}")
+        logger.error(f"Error fetching follower count for {comment['author']}: {e}")
         # If we can't get follower count, we might default to screening or retrying. 
         # For now, let's assume 0 to be safe/strict.
         follower_count = 0
 
     if isFollowerCountTooLow(comment['author'], steem_instance=s, cached_count=follower_count):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isFollowerCountTooLow: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isFollowerCountTooLow: True")
         return True
 
     accountInfo = None
@@ -138,30 +143,57 @@ def isAuthorScreened(comment, included_posts=None, steem_instance=None):
             if attempt < max_retries - 1:
                 time.sleep(2)
                 continue
-            print(f"Error fetching account info for {comment['author']}: {e}")
+            logger.error(f"Error fetching account info for {comment['author']}: {e}")
             return False
 
     if isInactive(accountInfo, steem_instance=s) :
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isInactive: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isInactive: True")
         return True
         
     if isRepTooLow(accountInfo['reputation']) :
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isRepTooLow: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isRepTooLow: True")
         return True
     
     if isMonthlyFollowersTooLow(accountInfo, comment, steem_instance=s, cached_count=follower_count):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isMonthlyFollowersTooLow: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isMonthlyFollowersTooLow: True")
         return True
     
     if isAdjustedMonthlyFollowersTooLow ( accountInfo, comment, steem_instance=s, cached_count=follower_count):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> isAdjustedMonthlyFollowersTooLow: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> isAdjustedMonthlyFollowersTooLow: True")
         return True
 
     median_rep = getMedianFollowerRep(comment['author'], steem_instance=s)
     if median_rep is not None and median_rep < config.getint('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP'):
-        print(f"DEBUG: isAuthorScreened({comment['author']}) -> median follower rep {median_rep} < MIN_FOLLOWER_MEDIAN_REP {config.getint('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP')}: True")
+        logger.debug(f"isAuthorScreened({comment['author']}) -> median follower rep {median_rep} < MIN_FOLLOWER_MEDIAN_REP {config.getint('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP')}: True")
         return True
         
+    return False
+
+def isAuthorPostLimitReached(comment, included_posts=None):
+    """
+    Check if an author has reached the maximum number of included posts.
+    This is a standalone function that only checks the post limit constraint,
+    separate from other author screening rules.
+    
+    Args:
+        comment: Dictionary containing post information with 'author' key
+        included_posts: List of already included posts to check against
+        
+    Returns:
+        bool: True if the author has reached the post limit, False otherwise
+    """
+    if included_posts is None:
+        return False
+        
+    max_posts = config.getint('AUTHOR', 'MAX_INCLUDED_POSTS_PER_AUTHOR', fallback=1)
+    
+    # Count how many posts this author already has in the included list
+    current_count = sum(1 for p in included_posts if p['author'] == comment['author'])
+    
+    if current_count >= max_posts:
+        logger.debug(f"isAuthorPostLimitReached({comment['author']}) -> max posts reached ({current_count} >= {max_posts}): True")
+        return True
+    
     return False
 
 def isRepTooLow(reputation):
@@ -181,7 +213,7 @@ def isFollowerCountTooLow(commentAuthor, steem_instance=None, cached_count=None)
                 if attempt < max_retries - 1:
                     time.sleep(2)
                     continue
-                print(f"Error checking follower count for {commentAuthor}: {e}")
+                logger.error(f"Error checking follower count for {commentAuthor}: {e}")
                 return False
                 
     return followerCount < config.getint('AUTHOR','MIN_FOLLOWERS')
@@ -201,7 +233,7 @@ def followersPerMonth(accountInfo, comment, steem_instance=None, cached_count=No
                 if attempt < max_retries - 1:
                     time.sleep(2)
                     continue
-                print(f"Error getting follower count in followersPerMonth for {comment['author']}: {e}")
+                logger.error(f"Error getting follower count in followersPerMonth for {comment['author']}: {e}")
                 return float('inf')
 
     accountCreated = datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
@@ -228,7 +260,7 @@ def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_i
                 if attempt < max_retries - 1:
                     time.sleep(2)
                     continue
-                print(f"Error getting follower count in adjustedFollowersPerMonth for {comment['author']}: {e}")
+                logger.error(f"Error getting follower count in adjustedFollowersPerMonth for {comment['author']}: {e}")
                 return float('inf')
 
     accountCreated = datetime.strptime(accountInfo['created'], '%Y-%m-%dT%H:%M:%S')
@@ -252,7 +284,7 @@ def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_i
         # Avoid division by zero for accounts less than a day old.
         adjustedFollowersPerMonth = 0.0
 
-    print(f"DEBUG: adjustedFollowersPerMonth({comment['author']}) -> followerCount: {followerCount}, age (days): {age.days}, halfLife (days): {halfLife}, adjustedFollowerCount: {adjustedFollowerCount:.2f}, adjustedFollowersPerMonth: {adjustedFollowersPerMonth:.2f}")
+    logger.debug(f"adjustedFollowersPerMonth({comment['author']}) -> followerCount: {followerCount}, age (days): {age.days}, halfLife (days): {halfLife}, adjustedFollowerCount: {adjustedFollowerCount:.2f}, adjustedFollowersPerMonth: {adjustedFollowersPerMonth:.2f}")
     return adjustedFollowersPerMonth
 
 def isMonthlyFollowersTooLow (accountInfo, comment, steem_instance=None, cached_count=None):
@@ -316,30 +348,39 @@ def isActiveFollowerCountTooLow(accountName, steem_instance=None):
                         active_followers_found += 1
                         if active_followers_found >= min_followers_needed:
                             # Success: enough active followers found. Count is NOT too low.
-                            print(f"DEBUG: isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: True. Result (is_too_low): False")
+                            logger.debug(f"isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: True. Result (is_too_low): False")
                             return False
             except Exception as e:
-                print(f"Warning: Error checking batch of followers for {accountName}: {e}")
+                logger.warning(f"Error checking batch of followers for {accountName}: {e}")
                 continue
         
         # If the loop completes without reaching the threshold, the count is too low.
         has_enough = active_followers_found >= min_followers_needed
         is_too_low = not has_enough
-        print(f"DEBUG: isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: {has_enough}. Result (is_too_low): {is_too_low}")
+        logger.debug(f"isActiveFollowerCountTooLow({accountName}) -> has_enough_active_followers: {has_enough}. Result (is_too_low): {is_too_low}")
         return is_too_low
 
     except Exception as e:
         # This catches errors from config.getint, getAllFollowers, etc.
-        print(f"Error during active follower check for {accountName}: {e}")
-        print(f"DEBUG: isActiveFollowerCountTooLow({accountName}) -> Exception occurred. Returning True.")
+        logger.error(f"Error during active follower check for {accountName}: {e}")
+        logger.debug(f"isActiveFollowerCountTooLow({accountName}) -> Exception occurred. Returning True.")
         return True # Fail safe: if we can't check, screen the author (i.e., count is "too low").
 
 def isInactive(accountInfo, steem_instance=None):
     lastPost = accountInfo['last_post']
     lastVote = accountInfo['last_vote_time']
 
-    lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
-    lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+    # Handle datetime objects vs strings - Steem API returns datetime objects
+    if isinstance(lastPost, str):
+        lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
+    else:
+        lastPostTime = lastPost
+        
+    if isinstance(lastVote, str):
+        lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+    else:
+        lastVoteTime = lastVote
+        
     mostRecentActivity = max(lastPostTime, lastVoteTime)
     today = datetime.now()
     days = (today - mostRecentActivity).days
@@ -355,8 +396,17 @@ def inactiveDays(accountName, steem_instance=None):
             lastPost = account_data['last_post']
             lastVote = account_data['last_vote_time']
 
-            lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
-            lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+            # Handle datetime objects vs strings - Steem API returns datetime objects
+            if isinstance(lastPost, str):
+                lastPostTime = datetime.strptime(lastPost, '%Y-%m-%dT%H:%M:%S')
+            else:
+                lastPostTime = lastPost
+                
+            if isinstance(lastVote, str):
+                lastVoteTime = datetime.strptime(lastVote, '%Y-%m-%dT%H:%M:%S')
+            else:
+                lastVoteTime = lastVote
+                
             mostRecentActivity = max(lastPostTime, lastVoteTime)
             today = datetime.now()
             return (today - mostRecentActivity).days
@@ -364,7 +414,7 @@ def inactiveDays(accountName, steem_instance=None):
             if attempt < max_retries - 1:
                 time.sleep(2)
                 continue
-            print(f"Error checking inactivity for {accountName}: {e}")
+            logger.error(f"Error checking inactivity for {accountName}: {e}")
             return 0
 
 def getAllFollowers(account, account_type='blog', steem_instance=None):
@@ -396,10 +446,10 @@ def getAllFollowers(account, account_type='blog', steem_instance=None):
            except Exception as e:
                if attempt < max_retries - 1:
                    sleep_time = 2 * (attempt + 1)
-                   print(f"Warning: Error fetching followers batch (Attempt {attempt+1}/{max_retries}): {e}. Retrying in {sleep_time}s...")
+                   logger.warning(f"Error fetching followers batch (Attempt {attempt+1}/{max_retries}): {e}. Retrying in {sleep_time}s...")
                    time.sleep(sleep_time)
                    continue
-               print(f"Error fetching followers batch for {account}: {e}")
+               logger.error(f"Error fetching followers batch for {account}: {e}")
        
        if not batch_success:
            break
@@ -435,8 +485,8 @@ def getMedianFollowerRep(author, steem_instance=None):
    """
    followersData = getAllFollowers(author, steem_instance=steem_instance)
    
-   # Extract reputation values from the data
-   reputations = [follower['reputation'] for follower in followersData]
+   # Extract reputation values from the data (already normalized by the Steem API)
+   reputations = [float(follower['reputation']) for follower in followersData]
    
    # Sort the reputations
    reputations.sort()
@@ -456,49 +506,67 @@ def getMedianFollowerRep(author, steem_instance=None):
        return (middle1 + middle2) / 2
 
 def isHiveActivityTooRecent(account):
-    hiveInactivity = hiveInactiveDays(account)
-    if ( hiveInactivity != None ):
-        if ( hiveInactivity < config.getint('AUTHOR','LAST_HIVE_ACTIVITY_AGE') ):
+    inactivity = remoteInactiveDays(account, 'hive')
+    if inactivity is not None:
+        limit = config.getint('AUTHOR', 'MIN_HIVE_INACTIVITY_HARD', fallback=7)
+        if inactivity < limit:
             return True
     return False
 
-def hiveInactiveDays(account):
+def isBlurtActivityTooRecent(account):
+    inactivity = remoteInactiveDays(account, 'blurt')
+    if inactivity is not None:
+        limit = config.getint('AUTHOR', 'MIN_BLURT_INACTIVITY_HARD', fallback=7)
+        if inactivity < limit:
+            return True
+    return False
+
+def remoteInactiveDays(account, chain):
     """
-    Calculate the number of days since the last activity for a Hive account.
+    Calculate the number of days since the last activity for a remote account (Hive or Blurt).
     
     Args:
-        account (str): The Hive account name to query
+        account (str): The account name to query
+        chain (str): The blockchain to query ('hive' or 'blurt')
         
     Returns:
         int: Number of days since last activity, or None if the activity date couldn't be retrieved
     """
-    lastHiveActivity = getLastHiveActivityDate(account)
+    lastActivity = getLastRemoteActivityDate(account, chain)
     
-    if not lastHiveActivity:
+    if not lastActivity:
         return None
     
     # Convert string date to datetime object
-    lastHiveActivityDt = datetime.strptime(lastHiveActivity, "%Y-%m-%d %H:%M:%S")
+    lastActivityDt = datetime.strptime(lastActivity, "%Y-%m-%d %H:%M:%S")
     
     # Get current datetime
     now = datetime.now()
     
     # Calculate the difference in days
-    daysPassed = (now - lastHiveActivityDt).days
+    daysPassed = (now - lastActivityDt).days
     
     return daysPassed
 
-def getLastHiveActivityDate(account):
+def getLastRemoteActivityDate(account, chain):
     """
-    Query the Hive API for an account and return the last activity date.
+    Query a remote API (Hive or Blurt) for an account and return the last activity date.
     
     Args:
-        account (str): The Hive account name to query
+        account (str): The account name to query
+        chain (str): The blockchain to query ('hive' or 'blurt')
         
     Returns:
         str: The last activity date as a formatted date string, or None if the API call fails
     """
-    url = "https://api.hive.blog"
+    if chain.lower() == 'hive':
+        url = "https://api.hive.blog"
+    elif chain.lower() == 'blurt':
+        url = "https://rpc.blurt.world"
+    else:
+        logger.error(f"Unsupported chain requested: {chain}")
+        return None
+        
     payload = {
         "jsonrpc": "2.0", 
         "method": "condenser_api.get_accounts", 
@@ -517,30 +585,30 @@ def getLastHiveActivityDate(account):
             account_data = data["result"][0]
             
             # Extract the last_post and last_vote_time fields
-            lastHivePostTime = account_data.get("last_post")
-            lastHiveVoteTime = account_data.get("last_vote_time")
+            lastPostTime = account_data.get("last_post")
+            lastVoteTime = account_data.get("last_vote_time")
             
             # Convert string dates to datetime objects
-            lastHivePostTime = datetime.fromisoformat(lastHivePostTime.replace("Z", "+00:00")) if lastHivePostTime else None
-            lastHiveVoteTime = datetime.fromisoformat(lastHiveVoteTime.replace("Z", "+00:00")) if lastHiveVoteTime else None
+            lastPostTime = datetime.fromisoformat(lastPostTime.replace("Z", "+00:00")) if lastPostTime else None
+            lastVoteTime = datetime.fromisoformat(lastVoteTime.replace("Z", "+00:00")) if lastVoteTime else None
             
             # Find the most recent date
-            if lastHivePostTime and lastHiveVoteTime:
-                lastHiveActivityTime = max(lastHivePostTime, lastHiveVoteTime)
-            elif lastHivePostTime:
-                lastHiveActivityTime = lastHivePostTime
-            elif lastHiveVoteTime:
-                lastHiveActivityTime = lastHiveVoteTime
+            if lastPostTime and lastVoteTime:
+                lastActivityTime = max(lastPostTime, lastVoteTime)
+            elif lastPostTime:
+                lastActivityTime = lastPostTime
+            elif lastVoteTime:
+                lastActivityTime = lastVoteTime
             else:
                 return None
                 
-            return lastHiveActivityTime.strftime("%Y-%m-%d %H:%M:%S")
+            return lastActivityTime.strftime("%Y-%m-%d %H:%M:%S")
         else:
             return None
             
     except requests.exceptions.RequestException as e:
-        print(f"Error querying API: {e}")
+        logger.error(f"Error querying {chain} API: {e}")
         return None
     except (json.JSONDecodeError, KeyError, ValueError) as e:
-        print(f"Error processing response: {e}")
+        logger.error(f"Error processing {chain} response: {e}")
         return None

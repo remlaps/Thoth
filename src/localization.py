@@ -15,7 +15,7 @@ class Localization:
         
         config = configparser.ConfigParser()
         config.read('config/config.ini')
-        self.language = config.get('ARLIAI', 'OUTPUT_LANGUAGE', fallback='English')
+        self.language = config.get('LLM', 'OUTPUT_LANGUAGE', fallback='English')
         
         lang_lower = self.language.lower()
         if lang_lower in ['german', 'de', 'deutsch']:

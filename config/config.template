@@ -2,22 +2,22 @@
 
 ###
 ### DO NOT COPY KEYS into config.template
-###    - Make sure ARLIAI/ARLIAI_KEY and STEEM/POSTING_KEY are both empty before saving!!!
+###    - Make sure LLM/LLM_API_KEY and STEEM/POSTING_KEY are both empty before saving in github!!!
 ###
 
-[ARLIAI]
+[LLM]
 # ArliAI info here - https://www.arliai.com/quick-start
 # Gemini info here - https://ai.google.dev/gemini-api/docs/quickstart
-##### ArliAI switched again.  This time to Gemma3-27B models for free tier.  These are mostly untested.
+##### ArliAI switched their free tier to Qwen3.5-27B-Derestricted.
 
-# ARLIAI_KEY = # This can be pulled from an environment variable.
+### LLM_API_KEY = # This can be pulled from an environment variable.   ***DO NOT USE THIS / PROTECT YOUR KEY***
 #ARLIAI example
-### ARLIAI_MODEL = Gemma-3-27B-it
-### ARLIAI_URL = https://api.arliai.com/v1/chat/completions
+### LLM_MODEL = Qwen3.5-27B-Derestricted
+### LLM_URL = https://api.arliai.com/v1/chat/completions
 
 #Gemini example
-ARLIAI_MODEL = gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash-lite, gemini-2.0-flash
-ARLIAI_URL = https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
+LLM_MODEL = gemini-2.5-pro, gemini-2.5-flash, gemini-2.0-flash-lite, gemini-2.0-flash
+LLM_URL = https://generativelanguage.googleapis.com/v1beta/openai/chat/completions
 
 INITIAL_BACKOFF_SECONDS = 15.0
 JITTER_FACTOR = 0.2
@@ -32,29 +32,63 @@ USER_PROMPT_FILE = config\userPrompt.txt
 USER_PROMPT_TEMPLATE = config\userPromptTemplate.txt
 # Feature flags for model switching behavior
 # When True, enable automatic switching to the next model in the list if rate-limited
-ARLIAI_ENABLE_MODEL_SWITCHING = False
-# When True (and ARLIAI_ENABLE_MODEL_SWITCHING is True), log rate-limit events but do not actually switch models
-ARLIAI_MODEL_SWITCHING_DRY_RUN = False
+LLM_ENABLE_MODEL_SWITCHING = False
+# When True (and LLM_ENABLE_MODEL_SWITCHING is True), log rate-limit events but do not actually switch models
+LLM_MODEL_SWITCHING_DRY_RUN = False
 
-[STEEM]
-DEFAULT_START_BLOCK = 3250000
-# Default to @social for testing
-POSTING_ACCOUNT = social
-# It is recommended to set these in your wallet, using "steempy"
-POSTING_KEY = 
-STEEM_API = 
-SDS_API = https://sds.steemworld.org
+# When True, skips making actual API calls to the LLM for curation and intro generation, inserting dummy text instead.
+SKIP_AI_CURATION = False
 
-# ACTIVE, HISTORY, RANDOM, OR TIME_WEIGHTED_RANDOM
-STREAM_TYPE = TIME_WEIGHTED_RANDOM
-# When using the TIME_WEIGHTED_RANDOM stream type, this controls how strongly
-# recent blocks are favored. 0 = uniform random, larger values favor recent
-# blocks more strongly. Typical values: 0.0 (no bias), 0.5, 1.0, 2.0
-STREAM_TIME_WEIGHT = 0.4
+[AUTHOR]
+ENABLE_MEDIAN_REP_SCORING = False
+FOLLOWER_HALFLIFE_YEARS = 2
+# minimum days since the account was active on Blurt (hard limit)
+MIN_BLURT_INACTIVITY_HARD = 7
+# minimum days since the account was active on Hive (hard limit)
+MIN_HIVE_INACTIVITY_HARD = 7
+MAX_FOLLOWER_INACTIVITY_DAYS = 90
+MAX_INACTIVITY_DAYS = 4000
+MAX_INCLUDED_POSTS_PER_AUTHOR = 1
+MIN_ACCOUNT_AGE = 30 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
+MIN_ACTIVE_FOLLOWERS = 10
+MIN_ADJUSTED_FOLLOWERS_PER_MONTH=3
+MIN_FOLLOWERS = 350
+MIN_FOLLOWERS_PER_MONTH = 10
+MIN_FOLLOWER_MEDIAN_REP = 40
+MIN_REPUTATION = 6
+# target days since the account was active on Blurt for maximum score
+TARGET_BLURT_INACTIVITY_DAYS = 60
+# target days since the account was active on Hive for maximum score
+TARGET_HIVE_INACTIVITY_DAYS = 60
 
-####
-#### From here down copy content from config.ini to config.template
-####
+
+[BLOG]
+CURATED_AUTHOR_WEIGHT = 900
+DELEGATOR_WEIGHT = 2000
+IMAGE_FOR_INTRO = https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png
+IMAGE_FOR_REPLIES = https://cdn.steemitimages.com/DQmW2gQy8hsvsVAgNicfK9qm6LpUuA6J4bc7J8Lxp35nQan/image.png
+# A comma-separated list of delegators who are ineligible for rewards for other reasons
+INELIGIBLE_DELEGATORS = 
+#
+# Delegators + reviewed posts cannot exceed 6 with a soft limit of 8 beneficiaries.
+# ( NUMBER_OF_DELEGATORS_PER_POST * DELEGATOR_WEIGHT + NUMBER_OF_REVIEWED_POSTS * CURATED_AUTHOR_WEIGHT + POSTING_ACCOUNT_WEIGHT )
+#   ^^^ ===> Cannot exceed 10000 - divde by 100 to get percentages.
+#
+NUMBER_OF_DELEGATORS_PER_POST = 1
+NUMBER_OF_REVIEWED_POSTS = 5
+POSTING_ACCOUNT_WEIGHT = 500
+# POST_TAGS = thoth-ai, payitbackwards, curation, gen-5, authorboost
+POST_TAGS = test, thoth-test, lifetime-rewards
+# A comma-separated list of delegators who should not receive beneficiary rewards (e.g., for pro-bono support)
+PRO_BONO_DELEGATORS = 
+# [Name, alias, or Acccount info here (will be published in the post)]
+THOTH_OPERATOR = 
+# Minimum quality tier required for curation: excellent, good, fair, poor, reject
+MIN_CURATION_TIER = fair
+### Implemented: CURATED_AUTHOR_WEIGHT, NUMBER_OF_REVIEWED_POSTS, POSTING_ACCOUNT, POSTING_ACCOUNT_WEIGHT
+### [ POSTING_ACCOUNT_WEIGHT + ( NUMBER_OF_REVIEWED_POSTS * CURATED_AUTHOR_WEIGHT ) ] must be less than 10000 (i.e. 500 == 5%)
+VOTE_DELAY_SECONDS = 300
+VOTE_PERCENT = 100
 
 [CONTENT]
 AUTHOR_WHITELIST_FILE = config\authorWhiteList.txt
@@ -78,51 +112,6 @@ WHITELIST_REQUIRED = False
 ### Implemented: REGISTRY_ACCOUNT (mutes only), MIN_WORDS, EXCLUDE_TAGS, INCLUDE_TAGS, LANGUAGE, AUTHOR_WHITELIST_FILE
 ###              WHITELIST_REQUIRED, MAX_TAG_COUNT
 
-[AUTHOR]
-FOLLOWER_HALFLIFE_YEARS = 2
-# required days since the account was active on Blurt (not yet implemented)
-LAST_BLURT_ACTIVITY_AGE = 0 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
-# required days since the account was active on Hive
-LAST_HIVE_ACTIVITY_AGE = 60
-MAX_FOLLOWER_INACTIVITY_DAYS = 90
-MAX_INACTIVITY_DAYS = 4000
-MAX_INCLUDED_POSTS_PER_AUTHOR = 1
-MIN_ACCOUNT_AGE = 30 # NOT IMPLEMENTED - Parameter loaded but not used in validation logic
-MIN_ACTIVE_FOLLOWERS = 10
-MIN_ADJUSTED_FOLLOWERS_PER_MONTH=3
-MIN_FOLLOWERS = 350
-MIN_FOLLOWERS_PER_MONTH = 10
-MIN_FOLLOWER_MEDIAN_REP = 40
-MIN_REPUTATION = 6
-### Implemented: MIN_REPUTATION, MIN_FOLLOWERS, MIN_FOLLOWERS_PER_MONTH, MAX_INACTIVITY_DAYS, MIN_FOLLOWER_MEDIAN_REP
-###              LAST_HIVE_ACTIVITY_AGE, MIN_UNDELEGATED_SP, MAX_DELEGATION_PCT
-
-[BLOG]
-CURATED_AUTHOR_WEIGHT = 900
-DELEGATOR_WEIGHT = 2000
-IMAGE_FOR_INTRO = https://cdn.steemitimages.com/DQmWzfm1qyb9c5hir4cC793FJCzMzShQr1rPK9sbUY6mMDq/image.png
-IMAGE_FOR_REPLIES = https://cdn.steemitimages.com/DQmW2gQy8hsvsVAgNicfK9qm6LpUuA6J4bc7J8Lxp35nQan/image.png
-# A comma-separated list of delegators who are ineligible for rewards for other reasons
-INELIGIBLE_DELEGATORS = 
-#
-# Delegators + reviewed posts cannot exceed 6 with a soft limit of 8 beneficiaries.
-# ( NUMBER_OF_DELEGATORS_PER_POST * DELEGATOR_WEIGHT + NUMBER_OF_REVIEWED_POSTS * CURATED_AUTHOR_WEIGHT + POSTING_ACCOUNT_WEIGHT )
-#   ^^^ ===> Cannot exceed 10000 - divde by 100 to get percentages.
-#
-NUMBER_OF_DELEGATORS_PER_POST = 1
-NUMBER_OF_REVIEWED_POSTS = 5
-POSTING_ACCOUNT_WEIGHT = 500
-# POST_TAGS = thoth-ai, payitbackwards, curation, gen-5, authorboost
-POST_TAGS = test, thoth-test, lifetime-rewards
-# A comma-separated list of delegators who should not receive beneficiary rewards (e.g., for pro-bono support)
-PRO_BONO_DELEGATORS = 
-# [Name, alias, or Acccount info here (will be published in the post)]
-THOTH_OPERATOR = 
-### Implemented: CURATED_AUTHOR_WEIGHT, NUMBER_OF_REVIEWED_POSTS, POSTING_ACCOUNT, POSTING_ACCOUNT_WEIGHT
-### [ POSTING_ACCOUNT_WEIGHT + ( NUMBER_OF_REVIEWED_POSTS * CURATED_AUTHOR_WEIGHT ) ] must be less than 10000 (i.e. 500 == 5%)
-VOTE_DELAY_SECONDS = 300
-VOTE_PERCENT = 100
-
 ### Enable screening based on a post's engagement score.
 ### Resteem scoring is not working yet.  Not sure how to get the resteem count back from the Steem API 
 ###    without weeding through the account history.
@@ -131,7 +120,11 @@ COMMENT_MAX = 20
 COMMENT_MIN = -10
 COMMENT_WEIGHT = 2
 ENGAGEMENT_THRESHOLD = 5
-RESETEEM_MAX = 20
+FEED_REACH_MAX = 10000
+FEED_REACH_MIN = 10
+FEED_REACH_SCREENING_ENABLED = False
+FEED_REACH_WEIGHT = 0.1
+RESTEEM_MAX = 20
 RESTEEM_MIN = 2
 RESTEEM_WEIGHT = 0
 VALUE_MAX = 100.0
@@ -140,6 +133,68 @@ VALUE_WEIGHT = 1
 VOTE_COUNT_MAX = 200
 VOTE_COUNT_MIN = 10 
 VOTE_COUNT_WEIGHT = 1
+
+[HISTORY]
+# Maximum number of times a specific author can be curated in a single day (24 hours)
+MAX_AUTHOR_PER_DAY = 1
+
+# Maximum number of times a specific author can be curated in a 7-day period
+MAX_AUTHOR_PER_WEEK = 4
+
+# Maximum number of times a specific post can be curated in a 30-day period
+# (The system currently defaults to a 30-day lookback for posts, but adding this keeps your configuration organized)
+MAX_POST_PER_MONTH = 2
+
+# When True, skips saving the curation history linked list on the blockchain via custom_json.
+SKIP_ONCHAIN_HISTORY = False
+
+[SCORING]
+# Author Component Max Scores
+MAX_REPUTATION_SCORE = 25.0
+MAX_FOLLOWERS_PER_MONTH_SCORE = 20.0
+MAX_ADJUSTED_FOLLOWERS_SCORE = 25.0
+MAX_MEDIAN_REP_SCORE = 15.0
+MAX_AGE_SCORE = 15.0
+MAX_ACTIVITY_SCORE = 15.0
+MAX_BLURT_INACTIVITY_SCORE = 10.0
+MAX_HIVE_INACTIVITY_SCORE = 10.0
+MAX_INFLUENCE_SCORE = 10.0
+
+# Component Weights (Should sum to 1.0)
+# These determine how much each factor contributes to the total score.
+COMPONENT_AUTHOR_WEIGHT = 0.40
+COMPONENT_CONTENT_WEIGHT = 0.35
+COMPONENT_ENGAGEMENT_WEIGHT = 0.25
+
+# Content Component Max Scores
+MAX_LENGTH_SCORE = 30.0
+MAX_TITLE_SCORE = 10.0
+MAX_TAG_SCORE = 15.0
+MAX_LANGUAGE_SCORE = 20.0
+
+# Quality Tiers (0-100)
+# These thresholds determine the label assigned to a post based on its total score.
+TIER_EXCELLENT_MIN = 60.0
+TIER_GOOD_MIN = 50.0
+TIER_FAIR_MIN = 45.0
+TIER_POOR_MIN = 35.0
+
+[STEEM]
+DEFAULT_START_BLOCK = 3250000
+DRY_RUN = False
+# Default to @social for testing
+POSTING_ACCOUNT = social
+# It is recommended to set these in your wallet, using "steempy"
+### POSTING_KEY =  ***DO NOT USE THIS / PROTECT YOUR KEY***
+STEEM_API = 
+SDS_API = https://sds.steemworld.org
+
+# ACTIVE, HISTORY, RANDOM, OR TIME_WEIGHTED_RANDOM
+STREAM_TYPE = TIME_WEIGHTED_RANDOM
+# When using the TIME_WEIGHTED_RANDOM stream type, this controls how strongly
+# recent blocks are favored. 0 = uniform random, larger values favor recent
+# blocks more strongly. Typical values: 0.0 (no bias), 0.5, 1.0, 2.0
+STREAM_TIME_WEIGHT = 0.4
 
 [WALLET]
 DELEGATION_FILE=config\delegationScreen.txt

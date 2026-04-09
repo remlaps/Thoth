@@ -17,14 +17,14 @@ config = configparser.ConfigParser()
 config.read('config/config.ini')
 
 # Initialize ModelManager with potentially comma-separated model list
-model_manager = ModelManager(config.get('ARLIAI', 'ARLIAI_MODEL', fallback='gemini'))
+model_manager = ModelManager(config.get('LLM', 'LLM_MODEL', fallback='gemini'))
 modelPrefix = model_manager.get_model_prefix()
 print(f"Using model prefix: {modelPrefix}")
 
-systemPromptFile=config.get('ARLIAI', 'SYSTEM_PROMPT_FILE')
-systemPromptTemplateFile=f"{config.get('ARLIAI', 'SYSTEM_PROMPT_TEMPLATE', fallback=None)}_{modelPrefix}.txt"
-userPromptFile=config.get('ARLIAI', 'USER_PROMPT_FILE')
-userPromptTemplateFile=f"{config.get('ARLIAI', 'USER_PROMPT_TEMPLATE', fallback=None)}_{modelPrefix}.txt"
+systemPromptFile=config.get('LLM', 'SYSTEM_PROMPT_FILE')
+systemPromptTemplateFile=f"{config.get('LLM', 'SYSTEM_PROMPT_TEMPLATE', fallback=None)}_{modelPrefix}.txt"
+userPromptFile=config.get('LLM', 'USER_PROMPT_FILE')
+userPromptTemplateFile=f"{config.get('LLM', 'USER_PROMPT_TEMPLATE', fallback=None)}_{modelPrefix}.txt"
 print(f"Using system prompt file: {systemPromptFile}")
 print(f"Using user prompt file: {userPromptFile}")
 print(f"Using system prompt template file: {systemPromptTemplateFile}")
@@ -32,9 +32,9 @@ print(f"Using user prompt template file: {userPromptTemplateFile}")
 print(f"Available models: {model_manager.models}")
 
 # API Retry settings
-MAX_RETRIES = int(config.get('ARLIAI', 'MAX_RETRIES', fallback=3))
-INITIAL_BACKOFF_SECONDS = float(config.get('ARLIAI', 'INITIAL_BACKOFF_SECONDS', fallback=2.0))
-JITTER_FACTOR = float(config.get('ARLIAI', 'JITTER_FACTOR', fallback=0.2))
+MAX_RETRIES = int(config.get('LLM', 'MAX_RETRIES', fallback=3))
+INITIAL_BACKOFF_SECONDS = float(config.get('LLM', 'INITIAL_BACKOFF_SECONDS', fallback=2.0))
+JITTER_FACTOR = float(config.get('LLM', 'JITTER_FACTOR', fallback=0.2))
 
 def ensurePromptFileExists(promptFilePath, templateFilePath, promptTypeName):
     """Checks if a prompt file exists, and copies from template if not."""
@@ -59,30 +59,32 @@ def ensurePromptFileExists(promptFilePath, templateFilePath, promptTypeName):
 ensurePromptFileExists(systemPromptFile, systemPromptTemplateFile, "System")
 ensurePromptFileExists(userPromptFile, userPromptTemplateFile, "User")
 
-def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_manager=None, enable_switching=False, dry_run=False):
+def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=None, enable_switching=False, dry_run=False, author="", permlink=""):
     """
     Curate a post using the AI API.
     
     Args:
-        arliaiKey: API key for the LLM service
-        arliaiModel: Model name (can be comma-separated list; will be handled by model_manager)
-        arliaiUrl: URL for the LLM API
+        llmKey: API key for the LLM service
+        llmModel: Model name (can be comma-separated list; will be handled by model_manager)
+        llmUrl: URL for the LLM API
         postBody: The post content to evaluate
         maxTokens: Maximum tokens for the response
         model_manager: Optional ModelManager instance for handling multiple models
+        author: Optional author name for debugging/logging
+        permlink: Optional permlink for debugging/logging
         
     Returns:
         str: The AI curation response or error message
     """
     today = datetime.now()
-    arliaiKey = arliaiKey.split()[0]  # Eliminate comments after the key (should be redundant)
+    llmKey = llmKey.split()[0]  # Eliminate comments after the key (should be redundant)
     loc = Localization()
     
     # Use provided model_manager or create one from the model string
     if model_manager is None:
-        model_manager = ModelManager(arliaiModel)
+        model_manager = ModelManager(llmModel)
     
-    output_language = config.get('ARLIAI', 'OUTPUT_LANGUAGE', fallback='English')
+    output_language = config.get('LLM', 'OUTPUT_LANGUAGE', fallback='English')
     try:
         with open(systemPromptFile, 'r', encoding='utf-8') as f:
             systemPrompt = f.read().format(language=output_language)
@@ -109,14 +111,21 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
         logging.error("aicurate: Received an empty or whitespace-only postBody. Cannot proceed.")
         return "Content Error - Empty Body"
 
-    if arliaiUrl.startswith("https://generativelanguage.googleapis.com"):  # Google API/models OpenAI compatibility mode
-        stop_param_name = "stop"
-    else:
-        stop_param_name = "stop_sequences"
+    # Context token management for ArliAI's 12K limit
+    if llmUrl.startswith("https://api.arliai.com"):
+        if maxTokens > 4096:
+            maxTokens = 4096
+        # 1 token is approx 4 characters. 12K tokens is approx 48K characters.
+        # Cap post body at 30,000 chars to leave plenty of room for prompt and generation.
+        max_chars = 30000
+        if len(postBody) > max_chars:
+            post_id = f"@{author}/{permlink}" if author and permlink else "Unknown Post"
+            logging.warning(f"[{post_id}] Post body exceeds safe limit for ArliAI 12K context. Truncating from {len(postBody)} to {max_chars} characters.")
+            postBody = postBody[:max_chars] + "\n...[TRUNCATED FOR LENGTH]..."
 
     headers = {
         'Content-Type': 'application/json',
-        'Authorization': f"Bearer {arliaiKey}"
+        'Authorization': f"Bearer {llmKey}"
     }
 
     # Try models in sequence if rate limiting occurs
@@ -125,40 +134,48 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
         
         payloadDict = {
             "model": current_model,
-            "messages": construct_messages(arliaiUrl, current_model, systemPrompt, f"{curationPrompt}\n\n## ARTICLE FOR EVALUATION\n\n{postBody}"),
+            "messages": construct_messages(llmUrl, current_model, systemPrompt, f"{curationPrompt}\n\n## ARTICLE FOR EVALUATION\n\n{postBody}"),
             "temperature": 0.3,
             "top_p": 0.85,
             "max_tokens": maxTokens,
             "stream": False,
-            stop_param_name: ["END_OF_CURATION_REPORT", "DO NOT CURATE"]
+            "stop": ["END_OF_CURATION_REPORT"]
         }
 
-        # if arliaiUrl.startswith("https://api.arliai.com"):  # ARLIAI API/models (vllm API)
-        #     payloadDict["repetition_penalty"] = 1.1
-        #     payloadDict["top_k"] = 40
-        #     payloadDict["frequency_penalty"] = 0.3
-        #     payloadDict["presence_penalty"] = 0.3
-        #     payloadDict["min_p"] = 0.0
-        #     payloadDict["extra_body"] = {
-        #         "chat_template_kwargs": {"enable_thinking": False}
-        #     }
+        if llmUrl.startswith("https://api.arliai.com"):  # VLLM API/models
+            payloadDict["repetition_penalty"] = 1.1
+            payloadDict["top_k"] = 40
+            payloadDict["frequency_penalty"] = 0.3
+            payloadDict["presence_penalty"] = 0.3
+            payloadDict["min_p"] = 0.0
 
         payload = json.dumps(payloadDict)
 
         for attempt in range(MAX_RETRIES + 1):
             try:
-                logging.debug(f"Attempt {attempt + 1}/{MAX_RETRIES + 1} to call AI API: {arliaiUrl} with model {current_model}")
-                response = requests.post(arliaiUrl, headers=headers, data=payload)
+                logging.debug(f"Attempt {attempt + 1}/{MAX_RETRIES + 1} to call AI API: {llmUrl} with model {current_model}")
+                response = requests.post(llmUrl, headers=headers, data=payload)
                 response.raise_for_status()  # Raises HTTPError for 4xx/5xx responses
-                rawResponse = response.json()['choices'][0]['message']['content']
+                
+                data = response.json()
+                if isinstance(data, list):
+                    data = data[0] if len(data) > 0 else {}
+                rawResponse = data.get('choices', [{}])[0].get('message', {}).get('content') or ''
 
                 # Post-process to remove any <think>...</think> blocks that the model might still include.
                 # The re.DOTALL flag ensures that the pattern matches even if the block spans multiple lines.
                 # .strip() removes any leading/trailing whitespace left after the removal.
-                cleanedResponse = re.sub(r'<think>.*?</think>', '', rawResponse, flags=re.DOTALL).strip()
+                cleanedResponse = re.sub(r'<think>.*?</think>', '', str(rawResponse), flags=re.DOTALL).strip()
+                cleanedResponse = re.sub(r'<thought>.*?</thought>', '', str(rawResponse), flags=re.DOTALL).strip()
+
+                post_id = f"@{author}/{permlink}" if author and permlink else "Unknown Post"
+                
+                if not cleanedResponse:
+                    logging.info(f"[{post_id}] AI model returned a completely empty response. Interpreting as an implicit rejection.")
+                    return "DO NOT CURATE"
 
                 if len(cleanedResponse) < 100: # Or another threshold for "suspiciously short"
-                    logging.warning(f"Received suspiciously short AI response after cleaning: '{cleanedResponse}'.")
+                    logging.warning(f"[{post_id}] Received suspiciously short AI response after cleaning: '{cleanedResponse}'.")
                     logging.warning(f"Original raw response: '{rawResponse}'")  # Add this line
                     logging.warning(f"Request payload that led to short response: {json.dumps(payloadDict, indent=2)}")
 
@@ -176,19 +193,20 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
                     error_details = e.response.json()
                     error_details_text = json.dumps(error_details, indent=2)
                     
-                    # Check for rate limiting (429 or 503 with overloaded message)
+                    # Check for rate limiting (429 or server errors like 502, 503, 504)
                     if status_code == 429:
                         is_rate_limited = True
-                    elif status_code == 503 and \
-                       isinstance(error_details, list) and len(error_details) > 0 and \
-                       isinstance(error_details[0], dict) and 'error' in error_details[0] and \
-                       isinstance(error_details[0]['error'], dict) and \
-                       error_details[0]['error'].get('code') == 503 and \
-                       "The model is overloaded. Please try again later." in error_details[0]['error'].get('message', ''):
+                    elif status_code == 503:
                         is_overloaded_error = True
+                        is_rate_limited = True
+                    elif status_code in [500, 502, 504]:
                         is_rate_limited = True
                 except json.JSONDecodeError:
                     error_details_text = e.response.text if e.response is not None else "No response text available"
+                    if status_code in [429, 500, 502, 503, 504]:
+                        is_rate_limited = True
+                        if status_code == 503:
+                            is_overloaded_error = True
 
                 # If rate limited and we have another model available, mark it and optionally switch
                 if is_rate_limited and model_manager.has_next_model():
@@ -252,7 +270,8 @@ def aicurate(arliaiKey, arliaiModel, arliaiUrl, postBody, maxTokens=8192, model_
                 logging.error(f"KeyError accessing response data: {e_key}. Response JSON: {response.json() if 'response' in locals() and hasattr(response, 'json') else 'Response JSON not available'}")
                 return "Response Error"
             except Exception as e_unexp:
-                logging.error(f"An unexpected error occurred: {e_unexp}. Attempt {attempt + 1}/{MAX_RETRIES + 1}.")
+                import traceback
+                logging.error(f"An unexpected error occurred: {type(e_unexp).__name__} - {e_unexp}\n{traceback.format_exc()}\nAttempt {attempt + 1}/{MAX_RETRIES + 1}.")
                 return "Unexpected Error"
         else:
             # If we get here, we've exhausted retries for this model without switching

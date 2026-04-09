@@ -1,8 +1,11 @@
 from steem import Steem
 from decimal import Decimal
 import configparser
+import logging
 
 import utils
+
+logger = logging.getLogger(__name__)
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -16,27 +19,25 @@ s = Steem(node=steemApi) if steemApi else Steem()
 screenedDelegateeFile = config.get('WALLET', 'SCREENED_DELEGATEE_FILE')
 uncountedDelegateeFile = config.get('WALLET', 'UNCOUNTED_DELEGATEE_FILE')
 
-def _get_thoth_incoming_delegations(author: str, steem_instance=None) -> list:
+def _get_authors_delegation_to_thoth(author: str, steem_instance=None) -> Decimal:
     """
-    Fetches incoming delegations to a Thoth author.
+    Fetches the amount of an author's outgoing delegation to the Thoth account.
 
-    Args: the Steem account name of the author
+    Args:
+        author: The Steem account name of the author.
 
-    TechDebt: At some point, this should be changed to happen only once per program execution.
-
-    Returns the total amount of vesting shares delegated to Thoth by the author.
-    If the author makes no delegations, returns 0.
+    Returns:
+        The amount of vesting shares delegated to Thoth by the author as a Decimal.
+        If the author makes no delegations to Thoth, returns Decimal('0').
     """
     steemApi = config.get('STEEM', 'STEEM_API')
     s = steem_instance or (Steem(node=steemApi) if steemApi else Steem())
     thothAccount = config.get('STEEM', 'POSTING_ACCOUNT')
                               
-    last_delegatee = None
+    last_delegatee = ''
     batch_size = 100
     is_first_batch = True
                               
-    incomingVests = Decimal('0')
-
     while True:
         data = s.get_vesting_delegations(author, last_delegatee, batch_size)
         if not data:
@@ -47,17 +48,15 @@ def _get_thoth_incoming_delegations(author: str, steem_instance=None) -> list:
 
         for delegation in data[start_idx:]:
             delegatee = delegation['delegatee']
-            vests_str = delegation['vesting_shares'].split(' ')[0]
             if delegatee == thothAccount:
-                incomingVests = Decimal(vests_str) 
-                break
+                vests_str = delegation['vesting_shares'].split(' ')[0]
+                return Decimal(vests_str)
             last_delegatee = delegatee
 
         if len(data) < batch_size:
             break
 
-    print (f"Total incoming VESTS to Thoth from {author}: {incomingVests}")
-    return incomingVests
+    return Decimal('0')
 
 def _get_account_vesting_info(author: str, steem_instance=None) -> tuple[float | None, float | None, float | None]:
     """
@@ -76,20 +75,17 @@ def _get_account_vesting_info(author: str, steem_instance=None) -> tuple[float |
     try:
         account = s.get_account(author)
         if not account:
-            print(f"Warning: Account '{author}' not found.")
+            logger.warning(f"Account '{author}' not found.")
             return None, None, None
 
         vesting_shares = float(account.get('vesting_shares', '0.0 ').split()[0])
         delegated_vesting_shares = float(account.get('delegated_vesting_shares', '0.0 ').split()[0])
         received_vesting_shares = float(account.get('received_vesting_shares', '0.0 ').split()[0])
 
-        thothDelegation = _get_thoth_incoming_delegations(author, steem_instance=s)
-        delegated_vesting_shares -= float(thothDelegation)
-
         return vesting_shares, delegated_vesting_shares, received_vesting_shares
 
     except Exception as e:
-        print(f"Error fetching vesting info for {author}: {e}")
+        logger.error(f"Error fetching vesting info for {author}: {e}")
         return None, None, None
 
 def walletScreened(account, steem_instance=None):
@@ -115,9 +111,9 @@ def walletScreened(account, steem_instance=None):
 
     screened_percentage = (screenedVests / vesting_shares) * 100
 
-    print (f"Vesting Shares: {vesting_shares:,.6f} VESTS")
-    print (f"Screened Delegations: {screenedVests:,.6f} VESTS")
-    print (f"Percentage screened: {screened_percentage:.2f}%")
+    logger.info(f"Vesting Shares: {vesting_shares:,.6f} VESTS")
+    logger.info(f"Screened Delegations: {screenedVests:,.6f} VESTS")
+    logger.info(f"Percentage screened: {screened_percentage:.2f}%")
     return screened_percentage > maxScreenedDelegationPct
 
 def totalScreenedOrIgnoredDelegations (delegator, delegateeFile=screenedDelegateeFile, steem_instance=None) -> float:
@@ -133,11 +129,11 @@ def totalScreenedOrIgnoredDelegations (delegator, delegateeFile=screenedDelegate
         with open(delegateeFile, 'r') as f:
             screenedDelegatees = {line.strip() for line in f if line.strip()}
     except FileNotFoundError:
-        print(f"Warning: Screened delegatee file not found at '{delegateeFile}'. Returning 0.")
+        logger.warning(f"Screened delegatee file not found at '{delegateeFile}'. Returning 0.")
         return 0.0
 
     total_vests = Decimal('0')
-    last_delegatee = None
+    last_delegatee = ''
     batch_size = 100
     is_first_batch = True
 
@@ -160,7 +156,7 @@ def totalScreenedOrIgnoredDelegations (delegator, delegateeFile=screenedDelegate
         if len(data) < batch_size:
             break
 
-    print (f"Delegator: {delegator}, total_vests: {total_vests}")
+    logger.info(f"Delegator: {delegator}, total_vests: {total_vests}")
     return float(total_vests)
 
 def _isPowerDownTooHigh(author: str, steemInstance=None) -> bool:
@@ -185,7 +181,7 @@ def _isPowerDownTooHigh(author: str, steemInstance=None) -> bool:
     try:
         authorAccountJson = s.get_account(author)
         if not authorAccountJson:
-            print(f"Warning: Account '{author}' not found.")
+            logger.warning(f"Account '{author}' not found.")
             return False
 
         totalVests = float(authorAccountJson['vesting_shares'].split()[0])
@@ -193,15 +189,15 @@ def _isPowerDownTooHigh(author: str, steemInstance=None) -> bool:
 
         yearlyPowerdownRate = 100 * withdrawRate * 52 / totalVests if totalVests > 0 else 0.0
 
-        print(f"Yearly Powerdown Percentage for @{author}: {yearlyPowerdownRate:.2f}%")
+        logger.info(f"Yearly Powerdown Percentage for @{author}: {yearlyPowerdownRate:.2f}%")
         if yearlyPowerdownRate > maxPowerdownYearlyPct:
-            print(f"FAIL: Yearly powerdown percentage ({yearlyPowerdownRate:.2f}%) exceeds max ({maxPowerdownYearlyPct:.2f}%).")
+            logger.info(f"FAIL: Yearly powerdown percentage ({yearlyPowerdownRate:.2f}%) exceeds max ({maxPowerdownYearlyPct:.2f}%).")
             return True
 
-        print("PASS: Yearly powerdown percentage is below the limit.")
+        logger.info("PASS: Yearly powerdown percentage is below the limit.")
         return False
     except Exception as e:
-        print(f"An unexpected error occurred while checking powerdown percentage: {e}")
+        logger.error(f"An unexpected error occurred while checking powerdown percentage: {e}")
 
     return False
 
@@ -225,14 +221,17 @@ def check_author_wallet(author: str, steem_instance=None) -> bool:
             # Error already printed in helper function
             return False
 
+        # Calculate penalty only for this check, using raw delegated vests
+        thoth_delegation = _get_authors_delegation_to_thoth(author, steem_instance=steem_instance)
         unCountedVests = totalScreenedOrIgnoredDelegations(delegator=author, delegateeFile=uncountedDelegateeFile, steem_instance=steem_instance)
-        delegationPenalty = delegated_vesting_shares - unCountedVests
+        # The penalty is the total outgoing delegations, minus any "free passes"
+        delegationPenalty = delegated_vesting_shares - float(thoth_delegation) - unCountedVests
 
-        print(f"\n--- Checking author: @{author} ---")
-        print(f"Vesting Shares: {vesting_shares:,.6f} VESTS")
-        print(f"Delegated Vesting Shares: {delegated_vesting_shares:,.6f} VESTS")
-        print(f"Uncounted Delegations: {unCountedVests:,.6f} VESTS")
-        print(f"Delegation Penalty (after uncounted): {delegationPenalty:,.6f} VESTS")
+        logger.info(f"--- Checking author: @{author} ---")
+        logger.info(f"Vesting Shares: {vesting_shares:,.6f} VESTS")
+        logger.info(f"Delegated Vesting Shares: {delegated_vesting_shares:,.6f} VESTS")
+        logger.info(f"Uncounted Delegations: {unCountedVests:,.6f} VESTS")
+        logger.info(f"Delegation Penalty (after uncounted): {delegationPenalty:,.6f} VESTS")
 
         # 2. Calculate delegation percentage
         if vesting_shares > 0:
@@ -240,38 +239,38 @@ def check_author_wallet(author: str, steem_instance=None) -> bool:
         else:
             delegation_percentage = 0.0
         
-        print(f"Delegation Percentage: {delegation_percentage:.2f}%")
+        logger.info(f"Delegation Percentage: {delegation_percentage:.2f}%")
 
         # 3. Calculate undelegated Steem Power (SP)
         steem_per_mvest = utils.get_steem_per_mvest(steem_instance)
         if steem_per_mvest == 0.0:
             return False # Stop if we can't get the conversion rate
             
-        print(f"Current STEEM per MVEST: {steem_per_mvest:.6f}")
+        logger.info(f"Current STEEM per MVEST: {steem_per_mvest:.6f}")
 
         undelegated_vests = vesting_shares - delegated_vesting_shares
         undelegated_sp = (undelegated_vests / 1_000_000) * steem_per_mvest
-        print(f"Undelegated SP: {undelegated_sp:,.3f}")
+        logger.info(f"Undelegated SP: {undelegated_sp:,.3f}")
 
         # 4. Screen based on the criteria
-        print(f"\n--- Screening Criteria ---")
-        print(f"Max Delegation Pct Threshold: {max_delegation_pct:.2f}%")
-        print(f"Min Undelegated SP Threshold: {min_undelegated_sp:,.3f}")
+        logger.info(f"--- Screening Criteria ---")
+        logger.info(f"Max Delegation Pct Threshold: {max_delegation_pct:.2f}%")
+        logger.info(f"Min Undelegated SP Threshold: {min_undelegated_sp:,.3f}")
 
         passes_screen = True
         if delegation_percentage > max_delegation_pct:
-            print(f"FAIL: Delegation ({delegation_percentage:.2f}%) exceeds max ({max_delegation_pct:.2f}%).")
+            logger.info(f"FAIL: Delegation ({delegation_percentage:.2f}%) exceeds max ({max_delegation_pct:.2f}%).")
             passes_screen = False
         
         if undelegated_sp < min_undelegated_sp:
-            print(f"FAIL: Undelegated SP ({undelegated_sp:,.3f}) is below min ({min_undelegated_sp:,.3f}).")
+            logger.info(f"FAIL: Undelegated SP ({undelegated_sp:,.3f}) is below min ({min_undelegated_sp:,.3f}).")
             passes_screen = False
 
         if passes_screen:
-            print("\nPASS: Author meets all criteria.")
+            logger.info("PASS: Author meets all criteria.")
         
         return passes_screen
 
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        logger.error(f"An unexpected error occurred: {e}")
         return False

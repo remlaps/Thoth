@@ -25,6 +25,7 @@ parsed_tags = [tag.strip() for tag in post_tags_config_string.split(',') if tag.
 taglist = parsed_tags # taglist is the list of all parsed tags
 initialWaitSeconds = config.getint('BLOG', 'VOTE_DELAY_SECONDS', fallback=600) # Default to 5 minutes if not set
 votePercent = config.getint('BLOG', 'VOTE_PERCENT', fallback=100)
+dry_run = config.getboolean('STEEM', 'DRY_RUN', fallback=False)
 
 def create_beneficiary_list(beneficiary_list, curatedAuthorWeight, delegatorWeight):
     # Initialize empty dictionary to track accounts and their weights
@@ -138,7 +139,7 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
         models_used = model_manager.get_models_used()
         used_model = ", ".join(models_used) if len(models_used) > 1 else models_used[0] if models_used else "unknown"
     else:
-        used_model = config.get('ARLIAI','ARLIAI_MODEL')
+        used_model = config.get('LLM','LLM_MODEL')
 
     loc = Localization()
 
@@ -265,10 +266,14 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
         with open('data/fakepost.html', 'w', encoding='utf-8') as f:
             print(f"{body}", file=f)
         try:
-            s.commit.post(title, body, postingAccount, permlink=reply_permlink, tags=taglist,
-                comment_options=comment_options, json_metadata=metadata,
-                beneficiaries=beneficiaryList, reply_identifier=f"@{thothAccount}/{thothPermlink}")
-            replyDone = True
+            if not dry_run:
+                s.commit.post(title, body, postingAccount, permlink=reply_permlink, tags=taglist,
+                    comment_options=comment_options, json_metadata=metadata,
+                    beneficiaries=beneficiaryList, reply_identifier=f"@{thothAccount}/{thothPermlink}")
+                replyDone = True
+            else:
+                print(f"DRY RUN ENABLED: Skipped posting {log_display_title}.")
+                replyDone = True
         except Exception as E:
             print (E)
             print ("Sleeping 1 minute before retry...")
@@ -278,9 +283,13 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
         print (f"Posting {log_display_title} failed after multiple retries. Exiting reply process.")
         return False
     
-    # Vote on the newly created reply, not the parent post
-    voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, reply_permlink, votePercent))
-    voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
-    voting_thread.start()
-    print (f"Reply {log_display_title} posted and vote scheduled in background.")
-    return voting_thread # Return the thread object so it can be joined later
+    if not dry_run:
+        # Vote on the newly created reply, not the parent post
+        voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, reply_permlink, votePercent))
+        voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
+        voting_thread.start()
+        print (f"Reply {log_display_title} posted and vote scheduled in background.")
+        return voting_thread # Return the thread object so it can be joined later
+    else:
+        print (f"DRY RUN: Reply vote for {log_display_title} skipped.")
+        return None
