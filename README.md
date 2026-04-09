@@ -90,6 +90,10 @@ Customize the `config/config.ini` file to your preferences.
 | `AUTHOR`  | `MIN_HIVE_INACTIVITY_HARD`      | Minimum days since the account was active on Hive to avoid instant rejection.                             |
 | `SCORING` | `MAX_BLURT_INACTIVITY_SCORE`    | Maximum points awarded in the content scoring step for Blurt inactivity.                                  |
 | `SCORING` | `MAX_HIVE_INACTIVITY_SCORE`     | Maximum points awarded in the content scoring step for Hive inactivity.                                   |
+| `ENGAGEMENT` | `FEED_REACH_SCREENING_ENABLED` | Enable feed reach screening rule. Default: `False`                                                       |
+| `ENGAGEMENT` | `FEED_REACH_MIN`             | Minimum required feed reach (audience size) for posts to pass screening. Default: `10`                    |
+| `ENGAGEMENT` | `FEED_REACH_MAX`             | Maximum feed reach value used for scaling engagement score. Default: `10000`                             |
+| `ENGAGEMENT` | `FEED_REACH_WEIGHT`          | Weight of feed reach metric in engagement scoring. Default: `0.1`                                        |
 | `BLOG`    | `CURATED_AUTHOR_WEIGHT`         | The beneficiary weight (e.g., 1000 for 10%) for each curated author in the top-level post.                                      |
 | `BLOG`    | `DELEGATOR_WEIGHT`              | The beneficiary weight for each included delegator in the top-level post.                                                     |
 | `BLOG`    | `POSTING_ACCOUNT_WEIGHT`        | The beneficiary weight for the Thoth account itself.                                                    |

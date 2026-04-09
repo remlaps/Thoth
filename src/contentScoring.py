@@ -7,6 +7,8 @@ the binary accept/reject screening with a multi-dimensional scoring approach.
 
 import re
 import json
+import urllib.request
+import urllib.error
 from datetime import datetime, timedelta
 import logging
 
@@ -15,9 +17,10 @@ from steem.account import Account
 from steem.account import AccountDoesNotExistsException
 
 from utils import get_rng, remove_formatting
-from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep, remoteInactiveDays
+from authorValidation import followersPerMonth, adjustedFollowersPerMonth, getMedianFollowerRep, remoteInactiveDays, getAllFollowers
 from contentValidation import word_count
 from steemHelpers import get_resteem_count
+from communityValidation import get_all_community_members
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +45,10 @@ class ContentScorer:
         
         # Cache for expensive calculations
         self.median_rep_cache = {}
+        
+        # Feed reach cache to avoid duplicate calculations
+        self._feed_reach_cache = None
+        self._feed_reach_post_key = None
         
     def _load_scoring_weights(self):
         """Load scoring weights from configuration."""
@@ -80,9 +87,9 @@ class ContentScorer:
         weights['engagement_comments'] = self.config.get_float('ENGAGEMENT', 'COMMENT_WEIGHT', 2.0)
         weights['engagement_value'] = self.config.get_float('ENGAGEMENT', 'VALUE_WEIGHT', 1.0)
         
-        # Additional engagement factors (currently not implemented but prepared)
+        # Additional engagement factors
         weights['engagement_resteems'] = self.config.get_float('ENGAGEMENT', 'RESTEEM_WEIGHT', 0.0)
-        weights['engagement_feed_reach'] = 0.1  # Placeholder for future implementation
+        weights['engagement_feed_reach'] = self.config.get_float('ENGAGEMENT', 'FEED_REACH_WEIGHT', 0.1)
         weights['engagement_downvotes'] = 0.5   # Penalty weight for downvotes
         
         # Component weights (Total Score calculation)
@@ -153,6 +160,10 @@ class ContentScorer:
             Dictionary containing total score, component scores, and quality tier
         """
         try:
+            # Invalidate feed reach cache for new post
+            self._feed_reach_cache = None
+            self._feed_reach_post_key = None
+            
             # Get detailed post information
             if content_data:
                 post = content_data
@@ -423,8 +434,121 @@ class ContentScorer:
             score = 100.0 * (value - min_val) / (max_val - min_val)
             return score
 
+    def _get_author_followers(self, author):
+        """Get unique followers for an author using getAllFollowers."""
+        try:
+            followers_data = getAllFollowers(author, steem_instance=self.steem)
+            return {follower['follower'] for follower in followers_data}
+        except Exception as e:
+            logger.error(f"Error getting followers for {author}: {e}")
+            return set()
+
+    def _get_resteem_followers(self, author, permlink):
+        """Get followers of accounts that resteemed this post using SDS API."""
+        try:
+            resteem_followers = set()
+            
+            # Use SDS API to get all resteemers directly
+            # API endpoint: https://sds.steemworld.org/post_resteems_api/getResteems/author/permlink/limit/offset
+            api_url = f"https://sds.steemworld.org/post_resteems_api/getResteems/{author}/{permlink}/1000/0"
+            
+            # Create GET request
+            req = urllib.request.Request(api_url, method='GET')
+            
+            # Execute the request
+            with urllib.request.urlopen(req, timeout=30) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                
+                # Check for errors in the response
+                if result.get('code', 0) != 0:
+                    logger.warning(f"SDS API error getting resteems for {author}/{permlink}: {result.get('message', 'Unknown error')}")
+                    return resteem_followers
+                
+                # Extract the result array
+                resteemers = result.get('result', [])
+                
+                # Get followers for each resteemer
+                for resteemer in resteemers:
+                    followers = self._get_author_followers(resteemer)
+                    resteem_followers.update(followers)
+            
+            return resteem_followers
+        except urllib.error.URLError as e:
+            logger.warning(f"Failed to fetch resteems for {author}/{permlink}: {e}")
+            return set()
+        except Exception as e:
+            logger.error(f"Error getting resteem followers for {author}/{permlink}: {e}")
+            return set()
+
+    def _calculate_feed_reach(self, post):
+        """Calculate feed reach as unique accounts that could see the post."""
+        try:
+            author = post['author']
+            permlink = post['permlink']
+            post_key = f"{author}/{permlink}"
+            
+            # Check if we have a cached result for this post
+            if self._feed_reach_cache is not None and self._feed_reach_post_key == post_key:
+                return self._feed_reach_cache
+            
+            # Calculate feed reach
+            # 1. Get author followers
+            author_followers = self._get_author_followers(author)
+            
+            # 2. Get resteem followers for all resteeming accounts
+            resteem_followers = self._get_resteem_followers(author, permlink)
+            
+            # 3. Get community members if posted in a community
+            community_members = get_all_community_members(post, self.steem)
+            
+            # 4. Count unique accounts in the combined list
+            all_reach_accounts = author_followers | resteem_followers | community_members
+            
+            # Cache the result
+            feed_reach = len(all_reach_accounts)
+            self._feed_reach_cache = feed_reach
+            self._feed_reach_post_key = post_key
+            
+            return feed_reach
+        except Exception as e:
+            logger.error(f"Error calculating feed reach: {e}")
+            return 0
+
+    def is_feed_reach_sufficient(self, post):
+        """
+        Check if a post meets the minimum feed reach requirement.
+        
+        Args:
+            post (dict): The post data from Steem API
+            
+        Returns:
+            bool: True if feed reach meets minimum requirement or screening is disabled
+        """
+        try:
+            # Check if feed reach screening is enabled
+            if not self.config.get_boolean('ENGAGEMENT', 'FEED_REACH_SCREENING_ENABLED', fallback=False):
+                return True
+            
+            # Get minimum feed reach requirement
+            min_feed_reach = self.config.get_int('ENGAGEMENT', 'FEED_REACH_MIN', 10)
+            
+            # Calculate actual feed reach
+            actual_feed_reach = self._calculate_feed_reach(post)
+            
+            # Check if it meets the minimum requirement
+            meets_requirement = actual_feed_reach >= min_feed_reach
+            
+            if not meets_requirement:
+                logger.debug(f"Feed reach screening: {actual_feed_reach} < {min_feed_reach} for {post.get('author', 'unknown')}/{post.get('permlink', 'unknown')}")
+            
+            return meets_requirement
+            
+        except Exception as e:
+            logger.error(f"Error checking feed reach requirement: {e}")
+            return True  # Fail open - don't screen if there's an error
+
     def _score_engagement(self, post):
-        """Score post engagement based on votes, comments, and value."""
+        """Score post engagement based on votes, comments, value, and feed reach."""
         try:
             # Basic engagement metrics
             author = post['author']
@@ -452,22 +576,32 @@ class ContentScorer:
             resteem_max = self.thresholds['max_resteem_count']
             resteem_weight = self.weights['engagement_resteems']
 
+            # Feed reach scoring
+            feed_reach_min = self.config.get_int('ENGAGEMENT', 'FEED_REACH_MIN', 10)
+            feed_reach_max = self.config.get_int('ENGAGEMENT', 'FEED_REACH_MAX', 10000)
+            feed_reach_weight = self.weights['engagement_feed_reach']
+
             # Calculate scaled scores (0-100 for each component)
             vote_score_scaled = self._scale(net_votes, vote_min, vote_max)
             comment_score_scaled = self._scale(children, comment_min, comment_max)
             value_scaled = self._scale(total_value, value_min, value_max)
             resteem_count = get_resteem_count(author, permlink)
             resteem_score_scaled = self._scale(resteem_count, resteem_min, resteem_max)
+            
+            # Calculate feed reach score
+            feed_reach = self._calculate_feed_reach(post)
+            feed_reach_score_scaled = self._scale(feed_reach, feed_reach_min, feed_reach_max)
 
             # Calculate weighted average
             total_weighted_score = (
                 vote_score_scaled * vote_weight +
                 comment_score_scaled * comment_weight +
                 value_scaled * value_weight +
-                resteem_score_scaled * resteem_weight
+                resteem_score_scaled * resteem_weight +
+                feed_reach_score_scaled * feed_reach_weight
             )
 
-            total_weight = vote_weight + comment_weight + value_weight + resteem_weight
+            total_weight = vote_weight + comment_weight + value_weight + resteem_weight + feed_reach_weight
 
             if total_weight == 0:
                 return 0.0

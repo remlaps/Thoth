@@ -331,6 +331,17 @@ class HybridScreening:
                 'rule_type': 'wallet_screened'
             }
 
+        # Rule 13: Feed reach screening (optional, network-intensive)
+        if not self.content_scorer.is_feed_reach_sufficient(post):
+            min_feed_reach = self.config.get_int('ENGAGEMENT', 'FEED_REACH_MIN', 10)
+            actual_feed_reach = self.content_scorer._calculate_feed_reach(post)
+            logger.info(f"Rule-based rejection: {author}/{permlink} feed reach too low ({actual_feed_reach} < {min_feed_reach})")
+            return {
+                'passed': False,
+                'reason': f'feed_reach_too_low: {actual_feed_reach} < {min_feed_reach}',
+                'rule_type': 'feed_reach_screening'
+            }
+
         # If all rule-based checks pass, content can proceed to scoring
         return {
             'passed': True,
