@@ -1,5 +1,6 @@
 from steem import Steem
 import random
+import os
 import string
 import configparser
 import datetime
@@ -68,7 +69,7 @@ def create_beneficiary_list(beneficiary_list):
     
     # Convert to list of dictionaries and sort alphabetically by account
     beneficiary_dicts = [{"account": account, "weight": weight} 
-                         for account, weight in account_weights.items()]
+                         for account, weight in account_weights.items() if weight > 0]
     beneficiary_dicts.sort(key=lambda x: x["account"])
     
     # Return the beneficiaries list to be inserted into extensions
@@ -101,8 +102,13 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
             retries += 1
 
 def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None, full_delegations=None):
-    postingKey=config.get('STEEM', 'POSTING_KEY')
-    steemApi=config.get('STEEM', 'STEEM_API')
+    # Safely retrieve posting key from environment or config.
+    # Note: UNLOCK is handled internally by the Steem library for wallet users.
+    postingKey = os.environ.get('POSTING_KEY')
+    if not postingKey:
+        postingKey = config.get('STEEM', 'POSTING_KEY', fallback=None)
+        
+    steemApi = config.get('STEEM', 'STEEM_API', fallback=None)
 
     # Connect to the STEEM blockchain
     randValue = ''.join(random.choices(string.ascii_lowercase, k=10))
@@ -225,7 +231,7 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
         'percent_steem_dollars': 10000,
         'allow_votes': True,
         'allow_curation_rewards': True,
-        'extensions': [[0, { }]]
+        'extensions': []
     }
 
     print (f"Body: {body}")
@@ -284,7 +290,9 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
                     print(f"Waiting 6 seconds before attempting next reply, if any...")
                     time.sleep(6) # Also wait if an error occurs before trying the next one
         except Exception as E:
-            print (E)
+            import traceback
+            print (f"Error during main curation post attempt: {E}")
+            traceback.print_exc()
             print ("Sleeping 1 minute before retry...")
             time.sleep(60)
             retryCount += 1

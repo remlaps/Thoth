@@ -114,21 +114,18 @@ class ConfigValidator:
             delegator_weight = self.config.getint('BLOG', 'DELEGATOR_WEIGHT', fallback=0)
             curated_author_weight = self.config.getint('BLOG', 'CURATED_AUTHOR_WEIGHT', fallback=0)
             
-            # Requirement 4: If POSTING_ACCOUNT_WEIGHT is zero, sum must be < 9
-            if posting_account_weight == 0:
-                if num_delegators + num_reviewed_posts >= 9:
-                    self.errors.append(
-                        "When [BLOG] POSTING_ACCOUNT_WEIGHT is zero, "
-                        "NUMBER_OF_DELEGATORS_PER_POST + NUMBER_OF_REVIEWED_POSTS must be less than 9"
-                    )
+            # Total beneficiaries cannot exceed Steem's limit of 8.
+            # Slots used: 1 for @null (always added), 1 for bot (if weight > 0), plus authors and delegators.
+            bot_exists = 1 if posting_account_weight > 0 else 0
+            total_slots_used = num_delegators + num_reviewed_posts + bot_exists + 1 # +1 for @null
             
-            # Requirement 5: If POSTING_ACCOUNT_WEIGHT > 0, sum must be < 8
-            elif posting_account_weight > 0:
-                if num_delegators + num_reviewed_posts >= 8:
-                    self.errors.append(
-                        "When [BLOG] POSTING_ACCOUNT_WEIGHT is greater than zero, "
-                        "NUMBER_OF_DELEGATORS_PER_POST + NUMBER_OF_REVIEWED_POSTS must be less than 8"
-                    )
+            if total_slots_used > 8:
+                self.errors.append(
+                    f"The combined number of beneficiaries ({total_slots_used}) exceeds Steem's limit of 8. "
+                    f"Check NUMBER_OF_DELEGATORS_PER_POST ({num_delegators}) + "
+                    f"NUMBER_OF_REVIEWED_POSTS ({num_reviewed_posts}) + "
+                    f"bot ({bot_exists}) + null (1)."
+                )
             
             # Requirement 6: Total weight calculation must be <= 10000
             total_weight = (

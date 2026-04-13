@@ -15,11 +15,16 @@ def initialize_steem_with_retry(node_api=None, keys=None, max_retries=5, initial
     """
     for attempt in range(max_retries):
         try:
-            nodes = [node_api] if node_api else None
-            if node_api:
-                s = Steem(nodes=nodes, keys=keys)
+            # Handle potentially comma-separated node lists for resilience
+            if isinstance(node_api, str) and ',' in node_api:
+                nodes = [n.strip() for n in node_api.split(',') if n.strip()]
+            elif node_api:
+                nodes = [node_api]
             else:
-                s = Steem(keys=keys)
+                nodes = None
+
+            # Initialize Steem. If keys is None, the library uses the UNLOCK env var.
+            s = Steem(nodes=nodes, keys=keys)
 
             # The Steem() constructor implicitly calls get_dynamic_global_properties(),
             # which is where the UnboundLocalError from the traceback can occur.

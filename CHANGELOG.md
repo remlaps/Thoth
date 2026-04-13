@@ -17,9 +17,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Helper Functions**: Updated `initialize_steem_with_retry` in `steemHelpers.py` to support signing keys for posting and voting operations.
 - **Diagnostic Tool**: `checkValidation.py` now explicitly re-fetches full post content using `get_content` after identifying the latest post by an author. This resolves an issue where `net_votes` and other engagement metrics were reported as 0 due to stale data from `get_discussions_by_author_before_date` summary calls.
 - **Content Scoring**: Enhanced `contentScoring.py` to robustly calculate `net_votes`. If `net_votes` is reported as 0 but `active_votes` are present, the count of `active_votes` is used as a fallback.
+- **Blockchain Connectivity**: `STEEM_API` now supports comma-separated lists of nodes, restoring failover capabilities while maintaining standardization.
 
 ### Fixed
 - **Connection Stability**: Fixed a frequent crash caused by a bug in the `steem-python` library (`UnboundLocalError: cannot access local variable 'error'`) by wrapping connection logic in a robust retry mechanism.
+- **Posting Logic**: Resolved RPC errors during broadcast by removing conflicting extension initializations in `comment_options`.
+- **Beneficiary Handling**: Prevented "Zero Weight" rejections by filtering out accounts with no assigned weight.
+- **Beneficiary Limits**: Updated `ConfigValidator` and `replyHelper.py` to strictly enforce the Steem blockchain's 8-beneficiary limit.
 - **Wallet Validation**: Resolved issue where delegations to uncounted services (e.g., steem-atlas) were still being penalized.
   - Implemented robust name normalization for the `UNCOUNTED_DELEGATEE_FILE` list (lowercase matching and `@` prefix removal).
   - Updated `MIN_UNDELEGATED_SP` check to treat "safe" delegations (Thoth + Uncounted list) as part of the author's available skin-in-the-game.

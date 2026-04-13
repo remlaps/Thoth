@@ -1,5 +1,6 @@
 from steem import Steem
 import random
+import os
 import string
 import configparser
 import time
@@ -65,7 +66,7 @@ def create_beneficiary_list(beneficiary_list, curatedAuthorWeight, delegatorWeig
     
     # Convert to list of dictionaries and sort alphabetically by account
     beneficiary_dicts = [{"account": account, "weight": weight} 
-                         for account, weight in account_weights.items()]
+                         for account, weight in account_weights.items() if weight > 0]
     beneficiary_dicts.sort(key=lambda x: x["account"])
     
     # Return the beneficiaries list to be inserted into extensions
@@ -121,8 +122,13 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
     :param thothPermlink: str, the permlink of the main Thoth curation post to reply to.
     :param model_manager: ModelManager instance for tracking which model was used.
     """
-    postingKey=config.get('STEEM', 'POSTING_KEY')
-    steemApi=config.get('STEEM', 'STEEM_API')
+    # Safely retrieve posting key from environment or config.
+    # Note: UNLOCK is handled internally by the Steem library for wallet users.
+    postingKey = os.environ.get('POSTING_KEY')
+    if not postingKey:
+        postingKey = config.get('STEEM', 'POSTING_KEY', fallback=None)
+        
+    steemApi = config.get('STEEM', 'STEEM_API', fallback=None)
 
     # Connect to the STEEM blockchain
     randValue = ''.join(random.choices(string.ascii_lowercase, k=10))
@@ -176,8 +182,13 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
     # curatedPostCount and delegatorCount are module-level globals read from config.
     freed_author_slots = max(0, curatedPostCount - num_authors_in_this_reply)
     
-    # Determine the total number of delegators to include for this reply.
-    total_delegators_to_include_for_reply = delegatorCount + freed_author_slots
+    # Determine the total number of delegators to include for this reply,
+    # but strictly cap it to respect Steem's 8 beneficiary limit.
+    # Slots used: 1 for the original author, 1 for @null, and 1 for the bot (if weight > 0).
+    bot_slot = 1 if postingAccountWeight > 0 else 0
+    max_delegator_slots = 8 - num_authors_in_this_reply - 1 - bot_slot
+    
+    total_delegators_to_include_for_reply = min(max_delegator_slots, delegatorCount + freed_author_slots)
     
     all_delegators_list = [] # Full shuffled list of eligible delegators
     selected_delegators = [] # The subset we will actually use
@@ -236,7 +247,7 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
         'percent_steem_dollars': 10000,
         'allow_votes': True,
         'allow_curation_rewards': True,
-        'extensions': [[0, { }]]
+        'extensions': []
     }
 
     # Generate a unique permlink for the reply before the retry loop
