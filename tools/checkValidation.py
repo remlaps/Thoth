@@ -1,204 +1,192 @@
+#!/usr/bin/env python3
+"""
+Diagnostic tool to check if Thoth would accept/reject a specific author or post.
+Rewritten to use the modern Hybrid Screening and Scoring system.
+"""
 import sys
 import os
+import logging
+import argparse
+from datetime import datetime, timezone
 
-# --- Set up paths to run from the 'tools' directory ---
-# Get the absolute path of the project's root directory (one level up from 'tools')
+# --- Path Configuration ---
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-
-# Change the current working directory to the project root.
-# This ensures that all relative paths in other modules (like 'config/config.ini')
-# are resolved correctly from the project root.
 os.chdir(project_root)
-
-# Add the 'src' directory to the Python path to allow importing modules from it.
-# Now that CWD is the project root, a relative path is fine.
 sys.path.append('src')
 
-# Now we can import our modules
-import configparser
-from datetime import datetime
-from steem import Steem
+# Import project modules
+from configValidator import ConfigValidator
+from hybridScreening import HybridScreening
+from authorValidation import isBlacklisted, isAuthorWhitelisted, isHiveActivityTooRecent, isBlurtActivityTooRecent, inactiveDays, isRepTooLow, rep_log10
+from walletValidation import walletScreened
+from steemHelpers import initialize_steem_with_retry
 
-import authorValidation
-import walletValidation
-import engagementValidation
-import utils
+# Configure logging to be informative but clean
+logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
+
+# Suppress noisy library logs
+logging.getLogger('steem.http_client').setLevel(logging.CRITICAL)
+logging.getLogger('steem.steemd').setLevel(logging.CRITICAL)
+logging.getLogger('urllib3.connectionpool').setLevel(logging.CRITICAL)
 
 def main():
-    """
-    Runs a series of validation checks against a specified Steem author.
-    """
-    # --- Configuration and Setup ---
-    config = configparser.ConfigParser()
-    # Since CWD is now the project root, this relative path is correct.
-    config_path = os.path.join('config', 'config.ini')
-    if not os.path.exists(config_path):
-        print(f"Error: Configuration file not found at '{config_path}'")
-        print("Please copy 'config/config.template' to 'config/config.ini' and fill it out.")
-        sys.exit(1)
-    config.read(config_path)
+    parser = argparse.ArgumentParser(description="Check if Thoth would curate a specific author or post.")
+    parser.add_argument("target", help="Target to check: '@author' or '@author/permlink'")
+    args = parser.parse_args()
 
-    if len(sys.argv) < 2:
-        print("Usage: python checkValidation.py <author_name>")
-        sys.exit(1)
+    target = args.target.replace('@', '').strip()
+    author = ""
+    permlink = ""
 
-    author_name = sys.argv[1].replace('@', '') # Remove @ if present
-
-    print(f"--- Running Validation Checks for @{author_name} ---")
-
-    # --- Steem and Account Info Setup ---
-    try:
-        steem_api = config.get('STEEM', 'STEEM_API', fallback=None)
-        s = Steem(node=steem_api) if steem_api else Steem()
-        account_info = s.get_account(author_name)
-        if not account_info:
-            print(f"Error: Could not find Steem account for '{author_name}'")
-            sys.exit(1)
-        # Create a dummy comment object required by some validation functions
-        comment = {'author': author_name, 'timestamp': datetime.utcnow()} 
-    except Exception as e:
-        print(f"Error connecting to Steem or getting account info: {e}")
-        sys.exit(1)
-
-    # --- Run Individual Validation Checks ---
-    
-    # Whitelist/Blacklist checks
-    print("\n--- General Screening ---")
-    is_whitelisted = authorValidation.isAuthorWhitelisted(author_name)
-    print(f"Is Whitelisted: {is_whitelisted}")
-    
-    is_blacklisted = authorValidation.isBlacklisted(author_name, steem_instance=s)
-    print(f"Is Blacklisted: {is_blacklisted}")
-
-    # If whitelisted, other checks are skipped by the main logic.
-    if is_whitelisted:
-        print("\nNOTE: Author is whitelisted. The main screening process would stop here and accept the post.")
-        print("Continuing with other checks for informational purposes only.")
-    
-    # Author checks from authorValidation.py
-    print("\n--- Author Validation ---")
-    
-    # Reputation
-    min_rep = config.getint('AUTHOR', 'MIN_REPUTATION')
-    author_rep = authorValidation.rep_log10(account_info['reputation'])
-    rep_too_low = authorValidation.isRepTooLow(account_info['reputation'])
-    print(f"Reputation: {author_rep:.2f} (Min: {min_rep}, Is Too Low: {rep_too_low})")
-
-    # Inactivity
-    max_inactive_days = config.getint('AUTHOR', 'MAX_INACTIVITY_DAYS')
-    days_inactive = authorValidation.inactiveDays(author_name, steem_instance=s)
-    is_inactive = authorValidation.isInactive(account_info, steem_instance=s)
-    print(f"Days Inactive: {days_inactive} (Max: {max_inactive_days}, Is Inactive: {is_inactive})")
-
-    # Hive Activity
-    last_hive_age = config.getint('AUTHOR', 'MIN_HIVE_INACTIVITY_HARD', fallback=7)
-    hive_too_recent = authorValidation.isHiveActivityTooRecent(author_name)
-    print(f"Hive Activity Too Recent (less than {last_hive_age} days ago): {hive_too_recent}")
-
-    # Blurt Activity
-    last_blurt_age = config.getint('AUTHOR', 'MIN_BLURT_INACTIVITY_HARD', fallback=7)
-    blurt_too_recent = authorValidation.isBlurtActivityTooRecent(author_name)
-    print(f"Blurt Activity Too Recent (less than {last_blurt_age} days ago): {blurt_too_recent}")
-
-    # Follower counts
-    min_followers = config.getint('AUTHOR', 'MIN_FOLLOWERS')
-    follower_count = s.get_follow_count(author_name)['follower_count']
-    followers_too_low = authorValidation.isFollowerCountTooLow(author_name, steem_instance=s)
-    print(f"Follower Count: {follower_count} (Min: {min_followers}, Is Too Low: {followers_too_low})")
-
-    # Monthly followers
-    min_monthly_followers = config.getint('AUTHOR', 'MIN_FOLLOWERS_PER_MONTH')
-    monthly_followers = authorValidation.followersPerMonth(account_info, comment, steem_instance=s)
-    monthly_too_low = authorValidation.isMonthlyFollowersTooLow(account_info, comment, steem_instance=s)
-    print(f"Followers/Month: {monthly_followers:.2f} (Min: {min_monthly_followers}, Is Too Low: {monthly_too_low})")
-
-    # Adjusted monthly followers
-    min_adj_monthly_followers = config.getint('AUTHOR', 'MIN_ADJUSTED_FOLLOWERS_PER_MONTH')
-    half_life_years = config.getfloat('AUTHOR', 'FOLLOWER_HALFLIFE_YEARS')
-    adj_monthly_followers = authorValidation.adjustedFollowersPerMonth(account_info, comment, halfLife=half_life_years * 365.25, steem_instance=s)
-    adj_monthly_too_low = authorValidation.isAdjustedMonthlyFollowersTooLow(account_info, comment, steem_instance=s)
-    print(f"Adjusted Followers/Month (Half-life: {half_life_years} yrs): {adj_monthly_followers:.2f} (Min: {min_adj_monthly_followers}, Is Too Low: {adj_monthly_too_low})")
-
-    # Active followers
-    min_active_followers = config.getint('AUTHOR', 'MIN_ACTIVE_FOLLOWERS')
-    print(f"Checking for at least {min_active_followers} active followers... (this may take a while)")
-    active_followers_too_low = authorValidation.isActiveFollowerCountTooLow(author_name, steem_instance=s)
-    print(f"Active Follower Count Too Low: {active_followers_too_low}")
-
-    # Median follower rep
-    min_median_rep = config.getint('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP')
-    print(f"Calculating median follower reputation... (this may take a while)")
-    median_rep = authorValidation.getMedianFollowerRep(author_name, steem_instance=s)
-    if median_rep is not None:
-        median_rep_too_low = median_rep < min_median_rep
-        if median_rep_too_low:
-            print(f"DEBUG: isAuthorScreened({comment['author']}) -> median follower rep {median_rep} < MIN_FOLLOWER_MEDIAN_REP {config.getint('AUTHOR', 'MIN_FOLLOWER_MEDIAN_REP')}: True")
-            print(f"Median Follower Rep: {median_rep:.2f} (Min: {min_median_rep}, Is Too Low: {median_rep_too_low})")
-        else:
-            print(f"Median Follower Rep: {median_rep:.2f} (Min: {min_median_rep}, Is Too Low: {median_rep_too_low})")
+    if '/' in target:
+        author, permlink = target.split('/', 1)
     else:
-        print(f"Median Follower Rep: Could not calculate for {author_name}.  (no followers).")
-    # if median_rep_raw is not None:
-    #     median_rep_ui = authorValidation.rep_log10(median_rep_raw)
-    #     median_rep_too_low = median_rep_ui < min_median_rep.real
-    #     print(f"Median Follower Rep: {median_rep_ui:.2f} (Min: {min_median_rep}, Is Too Low: {median_rep_too_low})")
-    # else:
-    #     print("Median Follower Rep: Could not calculate (no followers).")
+        author = target
 
-    # --- Engagement Validation ---
-    print("\n--- Engagement Validation ---")
-    # We need a more complete comment object for engagement checks
+    # 1. Load and Validate Configuration
+    validator = ConfigValidator()
+
+    # Diagnostic tools don't need private keys or API keys to evaluate rules/scores.
+    # Inject dummy environment variables to satisfy strict config validation.
+    os.environ.setdefault('UNLOCK', 'diagnostic_dummy_value')
+    os.environ.setdefault('LLMAPIKEY', 'diagnostic_dummy_value')
+
+    if not validator.validate_config():
+        print("\n[!] FATAL: Configuration validation failed:")
+        for error in validator.get_errors():
+            print(f"  - {error}")
+        sys.exit(1)
+
+    # 2. Initialize Steem connection
+    steem_api = validator.config.get('STEEM', 'STEEM_API', fallback=None)
+    print(f"Connecting to Steem node: {steem_api if steem_api else 'Default'}...")
+    s = initialize_steem_with_retry(node_api=steem_api)
+    if not s:
+        print("\n[!] FATAL: Could not connect to Steem blockchain.")
+        sys.exit(1)
+
+    # 3. Retrieve Post Content
     try:
-        posts = s.get_discussions_by_author_before_date(author_name, None, datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'), 1)
-        if posts:
-            full_comment_object = posts[0]
-            print(f"Using post '{full_comment_object['title']}' for engagement test.")
-            # The timestamp in the object from get_discussions_by_author_before_date is a string
-            # but hasLowEngagement expects a datetime object. Let's fix that.
-            full_comment_object['timestamp'] = datetime.strptime(full_comment_object['created'], '%Y-%m-%dT%H:%M:%S')
-            
-            low_engagement = engagementValidation.hasLowEngagement(full_comment_object)
-            print(f"Has Low Engagement: {low_engagement}")
+        if not permlink:
+            print(f"Fetching latest post for @{author}...")
+            # Fetch most recent post to perform a full check (including engagement/content rules)
+            posts = s.get_discussions_by_author_before_date(author, None, datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%S'), 1)
+            if not posts:
+                print(f"Error: No posts found for user @{author}.")
+                sys.exit(1)
+            post = posts[0]
+            permlink = post['permlink']
         else:
-            print("Could not retrieve a recent post for the author to run engagement test.")
-            print("Skipping engagement test.")
+            print(f"Fetching post @{author}/{permlink}...")
+            post = s.get_content(author, permlink)
+            if not post or not post.get('author'):
+                print(f"Error: Could not find post @{author}/{permlink}.")
+                sys.exit(1)
+
+        # Construct simulated stream data (required for hybrid screening)
+        post_data = {
+            'author': post['author'],
+            'permlink': post['permlink'],
+            'timestamp': datetime.strptime(post['created'], '%Y-%m-%dT%H:%M:%S'),
+            'title': post['title'],
+            'body': post['body'],
+            'net_votes': post.get('net_votes', 0),
+            'children': post.get('children', 0),
+            'pending_payout_value': post.get('pending_payout_value', '0.000 SBD'),
+            'total_payout_value': post.get('total_payout_value', '0.000 SBD')
+        }
+
     except Exception as e:
-        print(f"Error during engagement test: {e}")
-        print("Skipping engagement test.")
+        print(f"\n[!] Error retrieving blockchain data: {e}")
+        sys.exit(1)
+
+    # 4. Initialize the modern Hybrid Screening system
+    print("Initializing Hybrid Screening engine...")
+    hybrid_screening = HybridScreening(s, validator)
+    
+    print(f"\n{'='*60}")
+    print(f" THOTH DIAGNOSTIC REPORT: @{author}/{permlink}".center(60))
+    print(f"{'='*60}\n")
+    
+    # 5. Execute Screening (Rule-based then Score-based)
+    # Use None for included_posts to ignore author daily limits for this test
+    result = hybrid_screening.screen_content(post_data, latest_content=post, included_posts=None)
+    
+    # 6. Display Detailed Results
+    status = result['status'].upper()
+    reason = result['reason']
+    rule_type = result['rule_type']
+    
+    # 5b. Detailed Author Status (Independent of this specific post)
+    print(f"--- Author Status Summary (@{author}) ---")
+    
+    # Curation History usage
+    daily_limit = validator.get_int('HISTORY', 'MAX_AUTHOR_PER_DAY', 1)
+    daily_count = hybrid_screening.curation_history.get_author_curation_count(author, days=1)
+    weekly_limit = validator.get_int('HISTORY', 'MAX_AUTHOR_PER_WEEK', 2)
+    weekly_count = hybrid_screening.curation_history.get_author_curation_count(author, days=7)
+    
+    # Fetch account data for live status checks
+    account_data = s.get_account(author)
+    raw_rep = account_data.get('reputation', 0)
+    rep_val = rep_log10(raw_rep)
+    min_rep = validator.get_int('AUTHOR', 'MIN_REPUTATION', 0)
+    
+    status_bl  = isBlacklisted(author, steem_instance=s)
+    status_wl  = isAuthorWhitelisted(author)
+    status_rep = isRepTooLow(raw_rep)
+    days_inact = inactiveDays(author, steem_instance=s)
+    max_inact  = validator.get_int('AUTHOR', 'MAX_INACTIVITY_DAYS', 0)
+    hive_act   = isHiveActivityTooRecent(author)
+    blurt_act  = isBlurtActivityTooRecent(author)
+    wallet_flg = walletScreened(author, steem_instance=s)
+
+    print(f"  Blacklisted      : {'FAIL' if status_bl else 'PASS'}")
+    print(f"  Whitelisted      : {'YES' if status_wl else 'NO'}")
+    print(f"  Reputation       : {rep_val:.2f} (Min: {min_rep}) -> {'PASS' if not status_rep else 'FAIL'}")
+    print(f"  Steem Inactivity : {days_inact} days (Max: {max_inact}) -> {'PASS' if max_inact == 0 or days_inact <= max_inact else 'FAIL'}")
+    print(f"  Hive Activity    : {'FAIL (Too Recent)' if hive_act else 'PASS'}")
+    print(f"  Blurt Activity   : {'FAIL (Too Recent)' if blurt_act else 'PASS'}")
+    print(f"  Wallet Screening : {'FAIL (Flagged)' if wallet_flg else 'PASS'}")
+    print(f"  Curation History : Daily {daily_count}/{daily_limit}, Weekly {weekly_count}/{weekly_limit}")
+    
+    # Broad eligibility calculation
+    # Whitelisted authors pass unless blacklisted. 
+    # Regular authors must pass all checks and be within history limits.
+    author_eligible = not status_bl and (status_wl or (not status_rep and (max_inact == 0 or days_inact <= max_inact) and not hive_act and not blurt_act and not wallet_flg and daily_count < daily_limit and weekly_count < weekly_limit))
+    
+    print(f"  AUTHOR ELIGIBLE  : {'YES' if author_eligible else 'NO'}")
+    print(f"{'-'*40}\n")
+
+    # 6. Display Specific Post Result
+    print(f"DECISION        : {status}")
+    print(f"REASON          : {reason}")
+    print(f"RULE CATEGORY   : {rule_type}")
+    
+    if result.get('score_result'):
+        score = result['score_result']
+        print(f"QUALITY TIER    : {result['quality_tier'].upper()}")
+        print(f"TOTAL SCORE     : {result['total_score']:.2f} / 100.00")
         
-    # Wallet checks from walletValidation.py
-    print("\n--- Wallet Validation ---")
-    wallet_passes = walletValidation.check_author_wallet(author_name)
-    print(f"Passes Basic Wallet Screen (delegation % & undelegated SP): {wallet_passes}")
+        print(f"\nCOMPONENT BREAKDOWN:")
+        print(f"  - Author Quality    : {score['components']['author']:.2f}")
+        print(f"  - Content Quality   : {score['components']['content']:.2f}")
+        print(f"  - Engagement Quality: {score['components']['engagement']:.2f}")
+        
+        print(f"\nMETRICS SUMMARY:")
+        details = score['details']
+        print(f"  - Net Votes         : {details.get('net_votes', 'N/A')}")
+        print(f"  - Comments          : {details.get('children', 'N/A')}")
+        print(f"  - Payout Value      : {details.get('pending_payout_value', 'N/A')} (pending) / {details.get('total_payout_value', 'N/A')} (total)")
+        print(f"  - Tags              : {', '.join(details.get('tags', []))}")
+        print(f"  - Created           : {details.get('created', 'N/A')}")
+    else:
+        print("\n[!] NOTE: Scoring was bypassed.")
+        print("This post was rejected (or whitelisted) by a rule-based constraint before")
+        print("it could be evaluated by the scoring engine.")
 
-    wallet_screened = walletValidation.walletScreened(author_name)
-    print(f"Is Screened by Voting Service Delegation: {wallet_screened}")
-
-    # Overall screening result from utils.screenPost (which calls authorValidation and walletValidation)
-    print("\n--- Overall Result from utils.screenPost ---")
-    # We need a more complete comment object for screenPost
-    # Let's get a recent post from the author to test with
-    try:
-        posts = s.get_discussions_by_author_before_date(author_name, None, datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%S'), 1)
-        if posts:
-            full_comment_object = posts[0]
-            print(f"Using post '{full_comment_object['title']}' for full screening test.")
-            # The timestamp in the object from get_discussions_by_author_before_date is a string
-            # but isEdit expects a datetime object. Let's fix that.
-            full_comment_object['timestamp'] = datetime.strptime(full_comment_object['created'], '%Y-%m-%dT%H:%M:%S')
-            
-            screen_result = utils.screenPost(full_comment_object)
-            print(f"utils.screenPost result: '{screen_result}'")
-        else:
-            print("Could not retrieve a recent post for the author to run a full screenPost test.")
-            print("Running author-only screening via isAuthorScreened...")
-            if authorValidation.isAuthorScreened(comment):
-                 print("isAuthorScreened result: Screened (FAIL)")
-            else:
-                 print("isAuthorScreened result: Not Screened (PASS)")
-
-    except Exception as e:
-        print(f"Error during full screenPost test: {e}")
+    print(f"\n{'='*60}")
 
 if __name__ == "__main__":
     main()

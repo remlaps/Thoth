@@ -562,7 +562,7 @@ def getLastRemoteActivityDate(account, chain):
     if chain.lower() == 'hive':
         url = "https://api.hive.blog"
     elif chain.lower() == 'blurt':
-        url = "https://rpc.blurt.world"
+        url = "https://rpc.blurt.blog"
     else:
         logger.error(f"Unsupported chain requested: {chain}")
         return None

@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.10] - 2026-04-13
+### Added
+- **Diagnostics Tool**: Completely rebuilt `tools/checkValidation.py` from the ground up to use the production `HybridScreening` engine.
+  - Supports both `@author` (checks latest post) and `@author/permlink` targets.
+  - Provides a comprehensive "Author Status Summary" including eligibility checks, history usage, and wallet flags.
+  - Displays detailed score breakdowns for Author, Content, and Engagement quality metrics.
+  - Injects dummy keys to allow diagnostic runs without active private keys or LLM API access.
+### Fixed
+- **Wallet Validation**: Resolved issue where delegations to uncounted services (e.g., steem-atlas) were still being penalized.
+  - Implemented robust name normalization for the `UNCOUNTED_DELEGATEE_FILE` list (lowercase matching and `@` prefix removal).
+  - Updated `MIN_UNDELEGATED_SP` check to treat "safe" delegations (Thoth + Uncounted list) as part of the author's available skin-in-the-game.
+  - Fixed case-sensitivity when matching the Thoth posting account in delegation lists.
+- **Content Logic**: Fixed `KeyError` crashes in the scoring engine when blockchain data (e.g., `net_votes`, `children`) is missing or malformed by implementing safe defaults.
+- **Content Logic**: Fixed a crash in the `isEdit` rule that occurred when the post body was absent.
+- **Maintenance**: Updated `checkValidation.py` to use timezone-aware UTC objects, resolving Python deprecation warnings.
+
 ## [0.1.9] - 2026-04-09
 ### Added
 - **Feed Reach Screening System**: New rule in hybrid screening sequence based on post visibility metrics

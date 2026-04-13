@@ -34,7 +34,7 @@ def isTooShortHard(text_or_count):
     return count < minWords
 
 def isEdit(comment, steem_instance=None, latest_content=None):
-    if (comment['body'][:2] == '@@'):  ## Edited post (better check needed)
+    if 'body' in comment and comment['body'].startswith('@@'):  ## Edited post (better check needed)
         return True
     
     if latest_content:
