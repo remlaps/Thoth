@@ -75,8 +75,13 @@ def main():
             if not posts:
                 print(f"Error: No posts found for user @{author}.")
                 sys.exit(1)
-            post = posts[0]
+            # The discussion summary API can return stale net_votes.
+            # We need to get the permlink from the summary, then fetch the full content.
+            summary_post = posts[0]
+            post = s.get_content(author, summary_post['permlink'])
             permlink = post['permlink']
+            # Re-fetch the full content to ensure we have live engagement metrics (net_votes, etc.)
+            post = s.get_content(author, permlink)
         else:
             print(f"Fetching post @{author}/{permlink}...")
             post = s.get_content(author, permlink)

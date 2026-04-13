@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Provides a comprehensive "Author Status Summary" including eligibility checks, history usage, and wallet flags.
   - Displays detailed score breakdowns for Author, Content, and Engagement quality metrics.
   - Injects dummy keys to allow diagnostic runs without active private keys or LLM API access.
+### Changed
+- **Diagnostic Tool**: `checkValidation.py` now explicitly re-fetches full post content using `get_content` after identifying the latest post by an author. This resolves an issue where `net_votes` and other engagement metrics were reported as 0 due to stale data from `get_discussions_by_author_before_date` summary calls.
+- **Content Scoring**: Enhanced `contentScoring.py` to robustly calculate `net_votes`. If `net_votes` is reported as 0 but `active_votes` are present, the count of `active_votes` is used as a fallback.
+
 ### Fixed
 - **Wallet Validation**: Resolved issue where delegations to uncounted services (e.g., steem-atlas) were still being penalized.
   - Implemented robust name normalization for the `UNCOUNTED_DELEGATEE_FILE` list (lowercase matching and `@` prefix removal).
