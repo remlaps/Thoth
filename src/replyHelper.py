@@ -7,6 +7,7 @@ import delegationInfo
 import threading
 import utils
 import steembase.exceptions # Required for specific exception handling
+from steemHelpers import initialize_steem_with_retry
 from localization import Localization
 
 # Create a ConfigParser object
@@ -79,14 +80,14 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
     vote_interval_retry_delay_base = 3 # Base delay for vote interval errors (Steem rule)
     max_retries = 20
     retries = 0
+    steemApi = config.get('STEEM', 'STEEM_API')
 
     print(f"Vote for @{postingAccount}/{permlink} scheduled. Waiting {initialWaitSeconds // 60} minutes before first attempt...")
     time.sleep(initialWaitSeconds)
 
     while retries < max_retries:
+        s_instance = initialize_steem_with_retry(node_api=steemApi)
         try:
-            # Using simple Steem() instantiation as per current design in this function
-            s_instance = Steem()
             print(f"Attempting to vote for @{postingAccount}/{permlink} (Attempt {retries + 1}/{max_retries})...")
             s_instance.commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
             print(f"Successfully voted for @{postingAccount}/{permlink}")
@@ -125,14 +126,9 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
 
     # Connect to the STEEM blockchain
     randValue = ''.join(random.choices(string.ascii_lowercase, k=10))
-    if ( steemApi and postingKey):
-        s = Steem(keys=[postingKey], nodes=[steemApi])
-    elif ( steemApi ):
-        s = Steem(nodes=[steemApi])
-    elif ( postingKey ):
-        s = Steem(keys=[postingKey])
-    else:
-        s = Steem()
+    s = initialize_steem_with_retry(node_api=steemApi, keys=[postingKey] if postingKey else None)
+    if not s:
+        return False
 
     # Get the model that was actually used (from model_manager if provided, otherwise use config)
     if model_manager:

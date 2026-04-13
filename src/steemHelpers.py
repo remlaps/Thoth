@@ -9,16 +9,17 @@ from steem.blockchain import Blockchain
 config = configparser.ConfigParser()
 config.read('config/config.ini')
 
-def initialize_steem_with_retry(node_api=None, max_retries=5, initial_delay=1.0):
+def initialize_steem_with_retry(node_api=None, keys=None, max_retries=5, initial_delay=1.0):
     """
     Initializes the Steem instance with a retry mechanism for connection errors.
     """
     for attempt in range(max_retries):
         try:
+            nodes = [node_api] if node_api else None
             if node_api:
-                s = Steem(node=node_api)
+                s = Steem(nodes=nodes, keys=keys)
             else:
-                s = Steem()
+                s = Steem(keys=keys)
 
             # The Steem() constructor implicitly calls get_dynamic_global_properties(),
             # which is where the UnboundLocalError from the traceback can occur.

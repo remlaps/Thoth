@@ -3,6 +3,7 @@ from decimal import Decimal
 import configparser
 import logging
 
+from steemHelpers import initialize_steem_with_retry
 import utils
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,6 @@ config = configparser.ConfigParser()
 config.read('config/config.ini')
 
 steemApi = config.get('STEEM', 'STEEM_API')
-s = Steem(node=steemApi) if steemApi else Steem()
 
 screenedDelegateeFile = config.get('WALLET', 'SCREENED_DELEGATEE_FILE')
 uncountedDelegateeFile = config.get('WALLET', 'UNCOUNTED_DELEGATEE_FILE')
@@ -31,7 +31,10 @@ def _get_authors_delegation_to_thoth(author: str, steem_instance=None) -> Decima
         If the author makes no delegations to Thoth, returns Decimal('0').
     """
     steemApi = config.get('STEEM', 'STEEM_API')
-    s = steem_instance or (Steem(node=steemApi) if steemApi else Steem())
+    s = steem_instance or initialize_steem_with_retry(node_api=steemApi)
+    if not s:
+        return Decimal('0')
+        
     thothAccount = config.get('STEEM', 'POSTING_ACCOUNT', fallback='').strip().lower().replace('@', '')
                               
     last_delegatee = ''
@@ -70,7 +73,9 @@ def _get_account_vesting_info(author: str, steem_instance=None) -> tuple[float |
         or (None, None, None) if the account is not found or data is missing.
     """
     steemApi = config.get('STEEM', 'STEEM_API')
-    s = steem_instance or (Steem(node=steemApi) if steemApi else Steem())
+    s = steem_instance or initialize_steem_with_retry(node_api=steemApi)
+    if not s:
+        return None, None, None
 
     try:
         account = s.get_account(author)
@@ -123,7 +128,9 @@ def totalScreenedOrIgnoredDelegations (delegator, delegateeFile=screenedDelegate
         return 0.0
     
     steemApi = config.get('STEEM', 'STEEM_API')
-    s = steem_instance or (Steem(node=steemApi) if steemApi else Steem())
+    s = steem_instance or initialize_steem_with_retry(node_api=steemApi)
+    if not s:
+        return 0.0
 
     try:
         with open(delegateeFile, 'r') as f:
@@ -176,9 +183,12 @@ def _isPowerDownTooHigh(author: str, steemInstance=None) -> bool:
 
     if ( not steemInstance ):
         steemApi = config.get('STEEM', 'STEEM_API')
-        s = Steem(node=steemApi) if steemApi else Steem()
+        s = initialize_steem_with_retry(node_api=steemApi)
     else:
         s = steemInstance
+    
+    if not s:
+        return False
 
     try:
         authorAccountJson = s.get_account(author)

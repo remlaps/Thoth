@@ -9,6 +9,7 @@ import delegationInfo
 import threading
 import utils
 from localization import Localization
+from steemHelpers import initialize_steem_with_retry
 
 import replyHelper # From the thoth package
 
@@ -78,15 +79,17 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
     Waits for an initial period, then attempts to vote in a loop until successful.
     Retries every 3 seconds upon any failure.
     """
-    s_vote = Steem()
+    steemApi = config.get('STEEM', 'STEEM_API')
     retry_delay_seconds = 3
+    max_retries = 20
+    retries = 0
 
     print(f"Waiting {initialWaitSeconds // 60} minutes before attempting to vote for @{postingAccount}/{permlink}...")
     time.sleep(initialWaitSeconds)
-    max_retries=20
-    retries=0
 
     while retries < max_retries:
+        # Re-initialize or get instance inside loop for retry resilience
+        s_vote = initialize_steem_with_retry(node_api=steemApi)
         try:
             print(f"Attempting to vote for @{postingAccount}/{permlink}...")
             s_vote.commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
@@ -103,14 +106,9 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
 
     # Connect to the STEEM blockchain
     randValue = ''.join(random.choices(string.ascii_lowercase, k=10))
-    if ( steemApi and postingKey):
-        s = Steem(keys=[postingKey], nodes=[steemApi])
-    elif ( steemApi ):
-        s = Steem(nodes=[steemApi])
-    elif ( postingKey ):
-        s = Steem(keys=[postingKey])
-    else:
-        s = Steem()
+    s = initialize_steem_with_retry(node_api=steemApi, keys=[postingKey] if postingKey else None)
+    if not s:
+        return False
 
     # Get the model that was actually used (from model_manager if provided, otherwise use config)
     if model_manager:

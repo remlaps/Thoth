@@ -8,6 +8,7 @@ import logging
 import time
 
 import utils
+from steemHelpers import initialize_steem_with_retry
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -44,10 +45,10 @@ def rep_log10(rep):
     return round(out, 2)
 
 def isBlacklisted(account, steem_instance=None, registryAccount=None):
-    steemApi = config.get('STEEM', 'STEEM_API')
-    # Use provided Steem instance or create a new one
-    nodes = [n.strip() for n in steemApi.split(',')] if steemApi else None
-    s = steem_instance or Steem(node=nodes)
+    # Use provided Steem instance or initialize from config
+    s = steem_instance or initialize_steem_with_retry(node_api=config.get('STEEM', 'STEEM_API'))
+    if not s:
+        return False
     
     if not registryAccount:
         registryAccount = config.get('CONTENT', 'REGISTRY_ACCOUNT')
@@ -82,10 +83,9 @@ def isAuthorWhitelisted(account):
     return account in whiteList
 
 def isAuthorScreened(comment, included_posts=None, steem_instance=None):
-    steemApi = config.get('STEEM', 'STEEM_API')
-    # Create a single Steem instance to be reused by all validation functions
-    nodes = [n.strip() for n in steemApi.split(',')] if steemApi else None
-    s = steem_instance or Steem(node=nodes)
+    s = steem_instance or initialize_steem_with_retry(node_api=config.get('STEEM', 'STEEM_API'))
+    if not s:
+        return True # Screen if we can't connect
 
     if included_posts is not None:
         max_posts = config.getint('AUTHOR', 'MAX_INCLUDED_POSTS_PER_AUTHOR', fallback=1)
@@ -203,11 +203,13 @@ def isFollowerCountTooLow(commentAuthor, steem_instance=None, cached_count=None)
     if cached_count is not None:
         followerCount = cached_count
     else:
-        s = steem_instance or Steem()
+        s = steem_instance or initialize_steem_with_retry(node_api=config.get('STEEM', 'STEEM_API'))
+        if not s:
+            return False
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                followerCount = s.get_follow_count(commentAuthor)['follower_count']
+                followerCount = s.get_follow_count(commentAuthor).get('follower_count', 0)
                 break
             except Exception as e:
                 if attempt < max_retries - 1:
@@ -222,7 +224,9 @@ def followersPerMonth(accountInfo, comment, steem_instance=None, cached_count=No
     if cached_count is not None:
         followerCount = cached_count
     else:
-        s = steem_instance or Steem()
+        s = steem_instance or initialize_steem_with_retry(node_api=config.get('STEEM', 'STEEM_API'))
+        if not s:
+            return float('inf')
         followerCount = 0
         max_retries = 3
         for attempt in range(max_retries):
@@ -249,7 +253,9 @@ def adjustedFollowersPerMonth(accountInfo, comment, halfLife=365.25 * 1, steem_i
     if cached_count is not None:
         followerCount = cached_count
     else:
-        s = steem_instance or Steem()
+        s = steem_instance or initialize_steem_with_retry(node_api=config.get('STEEM', 'STEEM_API'))
+        if not s:
+            return float('inf')
         followerCount = 0
         max_retries = 3
         for attempt in range(max_retries):
@@ -318,7 +324,10 @@ def isActiveFollowerCountTooLow(accountName, steem_instance=None):
         max_inactivity_days = config.getint('AUTHOR', 'MAX_FOLLOWER_INACTIVITY_DAYS')
         min_followers_needed = config.getint('AUTHOR', 'MIN_ACTIVE_FOLLOWERS')
         
-        s = steem_instance or Steem()
+        s = steem_instance or initialize_steem_with_retry(node_api=config.get('STEEM', 'STEEM_API'))
+        if not s:
+            return True
+            
         followers_data = getAllFollowers(accountName, steem_instance=s)
         
         # Extract follower names for batch processing
@@ -388,7 +397,9 @@ def isInactive(accountInfo, steem_instance=None):
     return days > config.getint('AUTHOR','MAX_INACTIVITY_DAYS')
 
 def inactiveDays(accountName, steem_instance=None):
-    s = steem_instance or Steem()
+    s = steem_instance or initialize_steem_with_retry(node_api=config.get('STEEM', 'STEEM_API'))
+    if not s:
+        return 0
     max_retries = 3
     for attempt in range(max_retries):
         try:
@@ -428,7 +439,10 @@ def getAllFollowers(account, account_type='blog', steem_instance=None):
    Returns:
        list: A list of all follower data
    """
-   s = steem_instance or Steem()
+   s = steem_instance or initialize_steem_with_retry(node_api=config.get('STEEM', 'STEEM_API'))
+   if not s:
+       return []
+       
    all_followers = []
    batch_size = 1000
    last_account = ''

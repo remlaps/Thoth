@@ -6,6 +6,7 @@ import re
 import requests
 import time
 import logging
+from steemHelpers import initialize_steem_with_retry
 
 # Create a ConfigParser object
 config = configparser.ConfigParser()
@@ -40,7 +41,9 @@ def isEdit(comment, steem_instance=None, latest_content=None):
     if latest_content:
         content = latest_content
     else:
-        s = steem_instance or Steem()
+        s = steem_instance or initialize_steem_with_retry(node_api=config.get('STEEM', 'STEEM_API'))
+        if not s:
+            return False
         content = s.get_content(comment['author'], comment['permlink'])
         
     postCreated = datetime.strptime(content['created'], '%Y-%m-%dT%H:%M:%S')
