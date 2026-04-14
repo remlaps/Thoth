@@ -75,7 +75,7 @@ def create_beneficiary_list(beneficiary_list):
     # Return the beneficiaries list to be inserted into extensions
     return beneficiary_dicts
 
-def vote_in_background(postingAccount, permlink, voteWeight=100):
+def vote_in_background(postingAccount, permlink, voteWeight=100, keys=None):
     """
     Waits for an initial period, then attempts to vote in a loop until successful.
     Retries every 3 seconds upon any failure.
@@ -90,7 +90,7 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
 
     while retries < max_retries:
         # Re-initialize or get instance inside loop for retry resilience
-        s_vote = initialize_steem_with_retry(node_api=steemApi)
+        s_vote = initialize_steem_with_retry(node_api=steemApi, keys=keys)
         try:
             print(f"Attempting to vote for @{postingAccount}/{permlink}...")
             s_vote.commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
@@ -301,7 +301,8 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
         return False
     
     if not dry_run:
-        voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, votePercent))
+        posting_keys = [postingKey] if postingKey else None
+        voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, votePercent, posting_keys))
         voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
         voting_thread.start()
         active_voting_threads.append(voting_thread) # Add the main post's voting thread

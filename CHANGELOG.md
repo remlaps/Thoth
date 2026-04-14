@@ -31,6 +31,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Content Logic**: Fixed `KeyError` crashes in the scoring engine when blockchain data (e.g., `net_votes`, `children`) is missing or malformed by implementing safe defaults.
 - **Content Logic**: Fixed a crash in the `isEdit` rule that occurred when the post body was absent.
 - **Maintenance**: Updated `checkValidation.py` to use timezone-aware UTC objects, resolving Python deprecation warnings.
+- **Authentication**: Ensured background voting threads correctly inherit signing authority (either via `UNLOCK` environment variable or explicit `POSTING_KEY`).
+- **Robustness**: Updated `vote_in_background` signatures in `postHelper.py` and `replyHelper.py` to support passing keys to the retry-enabled Steem initializer.
 
 ## [0.1.9] - 2026-04-09
 ### Added

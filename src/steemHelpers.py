@@ -1,6 +1,7 @@
 import time
 import requests
 import configparser
+import os
 
 from steem import Steem
 from steem.blockchain import Blockchain
@@ -9,7 +10,7 @@ from steem.blockchain import Blockchain
 config = configparser.ConfigParser()
 config.read('config/config.ini')
 
-def initialize_steem_with_retry(node_api=None, keys=None, max_retries=5, initial_delay=1.0):
+def initialize_steem_with_retry(node_api=None, keys=None, max_retries=5, initial_delay=2.0):
     """
     Initializes the Steem instance with a retry mechanism for connection errors.
     """
@@ -23,8 +24,13 @@ def initialize_steem_with_retry(node_api=None, keys=None, max_retries=5, initial
             else:
                 nodes = None
 
-            # Initialize Steem. If keys is None, the library uses the UNLOCK env var.
-            s = Steem(nodes=nodes, keys=keys)
+            # Initialize Steem. 
+            if "UNLOCK" in os.environ:
+                print("UNLOCK environment variable detected. Initializing Steem without keys.")
+                s = Steem(nodes=nodes)
+            else:
+                print("UNLOCK environment variable not detected. Initializing Steem with keys.")
+                s = Steem(nodes=nodes, keys=keys)
 
             # The Steem() constructor implicitly calls get_dynamic_global_properties(),
             # which is where the UnboundLocalError from the traceback can occur.
