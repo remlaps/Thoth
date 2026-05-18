@@ -128,6 +128,13 @@ def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=N
         'Authorization': f"Bearer {llmKey}"
     }
 
+    # Baseline parameters for modern LLMs (Summarization/Curation context)
+    temperature = 0.7
+    top_p = 0.9
+
+    # Adjust ArliAI specifics (Qwen context)
+    is_arliai = llmUrl.startswith("https://api.arliai.com")
+
     # Try models in sequence if rate limiting occurs
     while True:
         current_model = model_manager.current_model
@@ -135,19 +142,19 @@ def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=N
         payloadDict = {
             "model": current_model,
             "messages": construct_messages(llmUrl, current_model, systemPrompt, f"{curationPrompt}\n\n## ARTICLE FOR EVALUATION\n\n{postBody}"),
-            "temperature": 0.3,
-            "top_p": 0.85,
+            "temperature": temperature,
+            "top_p": top_p,
             "max_tokens": maxTokens,
             "stream": False,
             "stop": ["END_OF_CURATION_REPORT"]
         }
 
-        if llmUrl.startswith("https://api.arliai.com"):  # VLLM API/models
-            payloadDict["repetition_penalty"] = 1.1
-            payloadDict["top_k"] = 40
+        if is_arliai:
             payloadDict["frequency_penalty"] = 0.3
             payloadDict["presence_penalty"] = 0.3
-            payloadDict["min_p"] = 0.0
+            payloadDict["repetition_penalty"] = 1.1
+            payloadDict["top_k"] = 40
+            payloadDict["min_p"] = 0.05
 
         payload = json.dumps(payloadDict)
 
@@ -166,7 +173,7 @@ def aicurate(llmKey, llmModel, llmUrl, postBody, maxTokens=8192, model_manager=N
                 # The re.DOTALL flag ensures that the pattern matches even if the block spans multiple lines.
                 # .strip() removes any leading/trailing whitespace left after the removal.
                 cleanedResponse = re.sub(r'<think>.*?</think>', '', str(rawResponse), flags=re.DOTALL).strip()
-                cleanedResponse = re.sub(r'<thought>.*?</thought>', '', str(rawResponse), flags=re.DOTALL).strip()
+                cleanedResponse = re.sub(r'<thought>.*?</thought>', '', cleanedResponse, flags=re.DOTALL).strip()
 
                 post_id = f"@{author}/{permlink}" if author and permlink else "Unknown Post"
                 

@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.11] - 2026-04-15
+### Added
+- **New Stream Type**: Introduced `TIME_WEIGHTED_RANDOM` in `main.py`, allowing users to bias block selection toward recent activity via the new `STREAM_TIME_WEIGHT` configuration setting.
+### Changed
+- **AI Model Parameters**: Standardized baseline parameters (`temperature` 0.7, `top_p` 0.9) and refined ArliAI-specific settings (`min_p` 0.05) to improve the creative quality of curation summaries and introductions.
+- **Prompt Construction**: Simplified `promptHelper.py` by standardizing on System/User role separation for all providers, removing legacy message-merging logic used for specific model combinations.
+- **Logic Refactoring**: Consistently implemented payload construction within the model-selection loops in `aiCurator.py` and `aiIntro.py`.
+### Fixed
+- **AI Response Cleaning**: Resolved a logic error in regex post-processing where reasoning blocks (`<thought>` tags) were being stripped from the raw response instead of the intermediate cleaned string, ensuring reliable removal of internal AI thoughts.
+
 ## [0.1.10] - 2026-04-13
 ### Added
 - **Diagnostics Tool**: Completely rebuilt `tools/checkValidation.py` from the ground up to use the production `HybridScreening` engine.

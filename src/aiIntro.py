@@ -103,26 +103,18 @@ def aiIntro(llmKey, llmModel, llmUrl, startTime, endTime, combinedComment, maxTo
     except Exception as e:
         logging.error(f"Error reading prompt file: {e}")
         return loc.get('error_prompt_error')
-    
-    payloadDict = {
-        "temperature": 0.3,
-        "top_p": 0.85,
-        "max_tokens": maxTokens,
-        "stream": False,
-        "stop": ["END_OF_CURATION_REPORT"]
-    }
-
-    if llmUrl.startswith("https://api.arliai.com"):      ## VLLM API/models
-        payloadDict["repetition_penalty"] = 1.1
-        payloadDict["top_k"] = 40
-        payloadDict["frequency_penalty"] = 0.3
-        payloadDict["presence_penalty"] = 0.3
-        payloadDict["min_p"] = 0.0
 
     headers = {
         'Content-Type': 'application/json',
         'Authorization': f"Bearer {llmKey}"
     }
+
+    # Baseline parameters for modern LLMs (Summarization/Curation context)
+    temperature = 0.7
+    top_p = 0.9
+    
+    # Adjust ArliAI specifics (Qwen context)
+    is_arliai = llmUrl.startswith("https://api.arliai.com")
 
     max_retries = int(config.get('LLM', 'MAX_RETRIES', fallback=5))
     initial_backoff = float(config.get('LLM', 'INITIAL_BACKOFF_SECONDS', fallback=2.0))
@@ -132,8 +124,23 @@ def aiIntro(llmKey, llmModel, llmUrl, startTime, endTime, combinedComment, maxTo
     while True:
         current_model = model_manager.current_model
         
-        payloadDict["model"] = current_model
-        payloadDict["messages"] = construct_messages(llmUrl, current_model, systemPrompt, userPrompt)
+        payloadDict = {
+            "model": current_model,
+            "messages": construct_messages(llmUrl, current_model, systemPrompt, userPrompt),
+            "temperature": temperature,
+            "top_p": top_p,
+            "max_tokens": maxTokens,
+            "stream": False,
+            "stop": ["END_OF_CURATION_REPORT"]
+        }
+
+        if is_arliai:
+            payloadDict["frequency_penalty"] = 0.3
+            payloadDict["presence_penalty"] = 0.3
+            payloadDict["repetition_penalty"] = 1.1
+            payloadDict["top_k"] = 40
+            payloadDict["min_p"] = 0.05
+
         payload = json.dumps(payloadDict)
 
         for attempt in range(max_retries):
@@ -148,7 +155,7 @@ def aiIntro(llmKey, llmModel, llmUrl, startTime, endTime, combinedComment, maxTo
 
                 # Post-process to remove any <think>...</think> blocks that the model might still include.
                 cleanedResponse = re.sub(r'<think>.*?</think>', '', str(rawResponse), flags=re.DOTALL).strip()
-                cleanedResponse = re.sub(r'<thought>.*?</thought>', '', str(rawResponse), flags=re.DOTALL).strip()
+                cleanedResponse = re.sub(r'<thought>.*?</thought>', '', cleanedResponse, flags=re.DOTALL).strip()
 
                 print(f"Intro Response before cleaning: {rawResponse}")
                 print(f"Intro Response after cleaning: {cleanedResponse}")
