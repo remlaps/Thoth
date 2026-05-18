@@ -3,6 +3,7 @@ from decimal import Decimal
 import configparser
 import logging
 
+from steemHelpers import initialize_steem_with_retry
 import utils
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,6 @@ config = configparser.ConfigParser()
 config.read('config/config.ini')
 
 steemApi = config.get('STEEM', 'STEEM_API')
-s = Steem(node=steemApi) if steemApi else Steem()
 
 screenedDelegateeFile = config.get('WALLET', 'SCREENED_DELEGATEE_FILE')
 uncountedDelegateeFile = config.get('WALLET', 'UNCOUNTED_DELEGATEE_FILE')
@@ -31,8 +31,11 @@ def _get_authors_delegation_to_thoth(author: str, steem_instance=None) -> Decima
         If the author makes no delegations to Thoth, returns Decimal('0').
     """
     steemApi = config.get('STEEM', 'STEEM_API')
-    s = steem_instance or (Steem(node=steemApi) if steemApi else Steem())
-    thothAccount = config.get('STEEM', 'POSTING_ACCOUNT')
+    s = steem_instance or initialize_steem_with_retry(node_api=steemApi)
+    if not s:
+        return Decimal('0')
+        
+    thothAccount = config.get('STEEM', 'POSTING_ACCOUNT', fallback='').strip().lower().replace('@', '')
                               
     last_delegatee = ''
     batch_size = 100
@@ -48,7 +51,7 @@ def _get_authors_delegation_to_thoth(author: str, steem_instance=None) -> Decima
 
         for delegation in data[start_idx:]:
             delegatee = delegation['delegatee']
-            if delegatee == thothAccount:
+            if delegatee.lower() == thothAccount:
                 vests_str = delegation['vesting_shares'].split(' ')[0]
                 return Decimal(vests_str)
             last_delegatee = delegatee
@@ -70,7 +73,9 @@ def _get_account_vesting_info(author: str, steem_instance=None) -> tuple[float |
         or (None, None, None) if the account is not found or data is missing.
     """
     steemApi = config.get('STEEM', 'STEEM_API')
-    s = steem_instance or (Steem(node=steemApi) if steemApi else Steem())
+    s = steem_instance or initialize_steem_with_retry(node_api=steemApi)
+    if not s:
+        return None, None, None
 
     try:
         account = s.get_account(author)
@@ -123,11 +128,14 @@ def totalScreenedOrIgnoredDelegations (delegator, delegateeFile=screenedDelegate
         return 0.0
     
     steemApi = config.get('STEEM', 'STEEM_API')
-    s = steem_instance or (Steem(node=steemApi) if steemApi else Steem())
+    s = steem_instance or initialize_steem_with_retry(node_api=steemApi)
+    if not s:
+        return 0.0
 
     try:
         with open(delegateeFile, 'r') as f:
-            screenedDelegatees = {line.strip() for line in f if line.strip()}
+            # Normalize account names: remove '@' prefix and convert to lowercase for robust matching
+            screenedDelegatees = {line.strip().lower().replace('@', '') for line in f if line.strip()}
     except FileNotFoundError:
         logger.warning(f"Screened delegatee file not found at '{delegateeFile}'. Returning 0.")
         return 0.0
@@ -149,7 +157,8 @@ def totalScreenedOrIgnoredDelegations (delegator, delegateeFile=screenedDelegate
         for delegation in data[start_idx:]:
             delegatee = delegation['delegatee']
             vests_str = delegation['vesting_shares'].split(' ')[0]
-            if delegatee in screenedDelegatees:
+            # Ensure case-insensitive matching against normalized list
+            if delegatee.lower() in screenedDelegatees:
                 total_vests += Decimal(vests_str)
             last_delegatee = delegatee
 
@@ -174,9 +183,12 @@ def _isPowerDownTooHigh(author: str, steemInstance=None) -> bool:
 
     if ( not steemInstance ):
         steemApi = config.get('STEEM', 'STEEM_API')
-        s = Steem(node=steemApi) if steemApi else Steem()
+        s = initialize_steem_with_retry(node_api=steemApi)
     else:
         s = steemInstance
+    
+    if not s:
+        return False
 
     try:
         authorAccountJson = s.get_account(author)
@@ -224,18 +236,21 @@ def check_author_wallet(author: str, steem_instance=None) -> bool:
         # Calculate penalty only for this check, using raw delegated vests
         thoth_delegation = _get_authors_delegation_to_thoth(author, steem_instance=steem_instance)
         unCountedVests = totalScreenedOrIgnoredDelegations(delegator=author, delegateeFile=uncountedDelegateeFile, steem_instance=steem_instance)
+        
         # The penalty is the total outgoing delegations, minus any "free passes"
-        delegationPenalty = delegated_vesting_shares - float(thoth_delegation) - unCountedVests
+        delegationPenalty = max(0.0, delegated_vesting_shares - float(thoth_delegation) - unCountedVests)
 
         logger.info(f"--- Checking author: @{author} ---")
         logger.info(f"Vesting Shares: {vesting_shares:,.6f} VESTS")
         logger.info(f"Delegated Vesting Shares: {delegated_vesting_shares:,.6f} VESTS")
+        logger.info(f"Thoth Delegation: {float(thoth_delegation):,.6f} VESTS")
         logger.info(f"Uncounted Delegations: {unCountedVests:,.6f} VESTS")
         logger.info(f"Delegation Penalty (after uncounted): {delegationPenalty:,.6f} VESTS")
 
         # 2. Calculate delegation percentage
         if vesting_shares > 0:
-            delegation_percentage = (delegationPenalty / vesting_shares) * 100
+            # We use the adjusted penalty for the percentage check
+            delegation_percentage = (delegationPenalty / vesting_shares) * 100.0
         else:
             delegation_percentage = 0.0
         
@@ -248,7 +263,11 @@ def check_author_wallet(author: str, steem_instance=None) -> bool:
             
         logger.info(f"Current STEEM per MVEST: {steem_per_mvest:.6f}")
 
-        undelegated_vests = vesting_shares - delegated_vesting_shares
+        # Safe delegations (to Thoth or uncounted services) are treated as 
+        # "available" skin-in-the-game for the MIN_UNDELEGATED_SP check.
+        # This prevents authors from being rejected just for delegating to safe partners.
+        effective_delegated_vests = delegationPenalty
+        undelegated_vests = vesting_shares - effective_delegated_vests
         undelegated_sp = (undelegated_vests / 1_000_000) * steem_per_mvest
         logger.info(f"Undelegated SP: {undelegated_sp:,.3f}")
 

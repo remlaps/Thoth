@@ -194,12 +194,12 @@ class ContentScorer:
                     'engagement': round(engagement_score, 2)
                 },
                 'details': {
-                    'author_reputation': post['author_reputation'],
-                    'net_votes': post['net_votes'],
-                    'pending_payout_value': post['pending_payout_value'],
-                    'total_payout_value': post['total_payout_value'],
-                    'children': post['children'],
-                    'created': post['created'],
+                    'author_reputation': post.get('author_reputation', 0),
+                    'net_votes': post.get('net_votes', 0),
+                    'pending_payout_value': post.get('pending_payout_value', '0.000 SBD'),
+                    'total_payout_value': post.get('total_payout_value', '0.000 SBD'),
+                    'children': post.get('children', 0),
+                    'created': post.get('created', ''),
                     'tags': self._extract_tags(post)
                 }
             }
@@ -551,12 +551,21 @@ class ContentScorer:
         """Score post engagement based on votes, comments, value, and feed reach."""
         try:
             # Basic engagement metrics
-            author = post['author']
-            permlink = post['permlink']
-            net_votes = post['net_votes']
-            children = post['children']
-            pending_payout = float(post['pending_payout_value'].split()[0])
-            total_payout = float(post['total_payout_value'].split()[0])
+            author = post.get('author', '')
+            permlink = post.get('permlink', '')
+            
+            # Robustly fetch net_votes (handle potential stale summary data)
+            net_votes = int(post.get('net_votes', 0))
+            # Check if net_votes is 0 and active_votes exist and are not empty
+            # This handles cases where summary APIs might return 0 for net_votes but the full content has votes
+            if net_votes == 0 and post.get('active_votes') and isinstance(post['active_votes'], list) and len(post['active_votes']) > 0:
+                logger.debug(f"Net votes was 0, but active_votes found. Using len(active_votes) as fallback for {author}/{permlink}.")
+                # Fallback to the length of the active_votes list if net_votes is 0 but votes exist
+                net_votes = len(post['active_votes'])
+                
+            children = int(post.get('children', 0))
+            pending_payout = float(str(post.get('pending_payout_value', '0.000 SBD')).split()[0])
+            total_payout = float(str(post.get('total_payout_value', '0.000 SBD')).split()[0])
             total_value = pending_payout + total_payout
 
             # Load scaling params and weights from pre-loaded config
