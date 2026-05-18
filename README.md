@@ -82,7 +82,8 @@ Customize the `config/config.ini` file to your preferences.
 | `LLM`     | `LLM_ENABLE_MODEL_SWITCHING`    | Enable automatic model switching when the current model is rate-limited (HTTP 429 or 503 overloaded). Default: `False`. Set to `True` to enable fallback to the next model in the `LLM_MODEL` list. Requires a comma-separated model list to be effective.                   |
 | `LLM`     | `LLM_MODEL_SWITCHING_DRY_RUN`   | When enabled (`True`) along with `LLM_ENABLE_MODEL_SWITCHING`, logs rate-limit events and marks models as rate-limited, but does **not** actually switch to the next model. Useful for observation and testing before enabling live switching. Default: `False`.                   |
 | `STEEM`   | `STEEM_API`                     | The Steem node to connect to (e.g., `https://api.steemit.com`). Leave blank for default.                  |
-| `STEEM`   | `STREAM_TYPE`                   | `ACTIVE` (recent posts), `HISTORY` (from last run), or `RANDOM`.                          |
+| `STEEM`   | `STREAM_TYPE`                   | `ACTIVE` (recent posts), `HISTORY` (from last run), `RANDOM`, or `TIME_WEIGHTED_RANDOM`.                          |
+| `STEEM`   | `STREAM_TIME_WEIGHT`            | Time-bias weight for `TIME_WEIGHTED_RANDOM`; 0 = uniform, >0 favors recent blocks. Default: `1.0`. |
 | `STEEM`   | `DEFAULT_START_BLOCK`         | The block number to start from if no history is found.                                                  |
 | `BLOG`    | `NUMBER_OF_REVIEWED_POSTS`      | The number of posts to find and review before generating the curation summary (max 5).                            |
 | `BLOG`    | `NUMBER_OF_DELEGATORS_PER_POST` | The number of top delegators to include as beneficiaries in each reply post (max 5).                              |

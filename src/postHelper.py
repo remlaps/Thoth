@@ -1,5 +1,6 @@
 from steem import Steem
 import random
+import os
 import string
 import configparser
 import datetime
@@ -9,6 +10,7 @@ import delegationInfo
 import threading
 import utils
 from localization import Localization
+from steemHelpers import initialize_steem_with_retry
 
 import replyHelper # From the thoth package
 
@@ -67,26 +69,28 @@ def create_beneficiary_list(beneficiary_list):
     
     # Convert to list of dictionaries and sort alphabetically by account
     beneficiary_dicts = [{"account": account, "weight": weight} 
-                         for account, weight in account_weights.items()]
+                         for account, weight in account_weights.items() if weight > 0]
     beneficiary_dicts.sort(key=lambda x: x["account"])
     
     # Return the beneficiaries list to be inserted into extensions
     return beneficiary_dicts
 
-def vote_in_background(postingAccount, permlink, voteWeight=100):
+def vote_in_background(postingAccount, permlink, voteWeight=100, keys=None):
     """
     Waits for an initial period, then attempts to vote in a loop until successful.
     Retries every 3 seconds upon any failure.
     """
-    s_vote = Steem()
+    steemApi = config.get('STEEM', 'STEEM_API')
     retry_delay_seconds = 3
+    max_retries = 20
+    retries = 0
 
     print(f"Waiting {initialWaitSeconds // 60} minutes before attempting to vote for @{postingAccount}/{permlink}...")
     time.sleep(initialWaitSeconds)
-    max_retries=20
-    retries=0
 
     while retries < max_retries:
+        # Re-initialize or get instance inside loop for retry resilience
+        s_vote = initialize_steem_with_retry(node_api=steemApi, keys=keys)
         try:
             print(f"Attempting to vote for @{postingAccount}/{permlink}...")
             s_vote.commit.vote(f"@{postingAccount}/{permlink}", voteWeight, postingAccount)
@@ -98,19 +102,19 @@ def vote_in_background(postingAccount, permlink, voteWeight=100):
             retries += 1
 
 def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None, full_delegations=None):
-    postingKey=config.get('STEEM', 'POSTING_KEY')
-    steemApi=config.get('STEEM', 'STEEM_API')
+    # Safely retrieve posting key from environment or config.
+    # Note: UNLOCK is handled internally by the Steem library for wallet users.
+    postingKey = os.environ.get('POSTING_KEY')
+    if not postingKey:
+        postingKey = config.get('STEEM', 'POSTING_KEY', fallback=None)
+        
+    steemApi = config.get('STEEM', 'STEEM_API', fallback=None)
 
     # Connect to the STEEM blockchain
     randValue = ''.join(random.choices(string.ascii_lowercase, k=10))
-    if ( steemApi and postingKey):
-        s = Steem(keys=[postingKey], nodes=[steemApi])
-    elif ( steemApi ):
-        s = Steem(nodes=[steemApi])
-    elif ( postingKey ):
-        s = Steem(keys=[postingKey])
-    else:
-        s = Steem()
+    s = initialize_steem_with_retry(node_api=steemApi, keys=[postingKey] if postingKey else None)
+    if not s:
+        return False
 
     # Get the model that was actually used (from model_manager if provided, otherwise use config)
     if model_manager:
@@ -227,7 +231,7 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
         'percent_steem_dollars': 10000,
         'allow_votes': True,
         'allow_curation_rewards': True,
-        'extensions': [[0, { }]]
+        'extensions': []
     }
 
     print (f"Body: {body}")
@@ -286,7 +290,9 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
                     print(f"Waiting 6 seconds before attempting next reply, if any...")
                     time.sleep(6) # Also wait if an error occurs before trying the next one
         except Exception as E:
-            print (E)
+            import traceback
+            print (f"Error during main curation post attempt: {E}")
+            traceback.print_exc()
             print ("Sleeping 1 minute before retry...")
             time.sleep(60)
             retryCount += 1
@@ -295,7 +301,8 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
         return False
     
     if not dry_run:
-        voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, votePercent))
+        posting_keys = [postingKey] if postingKey else None
+        voting_thread = threading.Thread(target=vote_in_background, args=(postingAccount, permlink, votePercent, posting_keys))
         voting_thread.daemon = True  # Allow main program to exit even if this thread is sleeping
         voting_thread.start()
         active_voting_threads.append(voting_thread) # Add the main post's voting thread

@@ -5,6 +5,45 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.11] - 2026-04-15
+### Added
+- **New Stream Type**: Introduced `TIME_WEIGHTED_RANDOM` in `main.py`, allowing users to bias block selection toward recent activity via the new `STREAM_TIME_WEIGHT` configuration setting.
+### Changed
+- **AI Model Parameters**: Standardized baseline parameters (`temperature` 0.7, `top_p` 0.9) and refined ArliAI-specific settings (`min_p` 0.05) to improve the creative quality of curation summaries and introductions.
+- **Prompt Construction**: Simplified `promptHelper.py` by standardizing on System/User role separation for all providers, removing legacy message-merging logic used for specific model combinations.
+- **Logic Refactoring**: Consistently implemented payload construction within the model-selection loops in `aiCurator.py` and `aiIntro.py`.
+### Fixed
+- **AI Response Cleaning**: Resolved a logic error in regex post-processing where reasoning blocks (`<thought>` tags) were being stripped from the raw response instead of the intermediate cleaned string, ensuring reliable removal of internal AI thoughts.
+
+## [0.1.10] - 2026-04-13
+### Added
+- **Diagnostics Tool**: Completely rebuilt `tools/checkValidation.py` from the ground up to use the production `HybridScreening` engine.
+  - Supports both `@author` (checks latest post) and `@author/permlink` targets.
+  - Provides a comprehensive "Author Status Summary" including eligibility checks, history usage, and wallet flags.
+  - Displays detailed score breakdowns for Author, Content, and Engagement quality metrics.
+  - Injects dummy keys to allow diagnostic runs without active private keys or LLM API access.
+### Changed
+- **Blockchain Connectivity**: Standardized all Steem connections to use the `initialize_steem_with_retry` helper, ensuring the `STEEM_API` configuration is respected globally and improving resilience against transient network errors.
+- **Helper Functions**: Updated `initialize_steem_with_retry` in `steemHelpers.py` to support signing keys for posting and voting operations.
+- **Diagnostic Tool**: `checkValidation.py` now explicitly re-fetches full post content using `get_content` after identifying the latest post by an author. This resolves an issue where `net_votes` and other engagement metrics were reported as 0 due to stale data from `get_discussions_by_author_before_date` summary calls.
+- **Content Scoring**: Enhanced `contentScoring.py` to robustly calculate `net_votes`. If `net_votes` is reported as 0 but `active_votes` are present, the count of `active_votes` is used as a fallback.
+- **Blockchain Connectivity**: `STEEM_API` now supports comma-separated lists of nodes, restoring failover capabilities while maintaining standardization.
+
+### Fixed
+- **Connection Stability**: Fixed a frequent crash caused by a bug in the `steem-python` library (`UnboundLocalError: cannot access local variable 'error'`) by wrapping connection logic in a robust retry mechanism.
+- **Posting Logic**: Resolved RPC errors during broadcast by removing conflicting extension initializations in `comment_options`.
+- **Beneficiary Handling**: Prevented "Zero Weight" rejections by filtering out accounts with no assigned weight.
+- **Beneficiary Limits**: Updated `ConfigValidator` and `replyHelper.py` to strictly enforce the Steem blockchain's 8-beneficiary limit.
+- **Wallet Validation**: Resolved issue where delegations to uncounted services (e.g., steem-atlas) were still being penalized.
+  - Implemented robust name normalization for the `UNCOUNTED_DELEGATEE_FILE` list (lowercase matching and `@` prefix removal).
+  - Updated `MIN_UNDELEGATED_SP` check to treat "safe" delegations (Thoth + Uncounted list) as part of the author's available skin-in-the-game.
+  - Fixed case-sensitivity when matching the Thoth posting account in delegation lists.
+- **Content Logic**: Fixed `KeyError` crashes in the scoring engine when blockchain data (e.g., `net_votes`, `children`) is missing or malformed by implementing safe defaults.
+- **Content Logic**: Fixed a crash in the `isEdit` rule that occurred when the post body was absent.
+- **Maintenance**: Updated `checkValidation.py` to use timezone-aware UTC objects, resolving Python deprecation warnings.
+- **Authentication**: Ensured background voting threads correctly inherit signing authority (either via `UNLOCK` environment variable or explicit `POSTING_KEY`).
+- **Robustness**: Updated `vote_in_background` signatures in `postHelper.py` and `replyHelper.py` to support passing keys to the retry-enabled Steem initializer.
+
 ## [0.1.9] - 2026-04-09
 ### Added
 - **Feed Reach Screening System**: New rule in hybrid screening sequence based on post visibility metrics
