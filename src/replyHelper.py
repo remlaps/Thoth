@@ -8,6 +8,7 @@ import delegationInfo
 import threading
 import utils
 import steembase.exceptions # Required for specific exception handling
+import version
 from steemHelpers import initialize_steem_with_retry
 from localization import Localization
 
@@ -239,7 +240,7 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
     )
 
     metadata = {
-        "app": "Thoth/0.0.1"
+        "app": f"Thoth/{version.__version__}"
     }
 
     comment_options = {

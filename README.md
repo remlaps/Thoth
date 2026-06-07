@@ -1,4 +1,5 @@
 # Thoth
+**Version:** 0.1.12-beta
 
 ## Project Diagram
 ![Description of Diagram](images/thothGen5Framework.png)
