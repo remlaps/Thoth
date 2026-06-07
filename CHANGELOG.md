@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.12-beta] - 2026-04-20
+### Changed
+- **AI Prompts**: Refined System and User curation prompts to enhance evaluation accuracy and thematic consistency in post summaries. These changes were validated through several weeks of testing.
+- **Versioning**: Updated code version and status to 0.1.12-beta.
+
 ## [0.1.11] - 2026-04-15
 ### Added
 - **New Stream Type**: Introduced `TIME_WEIGHTED_RANDOM` in `main.py`, allowing users to bias block selection toward recent activity via the new `STREAM_TIME_WEIGHT` configuration setting.

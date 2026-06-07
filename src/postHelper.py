@@ -10,6 +10,7 @@ import delegationInfo
 import threading
 import utils
 from localization import Localization
+import version
 from steemHelpers import initialize_steem_with_retry
 
 import replyHelper # From the thoth package
@@ -223,7 +224,7 @@ def postCuration (commentList, aiResponseList, aiIntroString, model_manager=None
     permlink = f"thoth{randValue}"
 
     metadata = {
-        "app": "Thoth/0.0.1"
+        "app": f"Thoth/{version.__version__}"
     }
 
     comment_options = {

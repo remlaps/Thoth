@@ -1,47 +1,41 @@
 /no_think
 
-Evaluate this article and create a curation report.
+Evaluate this article for Thoth curation. Follow the structure strictly.
 
-Start immediately with your response - no thinking blocks.
+## REQUIREMENTS
+* Language: {language}.
+* Heading Format: ## HEADING (Level 2).
+* Nomenclature: Refer to users as "Steemizens".
 
-## OUTPUT INSTRUCTIONS
-* Follow structure below strictly
-* No preamble (e.g., "Here is the report...")
-* If article qualifies, start with `## {key_takeaways_header}`
-* If not, respond only with `DO NOT CURATE`
+## PHASE 1: EXCLUSION
+If ANY are true, respond ONLY with `DO NOT CURATE` and STOP:
+* Content appears AI-generated, plagiarized, or is a close paraphrase of Wikipedia/encyclopedic sources.
+* Post is primarily an announcement of a contest, giveaway, or token promotion.
+* Is a curator application or a summary of other Steem posts.
+* Contains more than 20% direct quoted material.
 
-## MANDATORY REQUIREMENTS & TERMS
-* The curation report MUST be written in {language}.
-* Use level 2 heading formats for section titles (e.g., "## HEADING").
-* Refer to people who use the Steem blockchain as "Steemizens", not "Steemians".
+## PHASE 2: QUALITY SCORE
+Assess for 7/10 quality. 
+* EXCEPTION (News/Science): Lower the requirement for "personal voice" if the information utility is high.
+* EXCEPTION (Creative): Lower the requirement for "Actionable Value" if narrative craft or emotional resonance is high.
+* EXCEPTION (Contests): Contest entries are permitted if the content demonstrates independent quality.
+* EXCEPTION (Photo Logs): Field notes/technical metadata qualify as "Expertise."
+* REJECTION RULE: If the post is a generic personal diary lacking broader value, or fails the 7/10 threshold, respond ONLY with `DO NOT CURATE`.
 
-## EXCLUSION CONDITIONS (IMMEDIATE ACTION)
-If ANY of the following conditions are true for the article, you MUST respond with ONLY: `DO NOT CURATE` Then STOP. Do not provide explanations or reasoning.
-* Content appears AI-generated or plagiarized
-* Poor writing quality (confusing, repetitive, disorganized)
-* Focuses on gambling, prize contests, giveaways, or any online competitions involving rewards
-* Focuses primarily on cryptocurrency trading advice or token promotion
-* Repetitive phrases, vague generalizations, or a weak or disconnected conclusion
-* Consists mainly of lists, digests, or summaries of other Steem posts
-* Is a curator application or another curation report
-* Cursory, superficial, or generic coverage
-* Absence of value to readers (who, what, where, when, why are missing or vague)
-* Lacks concrete examples, data, or evidence to support claims
-* Shows minimal research effort or fails to cite credible sources when needed
-* Covers topics already extensively discussed without adding new perspectives
-* Uses clickbait titles or sensationalized language
-* Contains more than 20% quoted material from other sources
-
-## CURATION REPORT STRUCTURE (IF NO EXCLUSION CONDITIONS ARE MET)
-If NONE of the EXCLUSION CONDITIONS are met, and the post qualifies for curation, then create a curation report with ONLY the following three sections, 
-in this exact order.
+## PHASE 3: CURATION REPORT
+If qualified, provide ONLY these sections:
 
 ## {key_takeaways_header}
-(Provide 3–4 bullet points. Each bullet should summarize a main insight from the article. Aim for clarity and
-use SEO-friendly keywords where natural.)
+* (For Poetry/Fiction: Summarize the central theme/narrative arc).
+* (For Non-Fiction: List 3-4 main insights).
 
 ## {target_audience_header}
-(Identify who would find this content most valuable and explain why..)
+* [Target Group]: Identify the niche.
+* [Value Proposition]: Explain why this is valuable (e.g., Craft, resonance, utility, or unique perspective).
 
 ## {conversation_starters_header}
-(Formulate 3 distinct, thought-provoking questions related to the article's topic that could spark discussion among Steemizens.)
+1. (Formulate a thought-provoking question for the READERS, not the author).
+2. (Formulate a thought-provoking question for the READERS, not the author).
+3. (Formulate a thought-provoking question for the READERS, not the author).
+
+[STOP_GENERATION]
