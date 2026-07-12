@@ -7,10 +7,12 @@ the binary accept/reject screening with a multi-dimensional scoring approach.
 
 import re
 import json
+import ssl
 import urllib.request
 import urllib.error
 from datetime import datetime, timedelta
 import logging
+import certifi
 
 from steem import Steem
 from steem.account import Account
@@ -452,11 +454,14 @@ class ContentScorer:
             # API endpoint: https://sds.steemworld.org/post_resteems_api/getResteems/author/permlink/limit/offset
             api_url = f"https://sds.steemworld.org/post_resteems_api/getResteems/{author}/{permlink}/1000/0"
             
+            # Create SSL context using certifi's CA bundle (more up-to-date than system default)
+            ssl_context = ssl.create_default_context(cafile=certifi.where())
+            
             # Create GET request
             req = urllib.request.Request(api_url, method='GET')
             
             # Execute the request
-            with urllib.request.urlopen(req, timeout=30) as response:
+            with urllib.request.urlopen(req, timeout=30, context=ssl_context) as response:
                 result = json.loads(response.read().decode('utf-8'))
                 
                 # Check for errors in the response

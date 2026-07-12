@@ -161,7 +161,7 @@ def postReply (comment_item, ai_response_item, item_index, thothAccount, thothPe
     body += f'  </tr><tr>\n'
     body += f'     <td>{display_index}</td>\n'
     body += f'     <td><a href="/thoth/@{comment_item["author"]}/{comment_item["permlink"]}">{repr(comment_item["title"])}</a></td>\n'
-    body += f'     <td>{comment_item["author"]}</td>\n'
+    body += f'     <td>@{comment_item["author"]}</td>\n'
     body += f'   </tr>\n'
     body += f'</table>'
     body += f'<table><tr><td>\n\n{ai_response_item}\n\n' # Use the single ai_response_item
