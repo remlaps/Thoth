@@ -5,6 +5,10 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.13-beta] - 2026-07-12
+### Fixed
+- **SSL Certificate Verification**: Resolved `CERTIFICATE_VERIFY_FAILED` errors when fetching community members and resteem data from `sds.steemworld.org`. Python's default SSL CA bundle was outdated, causing `urllib.request.urlopen()` to reject the server's certificate as expired. Fixed by configuring `ssl.create_default_context(cafile=certifi.where())` for all SDS API calls in `communityValidation.py` and `contentScoring.py`.
+
 ## [0.1.12-beta] - 2026-04-20
 ### Changed
 - **AI Prompts**: Refined System and User curation prompts to enhance evaluation accuracy and thematic consistency in post summaries. These changes were validated through several weeks of testing.

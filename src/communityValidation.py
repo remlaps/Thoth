@@ -1,7 +1,9 @@
 import json
 import logging
+import ssl
 import urllib.request
 import urllib.error
+import certifi
 from steem import Steem
 
 logger = logging.getLogger(__name__)
@@ -84,6 +86,9 @@ def get_community_members(community_tag, steem_instance=None):
         # API endpoint: https://sds.steemworld.org/communities_api/getCommunitySubscribers/community_tag
         api_url = f"{SDS_API_URL}/communities_api/getCommunitySubscribers/{community_tag}"
         
+        # Create SSL context using certifi's CA bundle (more up-to-date than system default)
+        ssl_context = ssl.create_default_context(cafile=certifi.where())
+        
         # Create GET request
         req = urllib.request.Request(
             api_url,
@@ -91,7 +96,7 @@ def get_community_members(community_tag, steem_instance=None):
         )
         
         # Execute the request
-        with urllib.request.urlopen(req, timeout=30) as response:
+        with urllib.request.urlopen(req, timeout=30, context=ssl_context) as response:
             result = json.loads(response.read().decode('utf-8'))
             
             # Check for errors in the response
