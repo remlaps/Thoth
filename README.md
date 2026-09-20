@@ -1,202 +1,68 @@
 # Thoth
-**Version:** 0.1.12-beta
 
-## Project Diagram
-![Description of Diagram](images/thothGen5Framework.png)
+**Version:** 0.1.13-beta
 
-## Overview
+Thoth is an open-source AI curation bot for the [Steem blockchain](https://steem.com).
 
-Thoth is a curation bot that runs on the Steem blockchain.  It filters posts based upon the Thoth operator's preferences, and then does an evaluation through an LLM API call.  If the LLM decides to curate the post, it will write a summary and include links to the source article.  When all articles have been selected, it also creates a summary/overview post.  These are then posted to the Steem blockchain, as follows:
+## What is Thoth?
 
-- Introductory/overview post  
----> Reply 1 # Summary of curated post 1  
----> Reply 2 # Summary of curated post 2  
----> ...  
----> Reply N #  # Summary of curated post N  
+Thoth is named after the ancient Egyptian god of writing, science, art, wisdom, judgment, and magic. Its mission is to align the incentives of authors and investors toward the production and support of creativity that attracts human eyeballs to the Steem blockchain.
 
-Each post and reply provides the ability to direct beneficiary rewards to the following recipient roles:
-- Included authors
-- Delegators to the Thoth account
-- The Thoth account, itself
-- @null for reward-burning
+Thoth scans the blockchain for posts — recent and old — screens them against configurable quality rules, and evaluates the strongest candidates with a large language model (LLM). Posts that make the cut are curated: Thoth publishes an overview post with one reply per featured article, links back to the originals, and shares its own post rewards with the accounts who contributed to the effort.
 
-Additionally, Thoth maintains an immutable, on-chain record of its state and run history using a linked list data structure broadcasted via Steem `custom_json` transactions (this can be disabled in the configuration).
+## Why Thoth?
 
-After posting is done, the post and replies receive upvotes from the Thoth account and the blockchain consensus will eventually distribute all rewards as specified in the beneficiary settings.
+On Steem, most post rewards are concentrated in the first 7 days after publication. Once that window closes, even excellent content stops earning and fades from view. Thoth exists to change that dynamic:
 
----
+1. **Additional visibility for creators of lasting value.** Great content should not be forgotten just because it has already paid out. Thoth keeps finding and featuring quality posts long after their original payout, giving them additional exposure.  This gives readers a multiple chances to discover the content and it gives curators repeated opportunities to vote for it.
 
-## Thoth’s Flywheel (Incentive Model)
+2. **Reward streams that extend beyond the 7-day default.** Featured authors are set as beneficiaries of Thoth's posts and replies, so they continue to earn from content they may have written weeks, months, or even years ago. Every upvote on Thoth's output can follow beneficiary reward settings back to the original authors (#lifetime-rewards).
 
-Thoth operates as a self-reinforcing  cycle: curated authors, delegators, and the operator are aligned through beneficiary rewards and blockchain incentives.
+3. **Passive rewards for delegators.** Users who delegate Steem Power to the Thoth account are included as beneficiaries of the curation posts on a weighted random basis.  Larger delegations are promortionally more likely to be included as beneficiaries. Delegators receive ongoing passive rewards for supporting the curation effort (#passive-rewards).  Thoth sets delegators free of the requirement, imposed by other delegation services, to submit daily posts as a vehicle for receiving rewards.
 
-<p align="center">
-  <img src="images/ThothFlywheelImage20260215.png" alt="Thoth's Flywheel" width="900">
-</p>
+4. **Less spam.** When rewards are no longer a one-shot, 7-day sprint, the incentive to mass-produce low-effort, plagiarized, or spammy content drops dramatically. When delegators can receive beneficiary rewards without a daily post, the incentive for delegators to create spammy posts on a daily basis is reduced.  By shifting value toward sustained quality, Thoth intends to help the ecosystem reward substance over noise.
 
-This flywheel illustrates how content creation, curation, posting, and reward distribution reinforce one another over time.
-## Installation
+5. **Data dignity for creators.** Thoth's reward model reflects a principle Jaron Lanier calls "data dignity".  This is the idea that people should be compensated for the value their contributions create, rather than having that value extracted without acknowledgment. Where Lanier argues that AI systems should give data creators a stake in what they produce, Thoth applies the same idea on-chain: the authors behind curated content keep earning beneficiary rewards and recognition long after their original payout, instead of being mined once and forgotten.
 
-1. **Set-up a python-steem virtual environment**
+## How Thoth works
 
-For example, here's how to do it in Windows.  
+![Thoth's framework](images/thothGen5Framework.png)
 
-- [Getting steem-python to run on Windows with the latest python version](https://steemit.com/steem-dev/@remlaps/getting-steem-python-to-run)
+1. **Scan** — sample posts from the blockchain via a configurable stream (active, historical, random, or time-weighted-random).
+2. **Screen** — apply rule-based filters (word count, tags, language, blacklists, inactivity, delegation health), then a scoring model (author reputation & growth, content quality, engagement).
+3. **Evaluate** — a large language model summarizes each qualifying post, highlighting key takeaways and target audiences.
+4. **Publish** — each run produces an overview post plus one reply per curated article, each linking back to the original.
+5. **Reward** — Thoth upvotes its output, and the blockchain distributes rewards to any or all of the beneficiaries listed below.
 
-2.  **Clone the repository:**
+Thoth also maintains a tamper-evident, on-chain record of its state and run history as a linked list broadcast via Steem `custom_json` transactions (this can be disabled in the configuration).
 
-    ```bash
-    git clone https://github.com/remlaps/Thoth.git
-    cd Thoth
-    ```
+### Who earns rewards
 
-3.  **Install dependencies:**
+| Recipient | How they earn |
+|---|---|
+| **Curated authors** | A share of the rewards on Thoth's posts and replies for featured content |
+| **Delegators** | Passive rewards for Steem Power delegated to the Thoth account |
+| **Thoth account / operator** | A share that helps keep the operation running |
+| **@null** | Optional reward-burning destination |
 
-    Install the required Python packages using the `requirements.txt` file:
+## The flywheel (incentive model)
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+![Thoth's flywheel](images/ThothFlywheelImage20260215.png)
 
-## Configuration
+Thoth is designed as a self-reinforcing cycle: content creation feeds curation, curation attracts upvotes and delegations, and beneficiary rewards flow back to the authors and delegators who keep the cycle spinning.
 
-Thoth can be configured by editing `config/config.ini` and by using environment variables.
+## Getting started
 
-> **Note on Configuration:** This project is under active development. It is crucial to review all settings in `config/config.ini`, especially those related to post screening and beneficiary rewards. Not all planned screening features are functional at this time.
-
-### 1. API Key (Required)
-
-The LLM API key is required. It is recommended to provide it via an environment variable for better security, but it can also be set in the config file.
-
-*   **(Recommended) Environment Variable:** Set an environment variable named `LLMAPIKEY`. The script will prioritize this method.
-*   **(Alternative) Config File:** If the `LLMAPIKEY` environment variable is not found, the script will use the `LLM_API_KEY` value from `config/config.ini`.
-
-### 2. Config.ini
-
-Customize the `config/config.ini` file to your preferences.
-
-| Section | Key                             | Description                                                                                             |
-|---------|---------------------------------|---------------------------------------------------------------------------------------------------------|
-| `LLM`     | `LLM_API_KEY`                   | Your LLM API Key (used as a fallback if `LLMAPIKEY` env var is not set).                                  |
-| `LLM`     | `LLM_MODEL`                     | The specific model(s) for the LLM API. Use a single model (e.g., `gemini-2.5-pro`) or comma-separated list for fallback (e.g., `gemini-2.5-pro,gemini-2.5-flash`). If the primary model is rate-limited, the system automatically switches to the next available model.                                                 |
-| `LLM`     | `LLM_URL`                       | The base URL for the LLM API endpoint (tested with Google Gemini and ArliAI endpoints).                   |
-| `LLM`     | `LLM_ENABLE_MODEL_SWITCHING`    | Enable automatic model switching when the current model is rate-limited (HTTP 429 or 503 overloaded). Default: `False`. Set to `True` to enable fallback to the next model in the `LLM_MODEL` list. Requires a comma-separated model list to be effective.                   |
-| `LLM`     | `LLM_MODEL_SWITCHING_DRY_RUN`   | When enabled (`True`) along with `LLM_ENABLE_MODEL_SWITCHING`, logs rate-limit events and marks models as rate-limited, but does **not** actually switch to the next model. Useful for observation and testing before enabling live switching. Default: `False`.                   |
-| `STEEM`   | `STEEM_API`                     | The Steem node to connect to (e.g., `https://api.steemit.com`). Leave blank for default.                  |
-| `STEEM`   | `STREAM_TYPE`                   | `ACTIVE` (recent posts), `HISTORY` (from last run), `RANDOM`, or `TIME_WEIGHTED_RANDOM`.                          |
-| `STEEM`   | `STREAM_TIME_WEIGHT`            | Time-bias weight for `TIME_WEIGHTED_RANDOM`; 0 = uniform, >0 favors recent blocks. Default: `1.0`. |
-| `STEEM`   | `DEFAULT_START_BLOCK`         | The block number to start from if no history is found.                                                  |
-| `BLOG`    | `NUMBER_OF_REVIEWED_POSTS`      | The number of posts to find and review before generating the curation summary (max 5).                            |
-| `BLOG`    | `NUMBER_OF_DELEGATORS_PER_POST` | The number of top delegators to include as beneficiaries in each reply post (max 5).                              |
-| `AUTHOR`  | `MIN_BLURT_INACTIVITY_HARD`     | Minimum days since the account was active on Blurt to avoid instant rejection.                            |
-| `AUTHOR`  | `MIN_HIVE_INACTIVITY_HARD`      | Minimum days since the account was active on Hive to avoid instant rejection.                             |
-| `SCORING` | `MAX_BLURT_INACTIVITY_SCORE`    | Maximum points awarded in the content scoring step for Blurt inactivity.                                  |
-| `SCORING` | `MAX_HIVE_INACTIVITY_SCORE`     | Maximum points awarded in the content scoring step for Hive inactivity.                                   |
-| `ENGAGEMENT` | `FEED_REACH_SCREENING_ENABLED` | Enable feed reach screening rule. Default: `False`                                                       |
-| `ENGAGEMENT` | `FEED_REACH_MIN`             | Minimum required feed reach (audience size) for posts to pass screening. Default: `10`                    |
-| `ENGAGEMENT` | `FEED_REACH_MAX`             | Maximum feed reach value used for scaling engagement score. Default: `10000`                             |
-| `ENGAGEMENT` | `FEED_REACH_WEIGHT`          | Weight of feed reach metric in engagement scoring. Default: `0.1`                                        |
-| `BLOG`    | `CURATED_AUTHOR_WEIGHT`         | The beneficiary weight (e.g., 1000 for 10%) for each curated author in the top-level post.                                      |
-| `BLOG`    | `DELEGATOR_WEIGHT`              | The beneficiary weight for each included delegator in the top-level post.                                                     |
-| `BLOG`    | `POSTING_ACCOUNT_WEIGHT`        | The beneficiary weight for the Thoth account itself.                                                    |
-
-#### Beneficiary Reward Settings
-
-The distribution of post rewards to beneficiaries is highly configurable but must follow Steem blockchain rules. Please review these settings carefully.
-
-*   **Weight Limit:** The sum of all beneficiary weights cannot exceed `10000` (which represents 100.00%). You must ensure your configuration respects this limit. The formula for the main summary post is:
-    `(`NUMBER_OF_DELEGATORS_PER_POST` * `DELEGATOR_WEIGHT`) + (`NUMBER_OF_REVIEWED_POSTS` * `CURATED_AUTHOR_WEIGHT`) + `POSTING_ACCOUNT_WEIGHT` <= 10000`
-*   **Beneficiary Count Limit:** Steem allows a maximum of 8 beneficiaries per post. The bot logic has a soft limit of 6 beneficiaries (delegators + curated authors) to leave room for other beneficiary types (i.e. @null and the posting account).
-*  **Value adjustments:** Author and delegator settings will be adjusted from the specified values for Thoth's reply posts.
-
-#### Model Switching for Rate-Limit Resilience
-
-If you provide a comma-separated list of models in `LLM_MODEL`, Thoth can automatically switch to the next model if the current one becomes rate-limited. This provides built-in resilience against LLM API rate-limiting.
-
-**Configuration Example:**
-```ini
-[LLM]
-LLM_MODEL = gemini-2.5-pro,gemini-2.5-flash,gemini-2.0-flash
-LLM_ENABLE_MODEL_SWITCHING = True
-LLM_MODEL_SWITCHING_DRY_RUN = False
-```
-
-**Recommended Rollout Strategy:**
-
-1. **Initial Deployment (Safe Default)**
-   - `ARLIAI_ENABLE_MODEL_SWITCHING = False`
-   - `ARLIAI_MODEL_SWITCHING_DRY_RUN = False`
-   - Behavior: Falls back to standard retry/backoff if rate-limited; does not switch models.
-
-2. **Observation Phase (Dry-Run Mode)**
-   - `ARLIAI_ENABLE_MODEL_SWITCHING = True`
-   - `ARLIAI_MODEL_SWITCHING_DRY_RUN = True`
-   - Behavior: Logs rate-limit events and records which models *would* be switched to, but continues using the current model. Good for validating model list and observing behavior without production impact.
-
-3. **Live Rollout (Full Switching)**
-   - `ARLIAI_ENABLE_MODEL_SWITCHING = True`
-   - `ARLIAI_MODEL_SWITCHING_DRY_RUN = False`
-   - Behavior: When rate-limited, automatically switches to the next model in the list and retries the request. Provides automatic resilience against rate-limiting.
-
-**Logging and Monitoring:**
-When model switching is enabled, watch your logs for:
-- `WARNING - Marking model as rate limited: <model-name>`
-- `WARNING - Switching to next model: <new-model> (Rate limited models: [...])`
-- `ERROR - No more models available. All models rate limited: [...]`
-
-These messages indicate the bot's response to rate-limiting and help validate that fallback models are working as intended.
-
-
-## Usage
-
-To run the bot, you need to activate your ```steem-python``` virtual environment and set the necessary environment variables.  Here's an exampe bat file for Windows.
-
-### Windows (`run.bat`)
-
-```bat
-@echo off
-REM Activate the steem-python virtual environment
-call C:\path\to\your\virtual_env\Scripts\activate
-
-REM Set environment variables to UNLOCK the Steem wallet and the LLM API key.
-REM Using "set" makes these variables temporary (only for this command window).
-REM For a permanent key, use 'setx LLMAPIKEY "your_key_here"' in a separate command prompt.
-set UNLOCK=your_steem_wallet_password
-set LLMAPIKEY=your_llm_api_key
-
-REM Run Thoth from its source directory
-cd /d C:\path\to\your\Thoth\
-python src\main.py
-
-echo.
-echo Thoth has finished.
-
-REM Deactivate the virtual environment to clean up the session
-call deactivate
-
-pause
-```
+Ready to run your own instance? Follow the **[Installation & Configuration Guide](INSTALLATION.md)** — it covers prerequisites, installation steps, every configuration parameter with suggested starting values, and security best practices.
 
 ## Contributing
 
-Contributions are welcome! If you find a bug or have a feature request, please open an issue on GitHub. If you'd like to contribute code, please fork the repository and submit a pull request.
-
-### Needs
-- Check the [Issues](https://github.com/remlaps/Thoth/issues) section
-- Improve the appearance and information content for Thoth's posts and replies
-- Provide options for Thoth to create posts in languages other than English
-- Provide options to use additional LLM models
-- Preprocessing before handing off to the LLM
-   - Replace screening with scoring where possible/appropriate
-   - Add a ML/reinforcement learning layer for post recommendations in order to improve picks over time
-   - Screen for uniqueness (plagiarism, syndication, cross-posting, repetitive posting, etc.)
-   - Screen for AI authorship
-- What are your ideas?
+Contributions are welcome! Please open an [issue](https://github.com/remlaps/Thoth/issues) for bugs or feature ideas and submit pull requests for code changes.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+MIT License — see the [LICENSE](LICENSE) file.
 
 ## Disclaimer
 
-This software is provided as-is, without any warranty. Use at your own risk.
+This software is provided as-is, without warranty of any kind. Use at your own risk. No rate of return is guaranteed or implied.
