@@ -2,7 +2,7 @@
 
 This guide is written for **developers and operators** who want to install, configure, and run a Thoth AI curation bot instance on the Steem blockchain.
 
-> **Version note:** This guide matches Thoth **0.1.13-beta**. The project is under active development — after every upgrade, review `config/config.ini`, especially settings related to post screening and beneficiary rewards.
+> **Version note:** This guide matches Thoth **0.1.14-beta**. The project is under active development — after every upgrade, review `config/config.ini`, especially settings related to post screening and beneficiary rewards.
 
 > **Secret note:** Every key, password, or token shown in this document is an *obvious placeholder* (e.g., `your_wallet_password_here`). Never paste real API keys, wallet passwords, or posting keys into `config/config.ini`, `config/config.template`, or any file you intend to commit.
 

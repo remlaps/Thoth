@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.14-beta] - 2026-09-20
+### Added
+- **Installation & Configuration Guide**: Added `INSTALLATION.md`, a consolidated guide covering prerequisites, installation steps, environment variables/secrets, a full parameter reference, beneficiary constraints, and troubleshooting. It carries an explicit disclaimer that the installation instructions are **untested** end-to-end.
+- **README**: Added a "data dignity for creators" point to the "Why Thoth?" section, tying Thoth's beneficiary reward model to Jaron Lanier's "data dignity" concept.
+
+### Changed
+- **Configuration Template**: Refreshed `config/config.template` — updated the Gemini `LLM_MODEL` list, enabled `LLM_ENABLE_MODEL_SWITCHING` and median-reputation scoring by default, and revised screening/scoring defaults.
+- **Documentation**: Replaced the contents of `docs/configDocumentation.md` with a pointer to `INSTALLATION.md`.
+- **Versioning**: Updated code version and status to 0.1.14-beta.
+
 ## [0.1.13-beta] - 2026-07-12
 ### Fixed
 - **SSL Certificate Verification**: Resolved `CERTIFICATE_VERIFY_FAILED` errors when fetching community members and resteem data from `sds.steemworld.org`. Python's default SSL CA bundle was outdated, causing `urllib.request.urlopen()` to reject the server's certificate as expired. Fixed by configuring `ssl.create_default_context(cafile=certifi.where())` for all SDS API calls in `communityValidation.py` and `contentScoring.py`.

@@ -1,6 +1,6 @@
 # Thoth
 
-**Version:** 0.1.13-beta
+**Version:** 0.1.14-beta
 
 Thoth is an open-source AI curation bot for the [Steem blockchain](https://steem.com).
 
